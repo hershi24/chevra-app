@@ -110,13 +110,14 @@ export function GalleryView() {
               type="button"
               onClick={() => setActiveId(item.id)}
               className="group relative overflow-hidden rounded-2xl bg-muted"
+              aria-label={item.caption || item.eventLabel}
             >
               <div className="aspect-square">
                 {item.type === "image" ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.url}
-                    alt={item.caption || item.eventLabel}
+                    alt=""
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
                   />
                 ) : (
@@ -237,7 +238,7 @@ function LightboxBody({
             src={item.url}
             controls
             playsInline
-            className="mx-auto max-h-[70vh] w-full bg-black"
+            className="mx-auto max-h-[70vh] w-auto max-w-full"
           />
         )}
       </div>
