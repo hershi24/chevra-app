@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
+  Images,
   LayoutDashboard,
   LogOut,
   MessageCircle,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "לוח ראשי", short: "לוח", icon: LayoutDashboard },
   { href: "/journal", label: "יומן החבורה", short: "יומן", icon: BookOpen },
+  { href: "/gallery", label: "גלריה", short: "גלריה", icon: Images },
   { href: "/chat", label: "צ׳אט", short: "צ׳אט", icon: MessageCircle },
   { href: "/settings", label: "הגדרות", short: "הגדרות", icon: Settings },
 ];
@@ -80,7 +82,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
                   title={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-light transition lg:px-3.5",
+                    "flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-light transition lg:px-3.5",
                     active
                       ? "bg-white text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -126,7 +128,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-black/5 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/5 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
         {NAV.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -135,12 +137,12 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 py-2.5 text-[11px] font-light",
+                "flex flex-col items-center gap-1 py-2.5 text-[10px] font-light",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
               <item.icon className="size-5" />
-              {item.label}
+              {item.short}
             </Link>
           );
         })}

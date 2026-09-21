@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatDateHe, memberById } from "@/lib/format";
+import { formatDateHe, gatheringLabel, memberById } from "@/lib/format";
 import { useApp } from "@/components/app-provider";
 
 export function JournalView() {
@@ -29,7 +29,7 @@ export function JournalView() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={cover.url}
-                    alt={event.title}
+                    alt={gatheringLabel(event)}
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
                   />
                 ) : (
@@ -42,7 +42,7 @@ export function JournalView() {
                 </span>
               </div>
               <div className="mt-2.5 space-y-0.5">
-                <div className="truncate text-[13px] font-normal">{event.title}</div>
+                <div className="truncate text-[13px] font-normal">{gatheringLabel(event)}</div>
                 <div className="text-[12px] font-light text-muted-foreground">
                   {formatDateHe(event.startsAt)}
                   {host ? ` · ${host.displayName}` : ""}

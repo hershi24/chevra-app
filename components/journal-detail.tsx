@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   formatDateTimeHe,
+  gatheringLabel,
+  gatheringTitle,
   memberById,
   rsvpLabel,
 } from "@/lib/format";
@@ -84,7 +86,9 @@ export function JournalDetail({
       </Link>
       <div>
         <p className="text-[13px] font-light text-muted-foreground">{formatDateTimeHe(event.startsAt)}</p>
-        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">{event.title}</h1>
+        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">
+          {gatheringTitle(event) ?? gatheringLabel(event)}
+        </h1>
         <p className="mt-2 text-[15px] font-light text-muted-foreground">
           {event.location} · מארח {host?.displayName}
           {lecturer ? ` · שיעור: ${lecturer.displayName}` : ""}

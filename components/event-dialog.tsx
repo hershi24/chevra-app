@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/components/app-provider";
 import type { Member } from "@/lib/types";
@@ -27,6 +28,7 @@ export function EventDialog({
   const members = state?.members ?? [];
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [withTitle, setWithTitle] = useState(false);
 
   async function onSubmit(formData: FormData) {
     setSaving(true);
@@ -36,7 +38,7 @@ export function EventDialog({
       const startsAt = new Date(`${date}T${time}`).toISOString();
       await act({
         type: "createEvent",
-        title: String(formData.get("title")),
+        title: withTitle ? String(formData.get("title") ?? "").trim() : "",
         startsAt,
         location: String(formData.get("location")),
         hostId: String(formData.get("hostId")),
@@ -47,6 +49,7 @@ export function EventDialog({
       });
       toast.success("המפגש נקבע");
       setOpen(false);
+      setWithTitle(false);
       onCreated?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "שמירה נכשלה");
@@ -56,14 +59,41 @@ export function EventDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setWithTitle(false);
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>קביעת מפגש חדש</DialogTitle>
         </DialogHeader>
         <form action={onSubmit} className="grid gap-3">
-          <Field label="כותרת" name="title" defaultValue="חברותא · מפגש החבורה" required />
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3 py-2.5">
+            <div>
+              <Label htmlFor="withTitle" className="text-sm font-normal">
+                כותרת למפגש
+              </Label>
+              <p className="text-[12px] font-light text-muted-foreground">
+                אם מכבים — המפגש יוצג לפי תאריך ונושא בלבד.
+              </p>
+            </div>
+            <Switch
+              id="withTitle"
+              checked={withTitle}
+              onCheckedChange={setWithTitle}
+            />
+          </div>
+          {withTitle ? (
+            <Field
+              label="כותרת"
+              name="title"
+              placeholder="למשל: חברותא · פרשת השבוע"
+            />
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <Field label="תאריך" name="date" type="date" required />
             <Field label="שעה" name="time" type="time" defaultValue="20:30" required />

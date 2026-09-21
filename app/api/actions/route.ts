@@ -39,7 +39,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       for (const member of s.members) rsvps[member.id] = "pending";
       const event: Gathering = {
         id: crypto.randomUUID(),
-        title: body.title.trim() || "מפגש חבורה",
+        title: body.title?.trim() ?? "",
         startsAt: body.startsAt,
         location: body.location.trim(),
         hostId: body.hostId,

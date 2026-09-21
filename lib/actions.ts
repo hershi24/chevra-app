@@ -4,7 +4,7 @@ export type ActionBody =
   | { type: "rsvp"; eventId: string; status: RsvpStatus }
   | {
       type: "createEvent";
-      title: string;
+      title?: string;
       startsAt: string;
       location: string;
       hostId: string;

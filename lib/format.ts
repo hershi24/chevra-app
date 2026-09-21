@@ -9,6 +9,27 @@ export function formatDateHe(iso: string) {
   }).format(new Date(iso));
 }
 
+export function formatDateShortHe(iso: string) {
+  return new Intl.DateTimeFormat("he-IL", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+export function gatheringTitle(event: { title?: string }) {
+  const title = event.title?.trim();
+  return title ? title : null;
+}
+
+export function gatheringLabel(event: {
+  title?: string;
+  topic?: string;
+  startsAt: string;
+}) {
+  return gatheringTitle(event) ?? event.topic?.trim() ?? formatDateHe(event.startsAt);
+}
+
 export function formatTimeHe(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
     hour: "2-digit",
