@@ -1,5 +1,5 @@
 import type { Gathering, Member } from "./types";
-import { formatDateTimeHe, rsvpLabel } from "./format";
+import { formatDateTimeHe, gatheringLabel, rsvpLabel } from "./format";
 
 export function invitationHtml(opts: {
   member: Member;
@@ -33,7 +33,7 @@ export function invitationHtml(opts: {
               <td style="padding:28px 32px 8px;">
                 <p style="margin:0 0 16px;font-size:16px;">שלום ${member.displayName},</p>
                 <p style="margin:0 0 18px;line-height:1.7;">
-                  מחכים לך ב<strong>${event.title}</strong>.
+                  מחכים לך ב<strong>${gatheringLabel(event)}</strong>.
                   לחיצה אחת על הכפתור מעדכנת את ההגעה — בלי צורך להתחבר.
                 </p>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;">

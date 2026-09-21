@@ -56,6 +56,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, active?.id]);
 
+  useEffect(() => {
+    if (channelId || channels.length === 0) return;
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+    const firstRoom = channels.find((c) => c.type !== "dm") ?? channels[0];
+    if (firstRoom) router.replace(`/chat/${firstRoom.id}`);
+  }, [channelId, channels, router]);
+
   if (!state || !me) return null;
 
   const groups = groupChannels(channels);
@@ -150,16 +157,17 @@ export function ChatView({ channelId }: { channelId?: string }) {
       : [];
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] bg-white/50 pb-16 md:h-dvh md:bg-transparent md:pb-0">
+    <div className="flex h-[calc(100dvh-56px)] bg-white/50 pb-16 md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-white/55 md:backdrop-blur-md md:ring-1 md:ring-black/5">
       <aside
         className={cn(
-          "w-full shrink-0 border-e border-black/5 bg-white/90 md:w-80 md:bg-white/70",
+          "w-full shrink-0 border-e border-black/5 bg-white/90 md:w-80 md:bg-transparent",
           active ? "hidden md:flex md:flex-col" : "flex flex-col"
         )}
       >
         <div className="border-b border-black/5 px-4 py-4">
-          <h1 className="font-heading text-xl font-semibold text-primary">צ׳אט החבורה</h1>
-          <p className="text-xs text-muted-foreground">ערוצים, הודעות ושיחות אישיות</p>
+          <h1 className="text-xl font-medium tracking-tight">צ׳אט החבורה</h1>
+          <p className="text-xs font-light text-muted-foreground">ערוצים, הודעות ושיחות אישיות</p>
         </div>
         <ScrollArea className="flex-1">
           <RoomGroup title="ערוצים">
@@ -216,18 +224,18 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
       <section
         className={cn(
-          "min-w-0 flex-1 flex-col bg-[#f7f4ee]",
+          "min-w-0 flex-1 flex-col bg-[#f7f4ee] md:bg-[#faf8f4]/70",
           active ? "flex" : "hidden md:flex"
         )}
       >
         {active ? (
           <>
-            <header className="flex items-center gap-3 border-b border-black/5 bg-white/90 px-3 py-2.5">
+            <header className="flex items-center gap-3 border-b border-black/5 bg-white/90 px-3 py-2.5 md:bg-white/50">
               <Link href="/chat" className="md:hidden" aria-label="חזרה">
                 <ArrowRight className="size-5" />
               </Link>
               <RoomIcon channel={active} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <div className="truncate font-medium">
                   {active.type === "dm"
                     ? dmName(active.name, active.memberIds, me.id, (id) => memberById(state.members, id)?.displayName ?? "")
@@ -238,14 +246,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   {active.description ? ` · ${active.description}` : ""}
                 </div>
               </div>
-              <div className="hidden -space-x-2 space-x-reverse sm:flex">
+              <div className="ms-2 hidden -space-x-2 space-x-reverse sm:flex">
                 {active.memberIds.slice(0, 5).map((id) => (
                   <UserAvatar key={id} member={memberById(state.members, id)} size="sm" />
                 ))}
               </div>
             </header>
 
-            <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4 pb-36 md:pb-4">
+            <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4 pb-36 md:px-6 md:pb-4">
               {messages.map((message) => {
                 const author = memberById(state.members, message.authorId);
                 const mine = message.authorId === me.id;
@@ -255,7 +263,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 return (
                   <article key={message.id} className="flex gap-2">
                     <UserAvatar member={author} size="sm" />
-                    <div className="min-w-0 max-w-[min(100%,36rem)]">
+                    <div className="min-w-0 max-w-[min(100%,42rem)]">
                       <div className="mb-0.5 flex items-baseline gap-2">
                         <span className="text-sm font-medium">{author?.displayName}</span>
                         <span className="text-[11px] text-muted-foreground">
@@ -368,7 +376,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               <div ref={endRef} />
             </div>
 
-            <div className="fixed inset-x-0 bottom-[58px] z-20 border-t border-black/5 bg-white/95 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bottom-auto md:pb-3">
+            <div className="fixed inset-x-0 bottom-[58px] z-20 border-t border-black/5 bg-white/95 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bottom-auto md:bg-white/50 md:pb-3">
               {quote ? (
                 <div className="mb-2 flex items-center justify-between rounded-xl bg-[#f7f1e8] px-3 py-2 text-xs">
                   <span>
@@ -489,6 +497,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

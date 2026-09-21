@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
+  Images,
   LayoutDashboard,
   LogOut,
   MessageCircle,
@@ -17,10 +18,11 @@ import { roleLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "לוח ראשי", icon: LayoutDashboard },
-  { href: "/journal", label: "יומן החבורה", icon: BookOpen },
-  { href: "/chat", label: "צ׳אט", icon: MessageCircle },
-  { href: "/settings", label: "הגדרות", icon: Settings },
+  { href: "/", label: "לוח ראשי", short: "לוח", icon: LayoutDashboard },
+  { href: "/journal", label: "יומן החבורה", short: "יומן", icon: BookOpen },
+  { href: "/gallery", label: "גלריה", short: "גלריה", icon: Images },
+  { href: "/chat", label: "צ׳אט", short: "צ׳אט", icon: MessageCircle },
+  { href: "/settings", label: "הגדרות", short: "הגדרות", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -57,47 +59,56 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <BackgroundLayer />
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-[248px] flex-col border-e border-black/5 bg-white/55 p-5 backdrop-blur-xl md:flex">
-        <Link href="/" className="px-2 pb-8 pt-3">
-          <div className="text-[11px] font-light tracking-[0.22em] text-muted-foreground">CHEVRA</div>
-          <div className="mt-1 text-[1.35rem] font-medium tracking-tight text-foreground">מיין חברה</div>
-        </Link>
-        <nav className="flex flex-1 flex-col gap-0.5">
-          {NAV.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-full px-3 py-2 text-[13px] font-light transition",
-                  active
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:bg-black/4 hover:text-foreground"
-                )}
-              >
-                <item.icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="mt-auto px-1 py-2">
-          <div className="flex items-center gap-3">
-            <UserAvatar member={me} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-normal">{me.displayName}</div>
-              <div className="text-[11px] font-light text-muted-foreground">{roleLabel(me.role)}</div>
+
+      <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-white/70 backdrop-blur-xl md:block">
+        <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
+          <Link href="/" className="min-w-0 shrink-0">
+            <div className="text-[11px] font-light tracking-[0.22em] text-muted-foreground">
+              CHEVRA
             </div>
+            <div className="text-[1.15rem] font-medium leading-none tracking-tight text-foreground">
+              מיין חברה
+            </div>
+          </Link>
+
+          <nav className="flex items-center rounded-full bg-black/[0.035] p-1">
+            {NAV.map((item) => {
+              const active =
+                item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={item.label}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-light transition lg:px-3.5",
+                    active
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="size-3.5" />
+                  {item.short}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="hidden min-w-0 text-end lg:block">
+              <div className="truncate text-[13px] font-normal">{me.displayName}</div>
+              <div className="text-[11px] font-light text-muted-foreground">
+                {roleLabel(me.role)}
+              </div>
+            </div>
+            <UserAvatar member={me} />
             <Button variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label="יציאה">
               <LogOut className="size-4" />
             </Button>
           </div>
         </div>
-      </aside>
+      </header>
 
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/5 bg-white/75 px-4 py-3 backdrop-blur-xl md:hidden">
         <div>
@@ -109,32 +120,29 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
       <main
         className={cn(
-          "md:ms-[248px]",
           isChat
-            ? "pb-0 md:h-dvh md:overflow-hidden"
-            : "px-5 py-6 pb-24 md:px-10 md:py-10 md:pb-10"
+            ? "pb-0 md:h-[calc(100dvh-4rem)] md:overflow-hidden"
+            : "px-5 py-6 pb-24 md:px-8 md:py-10 md:pb-16"
         )}
       >
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-black/5 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/5 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
         {NAV.map((item) => {
           const active =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-                className={cn(
-                "flex flex-col items-center gap-1 py-2.5 text-[11px] font-light",
+              className={cn(
+                "flex flex-col items-center gap-1 py-2.5 text-[10px] font-light",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
               <item.icon className="size-5" />
-              {item.label}
+              {item.short}
             </Link>
           );
         })}

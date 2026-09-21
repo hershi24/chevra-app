@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { invitationHtml, sendEmail } from "@/lib/email";
-import { memberById } from "@/lib/format";
+import { gatheringLabel, memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { readState, updateState } from "@/lib/store";
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     });
     const result = await sendEmail({
       to: member.email,
-      subject: `הזמנה: ${event.title}`,
+      subject: `הזמנה: ${gatheringLabel(event)}`,
       html,
     });
     sent.push({
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       eventId: event.id,
       sentAt: new Date().toISOString(),
       recipients: sent.map((row) => row.to),
-      subject: `הזמנה: ${event.title}`,
+      subject: `הזמנה: ${gatheringLabel(event)}`,
     });
   });
 

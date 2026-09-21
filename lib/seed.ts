@@ -188,7 +188,7 @@ export function createSeed(): AppState {
         {
           id: "img-2",
           type: "image",
-          url: "https://images.unsplash.com/photo-1456513080880-7d93d20d2eb4?auto=format&fit=crop&w=1400&q=80",
+          url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1400&q=80",
           caption: "ספרים על השולחן",
           uploadedBy: "m-david",
           createdAt: past1.toISOString(),
@@ -454,7 +454,7 @@ export function createSeed(): AppState {
         },
         {
           id: "bg-4",
-          url: "https://images.unsplash.com/photo-1456513080880-7d93d20d2eb4?auto=format&fit=crop&w=1800&q=80",
+          url: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1800&q=80",
           label: "לימוד עם ספרים",
           fromGatheringId: "g-past-1",
         },

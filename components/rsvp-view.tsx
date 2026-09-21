@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { formatDateTimeHe } from "@/lib/format";
+import { formatDateTimeHe, gatheringLabel } from "@/lib/format";
 import type { Gathering, Member, RsvpStatus } from "@/lib/types";
 
 export function RsvpView({ token, choice }: { token: string; choice?: string }) {
@@ -70,7 +70,7 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
         {status === "done" && event && member ? (
           <div className="mt-4 space-y-4">
             <p>
-              שלום {member.displayName}, המפגש <strong>{event.title}</strong> יתקיים ב
+              שלום {member.displayName}, המפגש <strong>{gatheringLabel(event)}</strong> יתקיים ב
               {formatDateTimeHe(event.startsAt)}.
             </p>
             <p className="text-sm text-muted-foreground">{event.location}</p>

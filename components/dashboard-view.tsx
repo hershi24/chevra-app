@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import {
   formatDateHe,
   formatTimeHe,
+  gatheringLabel,
+  gatheringTitle,
   memberById,
   rsvpLabel,
 } from "@/lib/format";
@@ -85,66 +87,64 @@ export function DashboardView() {
         </section>
       )}
 
-      <div className="grid min-w-0 gap-10 lg:grid-cols-[1fr_18rem] lg:gap-14">
-        <section className="min-w-0">
-          <div className="mb-5 flex items-baseline gap-3">
-            <h2 className="text-sm font-normal text-muted-foreground">חברות קודמות</h2>
-            <Link href="/journal" className="text-sm font-light text-primary/80 hover:text-primary">
-              היומן
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {recent.map((g) => {
-              const cover = g.media.find((m) => m.type === "image");
-              return (
-                <Link key={g.id} href={`/journal/${g.id}`} className="group block">
-                  <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
-                    {cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={cover.url}
-                        alt={g.title}
-                        className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
-                      />
-                    ) : null}
+      <section>
+        <div className="mb-5 flex items-baseline gap-3">
+          <h2 className="text-sm font-normal text-muted-foreground">חברות קודמות</h2>
+          <Link href="/journal" className="text-sm font-light text-primary/80 hover:text-primary">
+            היומן
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+          {recent.map((g) => {
+            const photo = g.media.find((m) => m.type === "image");
+            return (
+              <Link key={g.id} href={`/journal/${g.id}`} className="group block">
+                <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
+                  {photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={photo.url}
+                      alt={gatheringLabel(g)}
+                      className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
+                    />
+                  ) : null}
+                </div>
+                <div className="mt-2.5">
+                  <div className="truncate text-[13px] font-normal">{gatheringLabel(g)}</div>
+                  <div className="text-[12px] font-light text-muted-foreground">
+                    {formatDateHe(g.startsAt)}
                   </div>
-                  <div className="mt-2.5">
-                    <div className="truncate text-[13px] font-normal">{g.title}</div>
-                    <div className="text-[12px] font-light text-muted-foreground">
-                      {formatDateHe(g.startsAt)}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
-        <section className="min-w-0">
-          <div className="mb-5 flex items-baseline gap-3">
-            <h2 className="text-sm font-normal text-muted-foreground">מה חדש</h2>
-            <Link href="/chat" className="text-sm font-light text-primary/80 hover:text-primary">
-              הצ׳אט
-            </Link>
-          </div>
-          <div className="space-y-4">
-            {latestMessages.map((msg) => {
-              const author = memberById(state.members, msg.authorId);
-              return (
-                <Link key={msg.id} href="/chat" className="flex gap-3">
-                  <UserAvatar member={author} size="sm" />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-normal">{author?.displayName}</div>
-                    <p className="truncate text-[13px] font-light leading-6 text-muted-foreground">
-                      {msg.text}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+      <section>
+        <div className="mb-5 flex items-baseline gap-3">
+          <h2 className="text-sm font-normal text-muted-foreground">מה חדש</h2>
+          <Link href="/chat" className="text-sm font-light text-primary/80 hover:text-primary">
+            הצ׳אט
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {latestMessages.map((msg) => {
+            const author = memberById(state.members, msg.authorId);
+            return (
+              <Link key={msg.id} href="/chat" className="flex gap-3">
+                <UserAvatar member={author} size="sm" />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-normal">{author?.displayName}</div>
+                  <p className="line-clamp-2 text-[13px] font-light leading-6 text-muted-foreground">
+                    {msg.text}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
@@ -166,6 +166,10 @@ function HeroEvent({
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
   const showList = can(me, "viewRsvps");
+  const title = gatheringTitle(event);
+  const topic = event.topic?.trim() || null;
+  const heading = topic || title;
+  const sub = topic && title ? title : null;
 
   return (
     <motion.section
@@ -179,11 +183,13 @@ function HeroEvent({
           <p className="text-[12px] font-light tracking-[0.14em] text-muted-foreground">
             {formatDateHe(event.startsAt)} · {formatTimeHe(event.startsAt)}
           </p>
-          <h2 className="mt-3 text-[1.85rem] font-medium leading-tight tracking-tight md:text-[2.35rem]">
-            {event.topic || event.title}
-          </h2>
-          {event.topic ? (
-            <p className="mt-2 text-sm font-light text-muted-foreground">{event.title}</p>
+          {heading ? (
+            <h2 className="mt-3 text-[1.85rem] font-medium leading-tight tracking-tight md:text-[2.15rem]">
+              {heading}
+            </h2>
+          ) : null}
+          {sub ? (
+            <p className="mt-2 text-sm font-light text-muted-foreground">{sub}</p>
           ) : null}
         </div>
 
