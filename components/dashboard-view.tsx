@@ -42,7 +42,7 @@ export function DashboardView() {
       ?.url;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-14">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10 md:gap-14">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[13px] font-light text-muted-foreground">
@@ -248,7 +248,7 @@ function HeroEvent({
       </div>
 
       {cover ? (
-        <div className="relative hidden min-h-[22rem] md:block">
+        <div className="relative hidden min-h-[28rem] md:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
         </div>

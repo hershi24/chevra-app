@@ -61,7 +61,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div>
         <p className="text-[13px] font-light text-muted-foreground">ניהול חברים, רקעים והזמנות</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">הגדרות</h1>
@@ -222,7 +222,7 @@ export function SettingsView() {
           <CardHeader>
             <CardTitle className="font-medium">חברי החבורה</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-2">
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {state.members.map((member) => (
               <div key={member.id} className="flex items-center gap-2">
                 <UserAvatar member={member} />

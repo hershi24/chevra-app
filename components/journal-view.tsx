@@ -12,12 +12,12 @@ export function JournalView() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <div>
         <p className="text-[13px] font-light text-muted-foreground">תיעוד המפגשים</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">יומן החבורה</h1>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2">
         {items.map((event) => {
           const cover = event.media.find((m) => m.type === "image");
           const host = memberById(state.members, event.hostId);
