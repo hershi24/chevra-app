@@ -61,13 +61,13 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="font-heading text-3xl font-semibold text-primary">הגדרות</h1>
-        <p className="text-sm text-muted-foreground">ניהול חברים, רקעים והזמנות</p>
+        <p className="text-[13px] font-light text-muted-foreground">ניהול חברים, רקעים והזמנות</p>
+        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">הגדרות</h1>
       </div>
 
-      <Card className="bg-white/80">
+      <Card className="rounded-[1.75rem] bg-white/55">
         <CardHeader>
           <CardTitle>החשבון שלי</CardTitle>
         </CardHeader>
@@ -88,9 +88,9 @@ export function SettingsView() {
       </Card>
 
       {can(me, "uploadBackground") ? (
-        <Card className="bg-white/80">
+        <Card className="rounded-[1.75rem] bg-white/55">
           <CardHeader>
-            <CardTitle>רקע · חברות קודמות</CardTitle>
+            <CardTitle className="font-medium">רקע · חברות קודמות</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -138,9 +138,9 @@ export function SettingsView() {
       ) : null}
 
       {can(me, "manageMembers") ? (
-        <Card className="bg-white/80">
+        <Card className="rounded-[1.75rem] bg-white/55">
           <CardHeader>
-            <CardTitle>חברי החבורה</CardTitle>
+            <CardTitle className="font-medium">חברי החבורה</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <ul className="space-y-2">
@@ -218,9 +218,9 @@ export function SettingsView() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-white/80">
+        <Card className="rounded-[1.75rem] bg-white/55">
           <CardHeader>
-            <CardTitle>חברי החבורה</CardTitle>
+            <CardTitle className="font-medium">חברי החבורה</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
@@ -237,9 +237,9 @@ export function SettingsView() {
       )}
 
       {can(me, "sendInvites") ? (
-        <Card className="bg-white/80">
+        <Card className="rounded-[1.75rem] bg-white/55">
           <CardHeader>
-            <CardTitle>הזמנות במייל · לחיצה אחת</CardTitle>
+            <CardTitle className="font-medium">הזמנות במייל · לחיצה אחת</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">

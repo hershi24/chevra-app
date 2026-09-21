@@ -77,28 +77,28 @@ export function JournalDetail({
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <Link href="/journal" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-5xl space-y-8">
+      <Link href="/journal" className="inline-flex items-center gap-1 text-sm font-light text-muted-foreground">
         <ArrowRight className="size-4" />
         חזרה ליומן
       </Link>
       <div>
-        <p className="text-sm text-muted-foreground">{formatDateTimeHe(event.startsAt)}</p>
-        <h1 className="font-heading text-3xl font-semibold text-primary">{event.title}</h1>
-        <p className="mt-1 text-muted-foreground">
+        <p className="text-[13px] font-light text-muted-foreground">{formatDateTimeHe(event.startsAt)}</p>
+        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">{event.title}</h1>
+        <p className="mt-2 text-[15px] font-light text-muted-foreground">
           {event.location} · מארח {host?.displayName}
           {lecturer ? ` · שיעור: ${lecturer.displayName}` : ""}
         </p>
       </div>
 
       {event.topic ? (
-        <p className="rounded-2xl bg-white/70 px-4 py-3 text-sm backdrop-blur-md">
+        <p className="rounded-[1.75rem] bg-white/55 px-5 py-4 text-sm font-light backdrop-blur-md">
           נושא: {event.topic}
         </p>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-xl">גלריה</h2>
+        <h2 className="text-sm font-normal text-muted-foreground">גלריה</h2>
         {can(me, "uploadMedia") ? (
           <>
             <input
@@ -118,8 +118,8 @@ export function JournalDetail({
       </div>
 
       {event.media.length === 0 ? (
-        <Card className="bg-white/70">
-          <CardContent className="py-10 text-center text-muted-foreground">
+        <Card className="rounded-[1.75rem] bg-white/55">
+          <CardContent className="py-10 text-center font-light text-muted-foreground">
             עדיין אין מדיה למפגש הזה. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
           </CardContent>
         </Card>
@@ -156,9 +156,9 @@ export function JournalDetail({
         </div>
       )}
 
-      <Card className="bg-white/80">
+      <Card className="rounded-[1.75rem] bg-white/55">
         <CardHeader>
-          <CardTitle>סיכום השיעור</CardTitle>
+          <CardTitle className="font-medium">סיכום השיעור</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {can(me, "uploadSummary") ? (
@@ -190,9 +190,9 @@ export function JournalDetail({
       </Card>
 
       {can(me, "viewRsvps") ? (
-        <Card className="bg-white/80">
+        <Card className="rounded-[1.75rem] bg-white/55">
           <CardHeader>
-            <CardTitle>אישורי הגעה</CardTitle>
+            <CardTitle className="font-medium">אישורי הגעה</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
