@@ -103,48 +103,39 @@ export function GalleryView() {
           אין מדיה שמתאימה לסינון הזה.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4">
-          {filtered.map((item) => {
-            const author = memberById(state.members, item.uploadedBy);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveId(item.id)}
-                className="group overflow-hidden rounded-2xl bg-muted text-start"
-              >
-                <div className="relative aspect-square">
-                  {item.type === "image" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.url}
-                      alt={item.caption || item.eventLabel}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
-                    />
-                  ) : (
-                    <>
-                      <video
-                        src={item.url}
-                        muted
-                        playsInline
-                        preload="metadata"
-                        className="h-full w-full object-cover"
-                      />
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-                        <Play className="size-8 text-white" fill="currentColor" />
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="px-2.5 py-2">
-                  <div className="truncate text-[12px] font-normal">{item.eventLabel}</div>
-                  <div className="truncate text-[11px] font-light text-muted-foreground">
-                    {author?.displayName} · {formatDateShortHe(item.createdAt)}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 md:gap-3">
+          {filtered.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveId(item.id)}
+              className="group relative overflow-hidden rounded-2xl bg-muted"
+            >
+              <div className="aspect-square">
+                {item.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.url}
+                    alt={item.caption || item.eventLabel}
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <video
+                    src={item.url}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              {item.type === "video" ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <Play className="size-8 text-white" fill="currentColor" />
+                </span>
+              ) : null}
+            </button>
+          ))}
         </div>
       )}
 
