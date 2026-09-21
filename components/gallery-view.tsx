@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Play } from "lucide-react";
+import { Play, X } from "lucide-react";
 import { useApp } from "@/components/app-provider";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   formatDateShortHe,
   memberById,
@@ -72,7 +72,7 @@ export function GalleryView() {
           <select
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}
-            className="h-8 rounded-full border border-black/8 bg-white/80 px-3 text-[13px] text-foreground"
+            className="h-8 min-w-[9rem] rounded-full border border-black/8 bg-white/80 px-3 text-[13px] text-foreground"
           >
             <option value="all">כולם</option>
             {uploaders.map((member) => (
@@ -87,7 +87,7 @@ export function GalleryView() {
           <select
             value={dateSort}
             onChange={(e) => setDateSort(e.target.value as DateSort)}
-            className="h-8 rounded-full border border-black/8 bg-white/80 px-3 text-[13px] text-foreground"
+            className="h-8 min-w-[8rem] rounded-full border border-black/8 bg-white/80 px-3 text-[13px] text-foreground"
           >
             <option value="newest">חדש לישן</option>
             <option value="oldest">ישן לחדש</option>
@@ -139,13 +139,29 @@ export function GalleryView() {
         </div>
       )}
 
-      <Dialog open={Boolean(active)} onOpenChange={(open) => !open && setActiveId(null)}>
-        <DialogContent
-          showCloseButton
-          className="max-h-[92vh] overflow-y-auto sm:max-w-3xl"
+      {active ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setActiveId(null)}
         >
-          <DialogTitle className="text-base font-medium">{active?.eventLabel ?? "גלריה"}</DialogTitle>
-          {active ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.eventLabel}
+            className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h2 className="text-base font-medium">{active.eventLabel}</h2>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="סגירה"
+                onClick={() => setActiveId(null)}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
             <LightboxBody
               item={active}
               authorName={memberById(state.members, active.uploadedBy)?.displayName}
@@ -158,9 +174,9 @@ export function GalleryView() {
                   : undefined
               }
             />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -208,16 +224,21 @@ function LightboxBody({
 }) {
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl bg-black">
+      <div className="overflow-hidden rounded-xl bg-[#111]">
         {item.type === "image" ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.url}
             alt={item.caption || item.eventLabel}
-            className="max-h-[60vh] w-full object-contain"
+            className="mx-auto max-h-[70vh] w-auto max-w-full object-contain"
           />
         ) : (
-          <video src={item.url} controls playsInline className="max-h-[60vh] w-full bg-black" />
+          <video
+            src={item.url}
+            controls
+            playsInline
+            className="mx-auto max-h-[70vh] w-full bg-black"
+          />
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] font-light text-muted-foreground">
