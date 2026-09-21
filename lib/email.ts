@@ -1,0 +1,97 @@
+import type { Gathering, Member } from "./types";
+import { formatDateTimeHe, rsvpLabel } from "./format";
+
+export function invitationHtml(opts: {
+  member: Member;
+  event: Gathering;
+  hostName: string;
+  kibudName?: string;
+  lecturerName?: string;
+  yesUrl: string;
+  noUrl: string;
+}) {
+  const { member, event, hostName, kibudName, lecturerName, yesUrl, noUrl } = opts;
+  return `<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>הזמנה לחברותא</title>
+  </head>
+  <body style="margin:0;background:#f4eee4;font-family:Arial,Helvetica,sans-serif;color:#2c2118;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4eee4;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#fffaf4;border-radius:18px;overflow:hidden;border:1px solid #ead9c4;">
+            <tr>
+              <td style="background:#0f5f59;color:#f8f1e6;padding:28px 32px;">
+                <div style="font-size:13px;letter-spacing:0.08em;">מיין חברה</div>
+                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;">הזמנה למפגש החבורה</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px 8px;">
+                <p style="margin:0 0 16px;font-size:16px;">שלום ${member.displayName},</p>
+                <p style="margin:0 0 18px;line-height:1.7;">
+                  מחכים לך ב<strong>${event.title}</strong>.
+                  לחיצה אחת על הכפתור מעדכנת את ההגעה — בלי צורך להתחבר.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;">
+                  <tr>
+                    <td style="padding:18px 20px;font-size:15px;line-height:1.8;">
+                      <div><strong>מתי:</strong> ${formatDateTimeHe(event.startsAt)}</div>
+                      <div><strong>איפה:</strong> ${event.location}</div>
+                      <div><strong>מארח:</strong> ${hostName}</div>
+                      ${lecturerName ? `<div><strong>שיעור:</strong> ${event.topic ?? ""} · ${lecturerName}</div>` : ""}
+                      ${kibudName ? `<div><strong>כיבוד:</strong> ${kibudName}</div>` : ""}
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding-left:10px;">
+                      <a href="${yesUrl}" style="display:inline-block;background:#0f5f59;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;">מאשר הגעה</a>
+                    </td>
+                    <td>
+                      <a href="${noUrl}" style="display:inline-block;background:#fff;color:#8a3b2b;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #e4c7be;">לא אוכל להגיע</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:28px 0 0;font-size:13px;color:#7b6a5a;">עם אהבה, החבורה</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 24px;font-size:12px;color:#9a8876;">הסטטוס הנוכחי שלך: ${rsvpLabel(event.rsvps[member.id] ?? "pending")}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM || "מיין חברה <chevra@localhost>";
+  if (!key) {
+    return { id: `mock-${Date.now()}`, mock: true as const };
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Resend failed: ${text}`);
+  }
+  return res.json();
+}
