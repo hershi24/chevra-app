@@ -200,7 +200,7 @@ export function JournalDetail({
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between rounded-xl bg-[#f7f1e8] px-3 py-2">
+              <div key={member.id} className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2">
                 <span className="flex items-center gap-2">
                   <UserAvatar member={member} size="sm" />
                   {member.displayName}

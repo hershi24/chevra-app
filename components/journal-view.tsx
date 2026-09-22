@@ -24,7 +24,7 @@ export function JournalView() {
           const isUpcoming = event.status === "upcoming";
           return (
             <Link key={event.id} href={`/journal/${event.id}`} className="group block">
-              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-[#efe6d8]">
+              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-secondary">
                 {cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

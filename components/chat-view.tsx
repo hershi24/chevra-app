@@ -202,7 +202,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 .map((member) => (
                   <button
                     key={member.id}
-                    className="rounded-full bg-[#f7f1e8] px-2 py-1 text-[11px]"
+                    className="rounded-full bg-secondary px-2 py-1 text-[11px] text-secondary-foreground"
                     onClick={async () => {
                       const next = await act({ type: "createDm", memberId: member.id });
                       const dm = next.channels.find(
@@ -224,7 +224,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
       <section
         className={cn(
-          "min-w-0 flex-1 flex-col bg-[#f7f4ee] md:bg-[#faf8f4]/70",
+          "min-w-0 flex-1 flex-col bg-muted md:bg-muted/80",
           active ? "flex" : "hidden md:flex"
         )}
       >
@@ -273,7 +273,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       <div
                         className={cn(
                           "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 shadow-sm",
-                          mine ? "bg-[#e7f3f1] text-foreground" : "bg-white"
+                          mine ? "bg-accent text-foreground" : "bg-white"
                         )}
                       >
                         {message.quote ? (
@@ -378,7 +378,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
             <div className="fixed inset-x-0 bottom-[58px] z-20 border-t border-black/5 bg-white/95 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bottom-auto md:bg-white/50 md:pb-3">
               {quote ? (
-                <div className="mb-2 flex items-center justify-between rounded-xl bg-[#f7f1e8] px-3 py-2 text-xs">
+                <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs">
                   <span>
                     ציטוט של {memberById(state.members, quote.authorId)?.displayName}: {quote.text}
                   </span>
@@ -548,7 +548,7 @@ function RoomRow({
 }
 
 function RoomIcon({ channel }: { channel: Channel }) {
-  const cls = "size-8 rounded-lg bg-[#f7f1e8] text-primary flex items-center justify-center";
+  const cls = "size-8 rounded-lg bg-secondary text-primary flex items-center justify-center";
   if (channel.type === "announcements")
     return (
       <span className={cls}>

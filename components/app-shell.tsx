@@ -41,7 +41,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f7f1e8] text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center bg-white text-muted-foreground">
         טוען את החבורה…
       </div>
     );
@@ -49,7 +49,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
   if (error || !me) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[#f7f1e8]">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-white">
         <p>{error ?? "יש להתחבר מחדש"}</p>
         <Button onClick={() => router.replace("/login")}>למסך הכניסה</Button>
       </div>
