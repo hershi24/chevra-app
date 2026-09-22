@@ -154,12 +154,12 @@ function HeroEvent({
           ) : null}
         </div>
 
-        <p className="max-w-xl text-[15px] font-light leading-7 text-foreground/75">
-          {event.location}
-          {host ? ` · אצל ${host.displayName}` : ""}
-          {kibud ? ` · כיבוד: ${kibud.displayName}` : ""}
-          {lecturer ? ` · השיעור: ${lecturer.displayName}` : ""}
-        </p>
+        <div className="max-w-xl space-y-1 text-[15px] font-light leading-7 text-foreground/75">
+          {event.location ? <p>{event.location}</p> : null}
+          {host ? <p>אצל {host.displayName}</p> : null}
+          {kibud ? <p>כיבוד: {kibud.displayName}</p> : null}
+          {lecturer ? <p>השיעור: {lecturer.displayName}</p> : null}
+        </div>
 
         <Countdown iso={event.startsAt} />
 
