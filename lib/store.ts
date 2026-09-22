@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { createSeed } from "./seed";
 import { emitUpdate } from "./realtime";
+import { isSupabaseEnabled } from "./supabase";
+import { bootstrapChatIfEmpty, loadChatFromSupabase, syncChatDiff } from "./supabase-chat";
 import type { AppState, Member, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -18,7 +20,7 @@ async function persist(state: AppState) {
   await writeFile(FILE, JSON.stringify(state, null, 2), "utf8");
 }
 
-export async function readState(): Promise<AppState> {
+async function loadJson(): Promise<AppState> {
   if (g.__chevraCache) return g.__chevraCache;
   try {
     const raw = await readFile(FILE, "utf8");
@@ -32,15 +34,42 @@ export async function readState(): Promise<AppState> {
   }
 }
 
+export async function readState(): Promise<AppState> {
+  const json = await loadJson();
+  if (!isSupabaseEnabled()) return json;
+
+  const state = structuredClone(json);
+  try {
+    await bootstrapChatIfEmpty(state);
+    const chat = await loadChatFromSupabase();
+    if (chat) {
+      state.channels = chat.channels;
+      state.messages = chat.messages;
+    }
+  } catch (error) {
+    console.error("Supabase chat read failed", error);
+  }
+  return state;
+}
+
 export async function updateState(
   mutator: (state: AppState) => void
 ): Promise<AppState> {
   const run = (g.__chevraWrite ?? Promise.resolve()).then(async () => {
     const current = structuredClone(await readState());
+    const before = structuredClone(current);
     mutator(current);
     current.revision += 1;
     g.__chevraCache = current;
     await persist(current);
+    if (isSupabaseEnabled()) {
+      try {
+        await syncChatDiff(before, current);
+      } catch (error) {
+        console.error("Supabase chat write failed", error);
+        throw new Error("ההודעה לא נשמרה בענן. נסו שוב.");
+      }
+    }
     emitUpdate(current.revision);
     return current;
   });

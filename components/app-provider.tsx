@@ -10,6 +10,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { ActionBody } from "@/lib/actions";
+import { applyReaction, messageFromRow, upsertMessage, type MessageRow, type ReactionRow } from "@/lib/chat-message";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { Member, PublicState } from "@/lib/types";
 
 type AppContextValue = {
@@ -76,6 +78,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     return () => es.close();
   }, [refresh]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabase();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel("chevra-live-chat")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload) => {
+          const incoming = messageFromRow(payload.new as MessageRow);
+          setState((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: upsertMessage(prev.messages, incoming) };
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_reactions" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as ReactionRow;
+          if (!row?.message_id) return;
+          const action = payload.eventType as "INSERT" | "UPDATE" | "DELETE";
+          setState((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: applyReaction(prev.messages, row, action) };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   const act = useCallback(async (body: ActionBody) => {
     const res = await fetch("/api/actions", {

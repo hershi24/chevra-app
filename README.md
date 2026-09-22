@@ -35,7 +35,25 @@ npm run dev
 
 ## אחסון נתונים
 
-ברירת המחדל היא קובץ JSON מקומי (`data/store.json`) כדי שהאפליקציה תעבוד בלי מפתחות. סכמת Supabase מוכנה ב־`supabase/schema.sql` — Realtime, Storage ו־RLS.
+ברירת המחדל היא קובץ JSON מקומי (`data/store.json`) כדי שהאפליקציה תעבוד בלי מפתחות.
+
+### צ׳אט חי ב־Supabase
+
+הדרך היציבה ביותר: כל הודעה נכתבת לטבלת `messages` ב־Postgres, וכל הלקוחות מקבלים אותה מיד דרך **Realtime postgres_changes** (לא SSE מקומי). כך כולם רואים את ההודעה באותו רגע, גם אם השרת רץ על כמה מופעים.
+
+1. צרו פרויקט ב־[supabase.com](https://supabase.com).
+2. ב־SQL Editor הריצו את `supabase/schema.sql`.
+3. ב־Project Settings → API העתיקו את שלושת הערכים ל־`.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+4. הפעילו מחדש את `npm run dev`. בהפעלה הראשונה הערוצים וההודעות מהקובץ המקומי יועלו לענן.
+
+הכתיבה נשארת בשרת (service role). הדפדפן רק מאזין לשינויים.
 
 קבצי מדיה נשמרים ב־`public/uploads` ומוצגים עם נגני HTML5. בפרודקשן עדיף Cloudflare R2 או Supabase Storage.
 
