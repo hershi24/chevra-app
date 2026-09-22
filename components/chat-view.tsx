@@ -157,7 +157,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       : [];
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] bg-[#f4f0e8] pb-16 md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5">
+    <div className="flex h-[calc(100dvh-56px)] bg-white pb-16 md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
         className={cn(
