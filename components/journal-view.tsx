@@ -14,7 +14,7 @@ export function JournalView() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div>
-        <p className="text-[13px] font-light text-muted-foreground">תיעוד המפגשים</p>
+        <p className="text-[13px] font-light text-muted-foreground">תיעוד החברות</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">יומן החבורה</h1>
       </div>
       <div className="grid gap-6 sm:grid-cols-2">
@@ -38,7 +38,7 @@ export function JournalView() {
                   </div>
                 )}
                 <span className="absolute end-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-light">
-                  {isUpcoming ? "קרוב" : "התקיים"}
+                  {isUpcoming ? "קרוב" : "חברה קודמת"}
                 </span>
               </div>
               <div className="mt-2.5 space-y-0.5">
