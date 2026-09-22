@@ -35,7 +35,24 @@ npm run dev
 
 ## אחסון נתונים
 
-ברירת המחדל היא קובץ JSON מקומי (`data/store.json`) כדי שהאפליקציה תעבוד בלי מפתחות. סכמת Supabase מוכנה ב־`supabase/schema.sql` — Realtime, Storage ו־RLS.
+ברירת המחדל היא קובץ JSON מקומי (`data/store.json`) כדי שהאפליקציה תעבוד בלי מפתחות.
+
+### צ׳אט חי ב־Supabase
+
+הדרך היציבה ביותר: כל הודעה נכתבת לטבלת `messages` ב־Postgres, וכל הלקוחות מקבלים אותה מיד דרך **Realtime postgres_changes**. חיבור הפרויקט בגיטהב לסופרבייס לא מחליף את המפתחות — האפליקציה קוראת אותם מ־`.env.local` או מההגדרות של השרת (Vercel וכו׳).
+
+1. בסופרבייס: SQL Editor, הריצו `supabase/schema.sql` (או את המיגרציה ב־`supabase/migrations/`).
+2. ב־Project Settings → API העתיקו ל־`.env.local` (ולסביבת הפרודקשן):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+3. הפעילו מחדש את השרת. בהפעלה הראשונה הערוצים וההודעות מהקובץ המקומי יועלו לענן.
+
+הכתיבה נשארת בשרת (service role). הדפדפן רק מאזין לשינויים.
 
 קבצי מדיה נשמרים ב־`public/uploads` ומוצגים עם נגני HTML5. בפרודקשן עדיף Cloudflare R2 או Supabase Storage.
 
