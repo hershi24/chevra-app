@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import {
   formatDateHe,
   formatTimeHe,
-  gatheringLabel,
   gatheringTitle,
   memberById,
   rsvpLabel,
@@ -27,10 +26,6 @@ export function DashboardView() {
   if (!state || !me) return null;
 
   const event = upcomingGathering(state);
-  const recent = state.gatherings
-    .filter((g) => g.id !== event?.id)
-    .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt))
-    .slice(0, 3);
   const latestMessages = [...state.messages]
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 4);
@@ -86,40 +81,6 @@ export function DashboardView() {
           )}
         </section>
       )}
-
-      <section>
-        <div className="mb-5 flex items-baseline gap-3">
-          <h2 className="text-sm font-normal text-muted-foreground">חברות קודמות</h2>
-          <Link href="/journal" className="text-sm font-light text-primary/80 hover:text-primary">
-            היומן
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
-          {recent.map((g) => {
-            const photo = g.media.find((m) => m.type === "image");
-            return (
-              <Link key={g.id} href={`/journal/${g.id}`} className="group block">
-                <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
-                  {photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photo.url}
-                      alt={gatheringLabel(g)}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
-                    />
-                  ) : null}
-                </div>
-                <div className="mt-2.5">
-                  <div className="truncate text-[13px] font-normal">{gatheringLabel(g)}</div>
-                  <div className="text-[12px] font-light text-muted-foreground">
-                    {formatDateHe(g.startsAt)}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
 
       <section>
         <div className="mb-5 flex items-baseline gap-3">
