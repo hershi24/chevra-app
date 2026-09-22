@@ -60,7 +60,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh">
       <BackgroundLayer />
 
-      <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-[#f4f0e8]/80 backdrop-blur-xl md:block">
+      <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-white md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
           <Link href="/" className="min-w-0 shrink-0">
             <div className="text-[11px] font-light tracking-[0.22em] text-muted-foreground">
@@ -71,7 +71,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
 
-          <nav className="flex items-center rounded-full bg-black/[0.035] p-1">
+          <nav className="flex items-center rounded-full bg-[var(--paper-card)] p-1">
             {NAV.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -110,7 +110,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/5 bg-[#f4f0e8]/85 px-4 py-3 backdrop-blur-xl md:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 md:hidden">
         <div>
           <div className="text-[1.05rem] font-medium tracking-tight">מיין חברה</div>
           <div className="text-[11px] text-muted-foreground">{me.displayName}</div>
@@ -128,7 +128,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/5 bg-[#f7f3eb]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/5 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         {NAV.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

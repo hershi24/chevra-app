@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { BookOpen, Home, MapPin, Plus, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { Countdown } from "@/components/countdown";
@@ -154,11 +154,31 @@ function HeroEvent({
           ) : null}
         </div>
 
-        <div className="max-w-xl space-y-1 text-[15px] font-light leading-7 text-foreground/75">
-          {event.location ? <p>{event.location}</p> : null}
-          {host ? <p>אצל {host.displayName}</p> : null}
-          {kibud ? <p>כיבוד: {kibud.displayName}</p> : null}
-          {lecturer ? <p>השיעור: {lecturer.displayName}</p> : null}
+        <div className="max-w-xl space-y-2 text-[15px] font-light leading-7 text-foreground/80">
+          {event.location ? (
+            <p className="flex items-start gap-2.5">
+              <MapPin className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
+              <span>{event.location}</span>
+            </p>
+          ) : null}
+          {host ? (
+            <p className="flex items-start gap-2.5">
+              <Home className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
+              <span>אצל {host.displayName}</span>
+            </p>
+          ) : null}
+          {kibud ? (
+            <p className="flex items-start gap-2.5">
+              <UtensilsCrossed className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
+              <span>כיבוד: {kibud.displayName}</span>
+            </p>
+          ) : null}
+          {lecturer ? (
+            <p className="flex items-start gap-2.5">
+              <BookOpen className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
+              <span>השיעור: {lecturer.displayName}</span>
+            </p>
+          ) : null}
         </div>
 
         <Countdown iso={event.startsAt} />

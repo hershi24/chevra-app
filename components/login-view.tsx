@@ -36,15 +36,8 @@ export function LoginView() {
   }
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1800&q=80"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="absolute inset-0 bg-[#2b2118]/45" />
-      <div className="relative w-full max-w-md rounded-3xl bg-[#fffaf4]/92 p-6 shadow-2xl backdrop-blur-md md:p-8">
+    <div className="flex min-h-dvh items-center justify-center bg-white px-4">
+      <div className="paper-card w-full max-w-md rounded-3xl p-6 md:p-8">
         <p className="text-[13px] font-light tracking-[0.22em] text-primary/80">CHEVRA</p>
         <h1 className="mt-2 text-4xl font-medium tracking-tight text-foreground">מיין חברה</h1>
         <p className="mt-3 text-[15px] font-light leading-7 text-muted-foreground">

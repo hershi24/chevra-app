@@ -94,7 +94,7 @@ export function SettingsView() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-[13px] font-light text-muted-foreground">
-              תמונה מחברה קודמת צובעת את החדר — בלי לשבת כטפט מאחורי הכרטיסים.
+              מסך האתר לבן. תמונה מחברה קודמת נשמרת כאן ולא נצבעת על הרקע.
             </p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {state.settings.backgrounds.map((bg) => (
