@@ -57,7 +57,7 @@ export function GalleryView() {
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">גלריה</h1>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-[1.75rem] bg-white/55 px-4 py-4 backdrop-blur-md md:flex-row md:flex-wrap md:items-center md:gap-4 md:px-5">
+      <div className="paper-card flex flex-col gap-3 rounded-[1.75rem] px-4 py-4 md:flex-row md:flex-wrap md:items-center md:gap-4 md:px-5">
         <FilterPills
           value={kind}
           onChange={setKind}
@@ -99,7 +99,7 @@ export function GalleryView() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="rounded-[1.75rem] bg-white/55 px-5 py-12 text-center text-sm font-light text-muted-foreground">
+        <p className="paper-card rounded-[1.75rem] px-5 py-12 text-center text-sm font-light text-muted-foreground">
           אין מדיה שמתאימה לסינון הזה.
         </p>
       ) : (

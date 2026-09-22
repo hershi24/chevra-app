@@ -67,7 +67,7 @@ export function SettingsView() {
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">הגדרות</h1>
       </div>
 
-      <Card className="rounded-[1.75rem] bg-white/55">
+      <Card className="paper-card rounded-[1.75rem]">
         <CardHeader>
           <CardTitle>החשבון שלי</CardTitle>
         </CardHeader>
@@ -88,11 +88,14 @@ export function SettingsView() {
       </Card>
 
       {can(me, "uploadBackground") ? (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
-            <CardTitle className="font-medium">רקע · חברות קודמות</CardTitle>
+            <CardTitle className="font-medium">אווירת החדר</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-[13px] font-light text-muted-foreground">
+              תמונה מחברה קודמת צובעת את החדר — בלי לשבת כטפט מאחורי הכרטיסים.
+            </p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {state.settings.backgrounds.map((bg) => (
                 <button
@@ -138,7 +141,7 @@ export function SettingsView() {
       ) : null}
 
       {can(me, "manageMembers") ? (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
             <CardTitle className="font-medium">חברי החבורה</CardTitle>
           </CardHeader>
@@ -218,7 +221,7 @@ export function SettingsView() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
             <CardTitle className="font-medium">חברי החבורה</CardTitle>
           </CardHeader>
@@ -237,7 +240,7 @@ export function SettingsView() {
       )}
 
       {can(me, "sendInvites") ? (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
             <CardTitle className="font-medium">הזמנות במייל · לחיצה אחת</CardTitle>
           </CardHeader>
