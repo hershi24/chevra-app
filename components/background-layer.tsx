@@ -8,14 +8,18 @@ export function BackgroundLayer() {
   const bg = state?.settings.backgrounds.find((item) => item.id === id);
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10">
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#f3efe6]">
       {bg ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={bg.url} alt="" className="h-full w-full object-cover scale-105 blur-[2px]" />
-      ) : (
-        <div className="h-full w-full bg-background" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#f7f6f3]/92 via-[#f7f6f3]/88 to-[#f3f1ec]/94" />
+        <img
+          src={bg.url}
+          alt=""
+          className="absolute inset-[-18%] h-[136%] w-[136%] object-cover opacity-[0.38] blur-[52px]"
+        />
+      ) : null}
+      <div className="absolute inset-0 bg-[#f4f0e8]/78" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#f7f3eb]/50 via-transparent to-[#efe8dc]/90" />
+      <div className="paper-grain absolute inset-0" />
     </div>
   );
 }

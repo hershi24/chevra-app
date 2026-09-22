@@ -96,7 +96,7 @@ export function JournalDetail({
       </div>
 
       {event.topic ? (
-        <p className="rounded-[1.75rem] bg-white/55 px-5 py-4 text-sm font-light backdrop-blur-md">
+        <p className="paper-card rounded-[1.75rem] px-5 py-4 text-sm font-light">
           נושא: {event.topic}
         </p>
       ) : null}
@@ -122,7 +122,7 @@ export function JournalDetail({
       </div>
 
       {event.media.length === 0 ? (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardContent className="py-10 text-center font-light text-muted-foreground">
             עדיין אין מדיה למפגש הזה. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
           </CardContent>
@@ -160,7 +160,7 @@ export function JournalDetail({
         </div>
       )}
 
-      <Card className="rounded-[1.75rem] bg-white/55">
+      <Card className="paper-card rounded-[1.75rem]">
         <CardHeader>
           <CardTitle className="font-medium">סיכום השיעור</CardTitle>
         </CardHeader>
@@ -194,7 +194,7 @@ export function JournalDetail({
       </Card>
 
       {can(me, "viewRsvps") ? (
-        <Card className="rounded-[1.75rem] bg-white/55">
+        <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
             <CardTitle className="font-medium">אישורי הגעה</CardTitle>
           </CardHeader>
