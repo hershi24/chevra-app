@@ -13,7 +13,7 @@ const heebo = Heebo({
 
 export const metadata: Metadata = {
   title: "מיין חברה",
-  description: "חבורה של חברים — לימוד, מפגשים וצ׳אט",
+  description: "חבורה של חברים — לימוד, חברות וצ׳אט",
   applicationName: "מיין חברה",
   appleWebApp: {
     capable: true,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f5f2",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

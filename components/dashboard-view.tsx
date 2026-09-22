@@ -38,7 +38,7 @@ export function DashboardView() {
             שלום {me.displayName.split(" ")[0]}
           </p>
           <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight text-foreground md:text-[2rem]">
-            המפגש הבא
+            החברה הבאה
           </h1>
         </div>
         {can(me, "createEvent") ? (
@@ -46,7 +46,7 @@ export function DashboardView() {
             trigger={
               <Button variant="ghost" className="rounded-full px-4 font-normal">
                 <Plus data-icon="inline-start" />
-                מפגש חדש
+                חברה חדשה
               </Button>
             }
           />
@@ -69,14 +69,14 @@ export function DashboardView() {
         />
       ) : (
         <section className="paper-card rounded-[1.75rem] px-6 py-12">
-          <p className="text-muted-foreground">אין מפגש קרוב ביומן כרגע.</p>
+          <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
           {can(me, "createEvent") ? (
             <div className="mt-4">
-              <EventDialog trigger={<Button variant="outline" className="rounded-full">קביעת מפגש</Button>} />
+              <EventDialog trigger={<Button variant="outline" className="rounded-full">קביעת חברה</Button>} />
             </div>
           ) : (
             <p className="mt-2 text-sm font-light text-muted-foreground">
-              כשמנהל המערכת יקבע מפגש — הוא יופיע כאן.
+              כשמנהל המערכת יקבע חברה — היא תופיע כאן.
             </p>
           )}
         </section>

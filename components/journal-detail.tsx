@@ -34,7 +34,7 @@ export function JournalDetail({
   if (!event) {
     return (
       <div className="p-6">
-        המפגש לא נמצא. <Link href="/journal" className="underline">חזרה ליומן</Link>
+        החברה לא נמצאה. <Link href="/journal" className="underline">חזרה ליומן</Link>
       </div>
     );
   }
@@ -124,7 +124,7 @@ export function JournalDetail({
       {event.media.length === 0 ? (
         <Card className="paper-card rounded-[1.75rem]">
           <CardContent className="py-10 text-center font-light text-muted-foreground">
-            עדיין אין מדיה למפגש הזה. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
+            עדיין אין מדיה לחברה הזאת. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
           </CardContent>
         </Card>
       ) : (
@@ -185,7 +185,7 @@ export function JournalDetail({
           ) : currentSummary ? (
             <p className="whitespace-pre-wrap leading-7">{currentSummary}</p>
           ) : (
-            <p className="text-muted-foreground">עדיין אין סיכום למפגש זה.</p>
+            <p className="text-muted-foreground">עדיין אין סיכום לחברה זו.</p>
           )}
           {event.audioUrl ? (
             <audio src={event.audioUrl} controls className="w-full" />
@@ -200,7 +200,7 @@ export function JournalDetail({
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between rounded-xl bg-[#f7f1e8] px-3 py-2">
+              <div key={member.id} className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2">
                 <span className="flex items-center gap-2">
                   <UserAvatar member={member} size="sm" />
                   {member.displayName}

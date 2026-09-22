@@ -49,39 +49,39 @@
 
 :root {
   --background: #ffffff;
-  --foreground: oklch(0.32 0.02 50);
+  --foreground: #1f2328;
   --paper: #ffffff;
-  --paper-card: #f3eee4;
-  --card: #f3eee4;
-  --card-foreground: oklch(0.32 0.02 50);
-  --popover: oklch(0.995 0.004 90);
-  --popover-foreground: oklch(0.32 0.02 50);
-  --primary: oklch(0.44 0.05 170);
-  --primary-foreground: oklch(0.99 0.005 90);
-  --secondary: oklch(0.96 0.01 90);
-  --secondary-foreground: oklch(0.35 0.02 50);
-  --muted: oklch(0.96 0.008 90);
-  --muted-foreground: oklch(0.55 0.02 60);
-  --accent: oklch(0.95 0.015 90);
-  --accent-foreground: oklch(0.32 0.02 50);
-  --destructive: oklch(0.55 0.12 28);
-  --border: oklch(0.91 0.012 80);
-  --input: oklch(0.91 0.012 80);
-  --ring: oklch(0.55 0.04 170);
-  --chart-1: oklch(0.44 0.05 170);
-  --chart-2: oklch(0.72 0.08 75);
-  --chart-3: oklch(0.55 0.04 50);
-  --chart-4: oklch(0.45 0.03 200);
-  --chart-5: oklch(0.35 0.02 30);
+  --paper-card: #f3f4f6;
+  --card: #f3f4f6;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #3f4650;
+  --primary-foreground: #ffffff;
+  --secondary: #eceef1;
+  --secondary-foreground: #3f4650;
+  --muted: #f7f8f9;
+  --muted-foreground: #6b7280;
+  --accent: #e8eaed;
+  --accent-foreground: #3f4650;
+  --destructive: #e11d48;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #3f4650;
+  --chart-1: #3f4650;
+  --chart-2: #9ca3af;
+  --chart-3: #6b7280;
+  --chart-4: #4b5563;
+  --chart-5: #f43f5e;
   --radius: 1.1rem;
-  --sidebar: oklch(0.99 0.004 90 / 0.8);
-  --sidebar-foreground: oklch(0.32 0.02 50);
-  --sidebar-primary: oklch(0.44 0.05 170);
-  --sidebar-primary-foreground: oklch(0.99 0.005 90);
-  --sidebar-accent: oklch(0.96 0.01 90);
-  --sidebar-accent-foreground: oklch(0.35 0.02 50);
-  --sidebar-border: oklch(0.93 0.01 80);
-  --sidebar-ring: oklch(0.55 0.04 170);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1f2328;
+  --sidebar-primary: #3f4650;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #3f4650;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #3f4650;
 }
 
 @layer base {
@@ -111,7 +111,7 @@
 @layer components {
   .paper-card {
     background: var(--paper-card);
-    box-shadow: 0 1px 2px rgb(42 30 18 / 0.04), 0 10px 28px rgb(42 30 18 / 0.06);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 22px rgb(15 23 42 / 0.05);
   }
 }
 

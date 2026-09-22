@@ -150,7 +150,7 @@ export function SettingsView() {
               {state.members.map((member) => (
                 <li
                   key={member.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#f7f1e8] px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary px-3 py-2"
                 >
                   <span className="flex items-center gap-2">
                     <UserAvatar member={member} size="sm" />
@@ -251,7 +251,7 @@ export function SettingsView() {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void sendInvites()} disabled={!event}>
-                שליחת הזמנות למפגש הקרוב
+                שליחת הזמנות לחברה הקרובה
               </Button>
               {can(me, "triggerIvr") ? (
                 <Button variant="outline" onClick={() => void pingIvr()}>
@@ -262,7 +262,7 @@ export function SettingsView() {
             {invitePreview?.length ? (
               <ul className="space-y-2 text-sm">
                 {invitePreview.map((row) => (
-                  <li key={row.to} className="rounded-xl bg-[#f7f1e8] p-3">
+                  <li key={row.to} className="rounded-xl bg-secondary p-3">
                     <div className="font-medium">{row.to}</div>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <a className="text-primary underline" href={row.yesUrl}>

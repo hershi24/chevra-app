@@ -47,7 +47,7 @@ export function EventDialog({
         topic: String(formData.get("topic") || "") || undefined,
         notes: String(formData.get("notes") || "") || undefined,
       });
-      toast.success("המפגש נקבע");
+      toast.success("החברה נקבעה");
       setOpen(false);
       setWithTitle(false);
       onCreated?.();
@@ -69,16 +69,16 @@ export function EventDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>קביעת מפגש חדש</DialogTitle>
+          <DialogTitle>קביעת חברה חדשה</DialogTitle>
         </DialogHeader>
         <form action={onSubmit} className="grid gap-3">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3 py-2.5">
             <div>
               <Label htmlFor="withTitle" className="text-sm font-normal">
-                כותרת למפגש
+                כותרת לחברה
               </Label>
               <p className="text-[12px] font-light text-muted-foreground">
-                אם מכבים — המפגש יוצג לפי תאריך ונושא בלבד.
+                אם מכבים — החברה תוצג לפי תאריך ונושא בלבד.
               </p>
             </div>
             <Switch
@@ -108,7 +108,7 @@ export function EventDialog({
             <Textarea id="notes" name="notes" rows={3} />
           </div>
           <Button type="submit" disabled={saving} className="mt-2">
-            {saving ? "שומר…" : "שמירת מפגש"}
+            {saving ? "שומר…" : "שמירת חברה"}
           </Button>
         </form>
       </DialogContent>

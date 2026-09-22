@@ -29,7 +29,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
     case "rsvp": {
       if (!can(me, "rsvp")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
-      if (!event) throw new Error("המפגש לא נמצא");
+      if (!event) throw new Error("החברה לא נמצאה");
       event.rsvps[me.id] = body.status;
       return;
     }
@@ -64,28 +64,28 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
     case "updateEvent": {
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
-      if (!event) throw new Error("המפגש לא נמצא");
+      if (!event) throw new Error("החברה לא נמצאה");
       Object.assign(event, body.patch);
       return;
     }
     case "cancelEvent": {
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
-      if (!event) throw new Error("המפגש לא נמצא");
+      if (!event) throw new Error("החברה לא נמצאה");
       event.status = "cancelled";
       return;
     }
     case "uploadMedia": {
       if (!can(me, "uploadMedia")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
-      if (!event) throw new Error("המפגש לא נמצא");
+      if (!event) throw new Error("החברה לא נמצאה");
       event.media.push({ ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() });
       return;
     }
     case "saveSummary": {
       if (!can(me, "uploadSummary")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
-      if (!event) throw new Error("המפגש לא נמצא");
+      if (!event) throw new Error("החברה לא נמצאה");
       if (body.summary !== undefined) event.summary = body.summary;
       if (body.audioUrl !== undefined) event.audioUrl = body.audioUrl;
       return;

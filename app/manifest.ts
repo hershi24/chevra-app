@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "מיין חברה",
     short_name: "מיין חברה",
-    description: "חבורה של חברים — לימוד, מפגשים וצ׳אט",
+    description: "חבורה של חברים — לימוד, חברות וצ׳אט",
     start_url: "/",
     display: "standalone",
     background_color: "#f7f1e8",

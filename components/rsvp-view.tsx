@@ -61,8 +61,8 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#f4eee4] px-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+    <div className="flex min-h-dvh items-center justify-center bg-white px-4">
+      <div className="paper-card w-full max-w-md rounded-3xl p-6">
         <p className="text-sm text-primary">מיין חברה</p>
         <h1 className="font-heading mt-1 text-2xl font-semibold">אישור הגעה</h1>
         {status === "loading" ? <p className="mt-4 text-muted-foreground">מעדכן…</p> : null}
@@ -70,11 +70,11 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
         {status === "done" && event && member ? (
           <div className="mt-4 space-y-4">
             <p>
-              שלום {member.displayName}, המפגש <strong>{gatheringLabel(event)}</strong> יתקיים ב
+              שלום {member.displayName}, החברה <strong>{gatheringLabel(event)}</strong> תתקיים ב
               {formatDateTimeHe(event.startsAt)}.
             </p>
             <p className="text-sm text-muted-foreground">{event.location}</p>
-            <p className="rounded-xl bg-[#f7f1e8] px-3 py-2 text-sm">
+            <p className="rounded-xl bg-secondary px-3 py-2 text-sm">
               הסטטוס שלך:{" "}
               {result === "yes" ? "מגיע" : result === "no" ? "לא מגיע" : result === "maybe" ? "אולי" : "טרם השיב"}
             </p>
