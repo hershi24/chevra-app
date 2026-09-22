@@ -39,11 +39,10 @@ npm run dev
 
 ### צ׳אט חי ב־Supabase
 
-הדרך היציבה ביותר: כל הודעה נכתבת לטבלת `messages` ב־Postgres, וכל הלקוחות מקבלים אותה מיד דרך **Realtime postgres_changes** (לא SSE מקומי). כך כולם רואים את ההודעה באותו רגע, גם אם השרת רץ על כמה מופעים.
+הדרך היציבה ביותר: כל הודעה נכתבת לטבלת `messages` ב־Postgres, וכל הלקוחות מקבלים אותה מיד דרך **Realtime postgres_changes**. חיבור הפרויקט בגיטהב לסופרבייס לא מחליף את המפתחות — האפליקציה קוראת אותם מ־`.env.local` או מההגדרות של השרת (Vercel וכו׳).
 
-1. צרו פרויקט ב־[supabase.com](https://supabase.com).
-2. ב־SQL Editor הריצו את `supabase/schema.sql`.
-3. ב־Project Settings → API העתיקו את שלושת הערכים ל־`.env.local`:
+1. בסופרבייס: SQL Editor, הריצו `supabase/schema.sql` (או את המיגרציה ב־`supabase/migrations/`).
+2. ב־Project Settings → API העתיקו ל־`.env.local` (ולסביבת הפרודקשן):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
@@ -51,7 +50,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-4. הפעילו מחדש את `npm run dev`. בהפעלה הראשונה הערוצים וההודעות מהקובץ המקומי יועלו לענן.
+3. הפעילו מחדש את השרת. בהפעלה הראשונה הערוצים וההודעות מהקובץ המקומי יועלו לענן.
 
 הכתיבה נשארת בשרת (service role). הדפדפן רק מאזין לשינויים.
 
