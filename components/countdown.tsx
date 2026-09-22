@@ -13,7 +13,7 @@ export function Countdown({ iso }: { iso: string }) {
 
   if (parts.expired) {
     return (
-      <p className="text-sm font-normal text-primary">המפגש מתחיל עכשיו — מחכים לכם</p>
+      <p className="text-sm font-normal text-primary">החברה מתחילה עכשיו — מחכים לכם</p>
     );
   }
 

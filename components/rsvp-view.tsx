@@ -70,7 +70,7 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
         {status === "done" && event && member ? (
           <div className="mt-4 space-y-4">
             <p>
-              שלום {member.displayName}, המפגש <strong>{gatheringLabel(event)}</strong> יתקיים ב
+              שלום {member.displayName}, החברה <strong>{gatheringLabel(event)}</strong> תתקיים ב
               {formatDateTimeHe(event.startsAt)}.
             </p>
             <p className="text-sm text-muted-foreground">{event.location}</p>

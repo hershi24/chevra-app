@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
   if (!event) {
-    return NextResponse.json({ error: "המפגש לא נמצא" }, { status: 404 });
+    return NextResponse.json({ error: "החברה לא נמצאה" }, { status: 404 });
   }
 
   const origin = new URL(request.url).origin;

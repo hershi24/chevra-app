@@ -26,7 +26,7 @@ export function invitationHtml(opts: {
             <tr>
               <td style="background:#0f5f59;color:#f8f1e6;padding:28px 32px;">
                 <div style="font-size:13px;letter-spacing:0.08em;">מיין חברה</div>
-                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;">הזמנה למפגש החבורה</h1>
+                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;">הזמנה לחברה</h1>
               </td>
             </tr>
             <tr>

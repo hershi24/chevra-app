@@ -249,7 +249,7 @@ function LightboxBody({
           {item.caption ? ` · ${item.caption}` : ""}
         </div>
         <Link href={`/journal/${item.eventId}`} className="text-primary/80 hover:text-primary">
-          למפגש ביומן
+          לחברה ביומן
         </Link>
       </div>
       <div className="flex justify-between gap-2">

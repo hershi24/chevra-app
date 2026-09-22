@@ -251,7 +251,7 @@ export function SettingsView() {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void sendInvites()} disabled={!event}>
-                שליחת הזמנות למפגש הקרוב
+                שליחת הזמנות לחברה הקרובה
               </Button>
               {can(me, "triggerIvr") ? (
                 <Button variant="outline" onClick={() => void pingIvr()}>
