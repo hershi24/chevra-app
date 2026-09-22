@@ -1,5 +1,5 @@
 -- מיין חברה · schema for Supabase (Postgres + Realtime + Storage)
--- Run in the SQL editor after creating a project.
+-- Copy THIS FILE'S CONTENTS into the SQL editor. Do not paste a file path.
 -- Chat is live via postgres_changes on messages / message_reactions.
 -- IDs are text so they match the existing app (m-david, c-general, …).
 
