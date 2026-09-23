@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { roleLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
 import type { Role } from "@/lib/types";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 export function SettingsView() {
@@ -20,6 +22,11 @@ export function SettingsView() {
   const [invitePreview, setInvitePreview] = useState<
     { to: string; yesUrl: string; noUrl: string }[] | null
   >(null);
+  const [pendingBg, setPendingBg] = useState<{
+    previewUrl: string;
+    progress: number;
+    remainingSeconds: number | null;
+  } | null>(null);
 
   if (!state || !me) return null;
   const user = me;
@@ -111,6 +118,18 @@ export function SettingsView() {
                   <div className="bg-white px-2 py-1.5 text-start text-[11px]">{bg.label}</div>
                 </button>
               ))}
+              {pendingBg ? (
+                <div className="overflow-hidden rounded-xl ring-2 ring-primary">
+                  <MediaProgressOverlay
+                    src={pendingBg.previewUrl}
+                    type="image"
+                    progress={pendingBg.progress}
+                    remainingSeconds={pendingBg.remainingSeconds}
+                    mediaClassName="aspect-[4/3] max-h-none"
+                  />
+                  <div className="bg-white px-2 py-1.5 text-start text-[11px]">מעלה…</div>
+                </div>
+              ) : null}
             </div>
             <input
               ref={fileRef}
@@ -120,17 +139,32 @@ export function SettingsView() {
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const body = new FormData();
-                body.append("file", file);
-                const res = await fetch("/api/upload", { method: "POST", body });
-                const data = await res.json();
-                if (!res.ok) return toast.error("העלאה נכשלה");
-                await act({
-                  type: "addBackground",
-                  url: data.url,
-                  label: file.name.replace(/\.[^.]+$/, ""),
+                const local = createLocalUpload(file);
+                setPendingBg({
+                  previewUrl: local.previewUrl,
+                  progress: 0,
+                  remainingSeconds: null,
                 });
-                toast.success("הרקע נוסף");
+                if (fileRef.current) fileRef.current.value = "";
+                try {
+                  const data = await uploadWithProgress(file, {}, ({ percent, remainingSeconds }) => {
+                    setPendingBg((prev) =>
+                      prev ? { ...prev, progress: percent, remainingSeconds } : prev
+                    );
+                  });
+                  await preloadMedia(data.url, "image");
+                  await act({
+                    type: "addBackground",
+                    url: data.url,
+                    label: file.name.replace(/\.[^.]+$/, ""),
+                  });
+                  toast.success("הרקע נוסף");
+                } catch {
+                  toast.error("העלאה נכשלה");
+                } finally {
+                  URL.revokeObjectURL(local.previewUrl);
+                  setPendingBg(null);
+                }
               }}
             />
             <Button variant="outline" onClick={() => fileRef.current?.click()}>

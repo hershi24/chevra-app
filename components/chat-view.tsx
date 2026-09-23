@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,8 +27,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatRelativeHe, memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
-import type { Channel, Message } from "@/lib/types";
+import type { Attachment, Channel, Message } from "@/lib/types";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
+
+type PendingChatUpload = {
+  id: string;
+  previewUrl: string;
+  type: "image" | "video" | "audio" | "file";
+  progress: number;
+  remainingSeconds: number | null;
+  name: string;
+};
 
 const EMOJIS = ["❤️", "👍", "😂", "🙏", "🔥", "✨", "🎉", "☕"];
 
@@ -40,7 +51,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
   const mediaRef = useRef<MediaRecorder | null>(null);
+  const pendingChatRef = useRef<HTMLElement>(null);
 
   const channels = useMemo(() => {
     if (!state || !me) return [];
@@ -52,9 +65,17 @@ export function ChatView({ channelId }: { channelId?: string }) {
     .filter((m) => m.channelId === active?.id)
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
 
+  function scrollPendingIntoView() {
+    pendingChatRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
+  }
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, active?.id]);
+    if (pendingUploads.length) {
+      scrollPendingIntoView();
+      return;
+    }
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, active?.id, pendingUploads.length]);
 
   useEffect(() => {
     if (channelId || channels.length === 0) return;
@@ -96,27 +117,47 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
   async function attach(files: FileList | null) {
     if (!files?.length || !active) return;
-    const attachments = [];
-    for (const file of Array.from(files)) {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) continue;
-      attachments.push({
-        id: crypto.randomUUID(),
-        type: file.type.startsWith("video")
-          ? ("video" as const)
-          : file.type.startsWith("audio")
-            ? ("audio" as const)
-            : file.type.startsWith("image")
-              ? ("image" as const)
-              : ("file" as const),
-        url: data.url as string,
-        name: file.name,
-      });
-    }
-    await send({ attachments });
+    const items = Array.from(files).map((file) => createLocalUpload(file));
+    setPendingUploads((prev) => [
+      ...prev,
+      ...items.map((item) => ({
+        id: item.id,
+        previewUrl: item.previewUrl,
+        type: item.type,
+        progress: 0,
+        remainingSeconds: null,
+        name: item.name,
+      })),
+    ]);
+    if (fileRef.current) fileRef.current.value = "";
+
+    const attachments: Attachment[] = [];
+    await Promise.all(
+      items.map(async (item) => {
+        try {
+          const data = await uploadWithProgress(item.file, {}, ({ percent, remainingSeconds }) => {
+            setPendingUploads((prev) =>
+              prev.map((p) =>
+                p.id === item.id ? { ...p, progress: percent, remainingSeconds } : p
+              )
+            );
+          });
+          await preloadMedia(data.url, item.type);
+          attachments.push({
+            id: crypto.randomUUID(),
+            type: item.type,
+            url: data.url,
+            name: item.name,
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "העלאה נכשלה");
+        }
+      })
+    );
+
+    if (attachments.length) await send({ attachments });
+    items.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    setPendingUploads((prev) => prev.filter((p) => !items.some((item) => item.id === p.id)));
   }
 
   async function toggleRecord() {
@@ -136,11 +177,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
         const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
-        const body = new FormData();
-        body.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body });
-        const data = await res.json();
-        if (res.ok) await send({ voiceUrl: data.url });
+        try {
+          const data = await uploadWithProgress(file, {}, () => undefined);
+          await send({ voiceUrl: data.url });
+        } catch {
+          toast.error("העלאה נכשלה");
+        }
       };
       mediaRef.current = rec;
       rec.start();
@@ -260,7 +302,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6">
+            <div
+              className={cn(
+                "min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6",
+                pendingUploads.length && "pb-28"
+              )}
+            >
               {messages.map((message) => {
                 const author = memberById(state.members, message.authorId);
                 const mine = message.authorId === me.id;
@@ -380,6 +427,31 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </article>
                 );
               })}
+              {pendingUploads.map((item, index) => (
+                <article
+                  key={item.id}
+                  ref={index === pendingUploads.length - 1 ? pendingChatRef : undefined}
+                  className="flex gap-2"
+                >
+                  <UserAvatar member={me} size="sm" />
+                  <div className="min-w-0 max-w-[min(100%,42rem)]">
+                    <div className="mb-0.5 flex items-baseline gap-2">
+                      <span className="text-sm font-medium">{me.displayName}</span>
+                      <span className="text-[11px] text-muted-foreground">מעלה…</span>
+                    </div>
+                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-accent shadow-sm">
+                      <MediaProgressOverlay
+                        src={item.previewUrl}
+                        type={item.type}
+                        progress={item.progress}
+                        remainingSeconds={item.remainingSeconds}
+                        mediaClassName="max-h-64"
+                        onReady={scrollPendingIntoView}
+                      />
+                    </div>
+                  </div>
+                </article>
+              ))}
               <div ref={endRef} />
             </div>
 
