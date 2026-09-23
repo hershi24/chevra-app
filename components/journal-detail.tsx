@@ -51,6 +51,7 @@ export function JournalDetail({
     for (const file of Array.from(files)) {
       const body = new FormData();
       body.append("file", file);
+      body.append("gatheringId", gathering.id);
       const res = await fetch("/api/upload", { method: "POST", body });
       const data = await res.json();
       if (!res.ok) {

@@ -54,7 +54,23 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 הכתיבה נשארת בשרת (service role). הדפדפן רק מאזין לשינויים.
 
-קבצי מדיה נשמרים ב־`public/uploads` ומוצגים עם נגני HTML5. בפרודקשן עדיף Cloudflare R2 או Supabase Storage.
+### מדיה ב־Cloudflare R2
+
+כשמוגדרים המפתחות ב־Render, קבצים עולים לדלי R2. פרטי הקובץ (שם, סוג, מי העלה, קישור) נשמרים בטבלת `media_files` בסופרבייס.
+
+ב־Render צריך:
+
+```
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_BUCKET
+R2_PUBLIC_URL
+```
+
+הדלי חייב גישה ציבורית לקריאה (`R2_PUBLIC_URL`). בלי המפתחות האלה ההעלאה נשארת ב־`public/uploads`.
+
+בסופרבייס הריצו גם את `supabase/migrations/20260923150000_media_files.sql`.
 
 ### מייל אמיתי
 
