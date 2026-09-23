@@ -91,7 +91,7 @@ export async function uploadWithProgress(
     xhr.send(form);
   });
 
-  const remain = 450 - (Date.now() - startedAt);
+  const remain = 1500 - (Date.now() - startedAt);
   if (remain > 0) await wait(remain);
   return result;
 }
