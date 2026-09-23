@@ -28,6 +28,11 @@ import { formatRelativeHe, memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
 import type { Attachment, Channel, Message } from "@/lib/types";
+import {
+  microphoneErrorMessage,
+  pickRecorderMime,
+  requestMicrophone,
+} from "@/lib/microphone";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
@@ -167,8 +172,15 @@ export function ChatView({ channelId }: { channelId?: string }) {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
+      toast.message("אשר גישה למיקרופון בשורת הכתובת למעלה");
+      const stream = await requestMicrophone();
+      const mime = pickRecorderMime();
+      if (typeof MediaRecorder === "undefined") {
+        stream.getTracks().forEach((track) => track.stop());
+        toast.error("הדפדפן במחשב לא תומך בהקלטה. נסו כרום או אדג׳.");
+        return;
+      }
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       const chunks: Blob[] = [];
       rec.ondataavailable = (ev) => {
         if (ev.data.size) chunks.push(ev.data);
@@ -209,8 +221,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
       mediaRef.current = rec;
       rec.start();
       setRecording(true);
-    } catch {
-      toast.error("אין גישה למיקרופון");
+    } catch (error) {
+      toast.error(microphoneErrorMessage(error));
     }
   }
 
@@ -548,7 +560,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           ? "עדכון לחבורה…"
                           : "כתבו הודעה. @ לתייג חבר"
                       }
-                      className="h-10 max-h-28 min-h-10 w-full resize-none rounded-full border border-input bg-white px-4 py-2 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      className="field-sizing-content max-h-28 min-h-10 w-full resize-none overflow-hidden rounded-full border border-input bg-white px-4 py-2 text-sm leading-6 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-scrollbar]:hidden"
                       onChange={(e) => {
                         setDraft(e.target.value);
                         setMentionOpen(e.target.value.includes("@"));
