@@ -176,12 +176,34 @@ export function ChatView({ channelId }: { channelId?: string }) {
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+        const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || "audio/webm" });
+        const local = createLocalUpload(file);
+        setPendingUploads((prev) => [
+          ...prev,
+          {
+            id: local.id,
+            previewUrl: local.previewUrl,
+            type: "audio",
+            progress: 0,
+            remainingSeconds: null,
+            name: local.name,
+          },
+        ]);
         try {
-          const data = await uploadWithProgress(file, {}, () => undefined);
+          const data = await uploadWithProgress(file, {}, ({ percent, remainingSeconds }) => {
+            setPendingUploads((prev) =>
+              prev.map((p) =>
+                p.id === local.id ? { ...p, progress: percent, remainingSeconds } : p
+              )
+            );
+          });
+          await preloadMedia(data.url, "audio");
           await send({ voiceUrl: data.url });
         } catch {
           toast.error("העלאה נכשלה");
+        } finally {
+          URL.revokeObjectURL(local.previewUrl);
+          setPendingUploads((prev) => prev.filter((p) => p.id !== local.id));
         }
       };
       mediaRef.current = rec;
@@ -364,6 +386,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               playsInline
                               className="mt-2 max-h-64 w-full rounded-xl bg-black"
                             />
+                          ) : file.type === "audio" ? (
+                            <audio
+                              key={file.id}
+                              src={file.url}
+                              controls
+                              className="mt-2 w-full"
+                            />
                           ) : (
                             <a
                               key={file.id}
@@ -445,6 +474,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         type={item.type}
                         progress={item.progress}
                         remainingSeconds={item.remainingSeconds}
+                        name={item.name}
                         mediaClassName="max-h-64"
                         onReady={scrollPendingIntoView}
                       />
@@ -475,6 +505,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   <input
                     ref={fileRef}
                     type="file"
+                    accept="image/*,video/*,audio/*"
                     className="hidden"
                     multiple
                     onChange={(e) => void attach(e.target.files)}

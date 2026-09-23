@@ -1,3 +1,4 @@
+import { Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function formatUploadRemaining(seconds: number | null | undefined) {
@@ -17,6 +18,7 @@ export function MediaProgressOverlay({
   remainingSeconds,
   className,
   mediaClassName,
+  name,
   onReady,
 }: {
   src: string;
@@ -25,6 +27,7 @@ export function MediaProgressOverlay({
   remainingSeconds?: number | null;
   className?: string;
   mediaClassName?: string;
+  name?: string;
   onReady?: () => void;
 }) {
   return (
@@ -49,6 +52,20 @@ export function MediaProgressOverlay({
           onLoad={onReady}
           className={cn("max-h-[420px] w-full object-cover", mediaClassName)}
         />
+      ) : type === "audio" ? (
+        <div className="flex min-h-40 flex-col justify-end bg-neutral-800 px-4 pb-4 pt-12">
+          <div className="mb-3 flex items-center gap-2 text-sm text-white/85">
+            <Music className="size-5 shrink-0" />
+            <span className="truncate">{name || "הקלטה"}</span>
+          </div>
+          <audio
+            src={src}
+            controls
+            preload="metadata"
+            onLoadedMetadata={onReady}
+            className="w-full"
+          />
+        </div>
       ) : (
         <div className="flex h-32 items-center justify-center text-sm text-white/80">מעלה קובץ…</div>
       )}

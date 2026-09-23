@@ -159,7 +159,7 @@ export function JournalDetail({
             />
             <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload data-icon="inline-start" />
-              העלאת תמונה או סרטון
+              העלאת תמונה, סרטון או אודיו
             </Button>
           </>
         ) : null}
@@ -168,7 +168,7 @@ export function JournalDetail({
       {event.media.length === 0 && pending.length === 0 ? (
         <Card className="paper-card rounded-[1.75rem]">
           <CardContent className="py-10 text-center font-light text-muted-foreground">
-            עדיין אין מדיה לחברה הזאת. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
+            עדיין אין מדיה לחברה הזאת. אפשר להעלות תמונות, סרטונים ואודיו שיוצגו כאן ישירות בדפדפן.
           </CardContent>
         </Card>
       ) : (
@@ -212,6 +212,7 @@ export function JournalDetail({
                 type={item.type}
                 progress={item.progress}
                 remainingSeconds={item.remainingSeconds}
+                name={item.name}
                 onReady={() =>
                   pendingRef.current?.scrollIntoView({ behavior: "auto", block: "center" })
                 }
