@@ -199,7 +199,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
       : [];
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] bg-white pb-16 md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5">
+    <div
+      className={cn(
+        "flex bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5",
+        active
+          ? "h-[calc(100dvh-4rem)] pb-[env(safe-area-inset-bottom)]"
+          : "h-[calc(100dvh-7.25rem)] pb-16"
+      )}
+    >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
         className={cn(
@@ -272,7 +279,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       >
         {active ? (
           <>
-            <header className="flex items-center gap-3 border-b border-black/5 bg-white/90 px-3 py-2.5 md:bg-white/50">
+            <header className="flex shrink-0 items-center gap-3 border-b border-black/5 bg-white px-3 py-3 md:bg-white/70">
               <Link href="/chat" className="md:hidden" aria-label="חזרה">
                 <ArrowRight className="size-5" />
               </Link>
@@ -297,8 +304,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
             <div
               className={cn(
-                "flex-1 space-y-4 overflow-y-auto px-3 py-4 pb-36 md:px-6",
-                pendingUploads.length ? "md:pb-28" : "md:pb-4"
+                "min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6",
+                pendingUploads.length && "pb-28"
               )}
             >
               {messages.map((message) => {
@@ -448,7 +455,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               <div ref={endRef} />
             </div>
 
-            <div className="fixed inset-x-0 bottom-[58px] z-20 border-t border-black/5 bg-white/95 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bottom-auto md:bg-white/50 md:pb-3">
+            <div className="shrink-0 border-t border-black/5 bg-white p-2 md:bg-white/70 md:p-3">
               {quote ? (
                 <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs">
                   <span>
@@ -459,7 +466,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               ) : null}
               {canWrite ? (
                 <form
-                  className="flex items-end gap-1.5"
+                  className="flex items-center gap-1"
                   onSubmit={(e) => {
                     e.preventDefault();
                     void send();
@@ -477,6 +484,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     variant="ghost"
                     size="icon"
                     aria-label="צירוף"
+                    className="size-10 rounded-full"
                     onClick={() => fileRef.current?.click()}
                   >
                     <Paperclip />
@@ -509,7 +517,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           ? "עדכון לחבורה…"
                           : "כתבו הודעה. @ לתייג חבר"
                       }
-                      className="max-h-28 w-full resize-none rounded-2xl border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      className="h-10 max-h-28 min-h-10 w-full resize-none rounded-full border border-input bg-white px-4 py-2 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       onChange={(e) => {
                         setDraft(e.target.value);
                         setMentionOpen(e.target.value.includes("@"));
@@ -524,7 +532,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </div>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" aria-label="אימוג׳י">
+                      <Button type="button" variant="ghost" size="icon" className="size-10 rounded-full" aria-label="אימוג׳י">
                         <Smile />
                       </Button>
                     </PopoverTrigger>
@@ -547,12 +555,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     type="button"
                     variant={recording ? "destructive" : "ghost"}
                     size="icon"
+                    className="size-10 rounded-full"
                     aria-label="הודעה קולית"
                     onClick={() => void toggleRecord()}
                   >
                     <Mic />
                   </Button>
-                  <Button type="submit" size="icon" aria-label="שליחה">
+                  <Button type="submit" size="icon" className="size-10 rounded-full" aria-label="שליחה">
                     <Send />
                   </Button>
                 </form>
