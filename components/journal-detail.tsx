@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,16 @@ import {
 } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { EventMedia } from "@/lib/types";
+import { createLocalUpload, uploadWithProgress } from "@/lib/upload-client";
+
+type PendingMedia = {
+  id: string;
+  previewUrl: string;
+  type: "image" | "video" | "audio" | "file";
+  progress: number;
+  remainingSeconds: number | null;
+  name: string;
+};
 
 export function JournalDetail({
   params,
@@ -27,6 +38,7 @@ export function JournalDetail({
   const { id } = use(params);
   const { state, me, act } = useApp();
   const [summary, setSummary] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingMedia[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!state || !me) return null;
@@ -48,35 +60,59 @@ export function JournalDetail({
 
   async function uploadFiles(files: FileList | null) {
     if (!files?.length) return;
-    for (const file of Array.from(files)) {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("gatheringId", gathering.id);
-      const res = await fetch("/api/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "העלאה נכשלה");
-        continue;
-      }
-      const type: EventMedia["type"] = file.type.startsWith("video")
-        ? "video"
-        : file.type.startsWith("audio")
-          ? "audio"
-          : "image";
-      await act({
-        type: "uploadMedia",
-        eventId: gathering.id,
-        media: {
-          id: crypto.randomUUID(),
-          type,
-          url: data.url,
-          caption: file.name,
-          uploadedBy: user.id,
-          createdAt: new Date().toISOString(),
-        },
-      });
-    }
-    toast.success("המדיה נוספה ליומן");
+    const items = Array.from(files).map((file) => createLocalUpload(file));
+    setPending((prev) => [
+      ...prev,
+      ...items.map((item) => ({
+        id: item.id,
+        previewUrl: item.previewUrl,
+        type: item.type,
+        progress: 0,
+        remainingSeconds: null,
+        name: item.name,
+      })),
+    ]);
+    if (fileRef.current) fileRef.current.value = "";
+
+    const results = await Promise.all(
+      items.map(async (item) => {
+        try {
+          const data = await uploadWithProgress(
+            item.file,
+            { gatheringId: gathering.id },
+            ({ percent, remainingSeconds }) => {
+              setPending((prev) =>
+                prev.map((p) =>
+                  p.id === item.id ? { ...p, progress: percent, remainingSeconds } : p
+                )
+              );
+            }
+          );
+          const type: EventMedia["type"] =
+            item.type === "video" ? "video" : item.type === "audio" ? "audio" : "image";
+          await act({
+            type: "uploadMedia",
+            eventId: gathering.id,
+            media: {
+              id: crypto.randomUUID(),
+              type,
+              url: data.url,
+              caption: item.name,
+              uploadedBy: user.id,
+              createdAt: new Date().toISOString(),
+            },
+          });
+          return true;
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "העלאה נכשלה");
+          return false;
+        } finally {
+          URL.revokeObjectURL(item.previewUrl);
+          setPending((prev) => prev.filter((p) => p.id !== item.id));
+        }
+      })
+    );
+    if (results.some(Boolean)) toast.success("המדיה נוספה ליומן");
   }
 
   return (
@@ -122,7 +158,7 @@ export function JournalDetail({
         ) : null}
       </div>
 
-      {event.media.length === 0 ? (
+      {event.media.length === 0 && pending.length === 0 ? (
         <Card className="paper-card rounded-[1.75rem]">
           <CardContent className="py-10 text-center font-light text-muted-foreground">
             עדיין אין מדיה לחברה הזאת. אפשר להעלות תמונות וסרטונים שיוצגו כאן ישירות בדפדפן.
@@ -156,6 +192,22 @@ export function JournalDetail({
                   {item.caption} · {memberById(state.members, item.uploadedBy)?.displayName}
                 </figcaption>
               ) : null}
+            </figure>
+          ))}
+          {pending.map((item) => (
+            <figure
+              key={item.id}
+              className="overflow-hidden rounded-2xl bg-black/90 ring-1 ring-black/10"
+            >
+              <MediaProgressOverlay
+                src={item.previewUrl}
+                type={item.type}
+                progress={item.progress}
+                remainingSeconds={item.remainingSeconds}
+              />
+              <figcaption className="bg-white px-3 py-2 text-sm text-muted-foreground">
+                {item.name} · {user.displayName}
+              </figcaption>
             </figure>
           ))}
         </div>
