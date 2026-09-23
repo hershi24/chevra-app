@@ -56,6 +56,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [mentionOpen, setMentionOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [recording, setRecording] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -82,6 +83,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
     }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, active?.id, pendingUploads.length]);
+
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const min = window.matchMedia("(min-width: 768px)").matches ? 40 : 36;
+    el.style.height = `${min}px`;
+    if (draft) el.style.height = `${Math.min(Math.max(el.scrollHeight, min), 112)}px`;
+  }, [draft]);
 
   useEffect(() => {
     if (channelId || channels.length === 0) return;
@@ -493,7 +502,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               <div ref={endRef} />
             </div>
 
-            <div className="shrink-0 border-t border-black/5 bg-white p-2 md:bg-white/70 md:p-3">
+            <div className="shrink-0 border-t border-black/5 bg-white px-1.5 py-1.5 md:bg-white/70 md:p-3">
               {quote ? (
                 <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs">
                   <span>
@@ -504,7 +513,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               ) : null}
               {canWrite ? (
                 <form
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-0.5 md:gap-1"
                   onSubmit={(e) => {
                     e.preventDefault();
                     void send();
@@ -523,7 +532,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     variant="ghost"
                     size="icon"
                     aria-label="צירוף"
-                    className="size-10 rounded-full"
+                    className="size-9 rounded-full md:size-10"
                     onClick={() => fileRef.current?.click()}
                   >
                     <Paperclip />
@@ -549,14 +558,15 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       </div>
                     ) : null}
                     <textarea
+                      ref={composerRef}
                       value={draft}
                       rows={1}
                       placeholder={
                         active.type === "announcements"
                           ? "עדכון לחבורה…"
-                          : "כתבו הודעה. @ לתייג חבר"
+                          : "כתבו הודעה…"
                       }
-                      className="field-sizing-content max-h-28 min-h-10 w-full resize-none overflow-hidden rounded-full border border-input bg-white px-4 py-2 text-sm leading-6 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-scrollbar]:hidden"
+                      className="h-9 max-h-28 min-h-9 w-full resize-none overflow-hidden rounded-full border border-input bg-white px-3 py-1.5 text-sm leading-5 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring/40 md:h-10 md:min-h-10 md:px-4 md:py-2 md:leading-6 [&::-webkit-scrollbar]:hidden"
                       onChange={(e) => {
                         setDraft(e.target.value);
                         setMentionOpen(e.target.value.includes("@"));
@@ -571,7 +581,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </div>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" className="size-10 rounded-full" aria-label="אימוג׳י">
+                      <Button type="button" variant="ghost" size="icon" className="size-9 rounded-full md:size-10" aria-label="אימוג׳י">
                         <Smile />
                       </Button>
                     </PopoverTrigger>
@@ -594,13 +604,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     type="button"
                     variant={recording ? "destructive" : "ghost"}
                     size="icon"
-                    className="size-10 rounded-full"
+                    className="size-9 rounded-full md:size-10"
                     aria-label="הודעה קולית"
                     onClick={() => void toggleRecord()}
                   >
                     <Mic />
                   </Button>
-                  <Button type="submit" size="icon" className="size-10 rounded-full" aria-label="שליחה">
+                  <Button type="submit" size="icon" className="size-9 rounded-full md:size-10" aria-label="שליחה">
                     <Send />
                   </Button>
                 </form>
