@@ -155,5 +155,16 @@ create policy "settings readable" on public.settings for select using (true);
 
 insert into public.settings (id) values (1) on conflict do nothing;
 
--- Storage buckets (run in dashboard or via API):
---   chevra-media  (public read, authenticated write) for photos/videos/voice
+create table if not exists public.media_files (
+  id text primary key,
+  url text not null,
+  type public.media_type not null,
+  name text,
+  size bigint,
+  gathering_id text,
+  uploaded_by text references public.members(id),
+  created_at timestamptz not null default now()
+);
+
+alter table public.media_files enable row level security;
+create policy "media files readable" on public.media_files for select using (true);
