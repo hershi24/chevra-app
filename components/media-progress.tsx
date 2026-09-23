@@ -17,6 +17,7 @@ export function MediaProgressOverlay({
   remainingSeconds,
   className,
   mediaClassName,
+  onReady,
 }: {
   src: string;
   type: "image" | "video" | "audio" | "file";
@@ -24,20 +25,30 @@ export function MediaProgressOverlay({
   remainingSeconds?: number | null;
   className?: string;
   mediaClassName?: string;
+  onReady?: () => void;
 }) {
   return (
-    <div className={cn("relative overflow-hidden bg-black/90", className)}>
+    <div
+      data-upload-progress=""
+      className={cn("relative min-h-40 overflow-hidden bg-black/90", className)}
+    >
       {type === "video" ? (
         <video
           src={src}
           muted
           playsInline
           preload="metadata"
+          onLoadedMetadata={onReady}
           className={cn("max-h-[420px] w-full bg-black object-cover", mediaClassName)}
         />
       ) : type === "image" ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className={cn("max-h-[420px] w-full object-cover", mediaClassName)} />
+        <img
+          src={src}
+          alt=""
+          onLoad={onReady}
+          className={cn("max-h-[420px] w-full object-cover", mediaClassName)}
+        />
       ) : (
         <div className="flex h-32 items-center justify-center text-sm text-white/80">מעלה קובץ…</div>
       )}

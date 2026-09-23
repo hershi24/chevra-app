@@ -211,6 +211,9 @@ export function JournalDetail({
                 type={item.type}
                 progress={item.progress}
                 remainingSeconds={item.remainingSeconds}
+                onReady={() =>
+                  pendingRef.current?.scrollIntoView({ behavior: "auto", block: "center" })
+                }
               />
               <figcaption className="bg-white px-3 py-2 text-sm text-muted-foreground">
                 {item.name} · {user.displayName}

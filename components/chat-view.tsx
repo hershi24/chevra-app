@@ -53,6 +53,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [recording, setRecording] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
   const mediaRef = useRef<MediaRecorder | null>(null);
+  const pendingChatRef = useRef<HTMLElement>(null);
 
   const channels = useMemo(() => {
     if (!state || !me) return [];
@@ -64,11 +65,16 @@ export function ChatView({ channelId }: { channelId?: string }) {
     .filter((m) => m.channelId === active?.id)
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
 
+  function scrollPendingIntoView() {
+    pendingChatRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
+  }
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({
-      behavior: pendingUploads.length ? "auto" : "smooth",
-      block: "end",
-    });
+    if (pendingUploads.length) {
+      scrollPendingIntoView();
+      return;
+    }
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, active?.id, pendingUploads.length]);
 
   useEffect(() => {
@@ -288,7 +294,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
               </div>
             </header>
 
-            <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4 pb-36 md:px-6 md:pb-4">
+            <div
+              className={cn(
+                "flex-1 space-y-4 overflow-y-auto px-3 py-4 pb-36 md:px-6",
+                pendingUploads.length ? "md:pb-28" : "md:pb-4"
+              )}
+            >
               {messages.map((message) => {
                 const author = memberById(state.members, message.authorId);
                 const mine = message.authorId === me.id;
@@ -408,8 +419,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </article>
                 );
               })}
-              {pendingUploads.map((item) => (
-                <article key={item.id} className="flex gap-2">
+              {pendingUploads.map((item, index) => (
+                <article
+                  key={item.id}
+                  ref={index === pendingUploads.length - 1 ? pendingChatRef : undefined}
+                  className="flex gap-2"
+                >
                   <UserAvatar member={me} size="sm" />
                   <div className="min-w-0 max-w-[min(100%,42rem)]">
                     <div className="mb-0.5 flex items-baseline gap-2">
@@ -423,6 +438,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         progress={item.progress}
                         remainingSeconds={item.remainingSeconds}
                         mediaClassName="max-h-64"
+                        onReady={scrollPendingIntoView}
                       />
                     </div>
                   </div>
