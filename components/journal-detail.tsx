@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +40,12 @@ export function JournalDetail({
   const [summary, setSummary] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingMedia[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pending.length) return;
+    pendingRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
+  }, [pending.length]);
 
   if (!state || !me) return null;
   const event = state.gatherings.find((g) => g.id === id);
@@ -194,9 +200,10 @@ export function JournalDetail({
               ) : null}
             </figure>
           ))}
-          {pending.map((item) => (
+          {pending.map((item, index) => (
             <figure
               key={item.id}
+              ref={index === pending.length - 1 ? pendingRef : undefined}
               className="overflow-hidden rounded-2xl bg-black/90 ring-1 ring-black/10"
             >
               <MediaProgressOverlay

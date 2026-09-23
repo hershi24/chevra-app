@@ -65,7 +65,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({
+      behavior: pendingUploads.length ? "auto" : "smooth",
+      block: "end",
+    });
   }, [messages.length, active?.id, pendingUploads.length]);
 
   useEffect(() => {
