@@ -27,14 +27,6 @@ import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { formatRelativeHe, memberById } from "@/lib/format";
 import { can, canDeleteMessage } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
@@ -658,53 +650,53 @@ export function ChatView({ channelId }: { channelId?: string }) {
       </section>
       </div>
     </div>
-    <Sheet
-      open={Boolean(deleteTarget)}
-      onOpenChange={(open) => {
-        if (!open && !deleting) setDeleteTarget(null);
-      }}
-    >
-      <SheetContent
-        side="bottom"
-        showCloseButton={false}
-        className="rounded-t-3xl bg-white px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
-        <SheetHeader className="px-0 text-start">
-          <SheetTitle>למחוק את ההודעה?</SheetTitle>
-          <SheetDescription>
+    {deleteTarget ? (
+      <div className="fixed inset-0 z-50 md:hidden">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40"
+          aria-label="ביטול"
+          disabled={deleting}
+          onClick={() => setDeleteTarget(null)}
+        />
+        <div
+          role="dialog"
+          aria-labelledby="delete-message-title"
+          className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl"
+        >
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
+          <h2 id="delete-message-title" className="text-base font-medium">
+            למחוק את ההודעה?
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             ההודעה, כולל תמונות, סרטונים והודעות קוליות שצורפו אליה, תימחק מהצ׳אט.
-            {deleteTarget && deleteTarget.authorId !== me.id
-              ? " אתם מוחקים הודעה של חבר."
-              : ""}
-          </SheetDescription>
-        </SheetHeader>
-        {deleteTarget ? (
-          <p className="truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {deleteTarget.authorId !== me.id ? " אתם מוחקים הודעה של חבר." : ""}
+          </p>
+          <p className="mt-3 truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
             {deletePreview(deleteTarget)}
           </p>
-        ) : null}
-        <SheetFooter className="px-0">
-          <Button
-            variant="destructive"
-            className="h-12 w-full rounded-xl"
-            disabled={deleting}
-            onClick={() => void confirmDelete()}
-          >
-            <Trash2 data-icon="inline-start" />
-            {deleting ? "מוחק…" : "מחק"}
-          </Button>
-          <Button
-            variant="outline"
-            className="h-12 w-full rounded-xl"
-            disabled={deleting}
-            onClick={() => setDeleteTarget(null)}
-          >
-            ביטול
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <div className="mt-4 flex flex-col gap-2">
+            <Button
+              variant="destructive"
+              className="h-12 w-full rounded-xl"
+              disabled={deleting}
+              onClick={() => void confirmDelete()}
+            >
+              <Trash2 data-icon="inline-start" />
+              {deleting ? "מוחק…" : "מחק"}
+            </Button>
+            <Button
+              variant="outline"
+              className="h-12 w-full rounded-xl"
+              disabled={deleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              ביטול
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     </>
   );
 }
