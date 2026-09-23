@@ -45,6 +45,14 @@ export function preloadMedia(url: string, type: LocalUpload["type"]) {
       img.src = url;
       return;
     }
+    if (type === "audio") {
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.onloadeddata = done;
+      audio.onerror = done;
+      audio.src = url;
+      return;
+    }
     resolve();
   });
 }

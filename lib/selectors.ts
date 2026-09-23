@@ -22,7 +22,7 @@ export type GalleryItem = EventMedia & {
 export function galleryItems(state: AppState | { gatherings: Gathering[] }): GalleryItem[] {
   return state.gatherings.flatMap((event) =>
     event.media
-      .filter((item) => item.type === "image" || item.type === "video")
+      .filter((item) => item.type === "image" || item.type === "video" || item.type === "audio")
       .map((item) => ({
         ...item,
         eventId: event.id,

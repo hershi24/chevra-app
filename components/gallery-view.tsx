@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Play, X } from "lucide-react";
+import { Music, Play, X } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 import { galleryItems, type GalleryItem } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
-type KindFilter = "all" | "image" | "video";
+type KindFilter = "all" | "image" | "video" | "audio";
 type DateSort = "newest" | "oldest";
 
 export function GalleryView() {
@@ -53,7 +53,7 @@ export function GalleryView() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <p className="text-[13px] font-light text-muted-foreground">כל התמונות והסרטונים של החבורה</p>
+        <p className="text-[13px] font-light text-muted-foreground">כל התמונות, הסרטונים והאודיו של החבורה</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">גלריה</h1>
       </div>
 
@@ -65,6 +65,7 @@ export function GalleryView() {
             { id: "all", label: "הכל" },
             { id: "image", label: "תמונות" },
             { id: "video", label: "סרטונים" },
+            { id: "audio", label: "אודיו" },
           ]}
         />
         <label className="flex min-w-0 items-center gap-2 text-[13px] font-light text-muted-foreground">
@@ -120,6 +121,10 @@ export function GalleryView() {
                     alt=""
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
                   />
+                ) : item.type === "audio" ? (
+                  <div className="flex h-full w-full items-center justify-center bg-neutral-800">
+                    <Music className="size-8 text-white" />
+                  </div>
                 ) : (
                   <video
                     src={item.url}
@@ -233,6 +238,10 @@ function LightboxBody({
             alt={item.caption || item.eventLabel}
             className="mx-auto max-h-[70vh] w-auto max-w-full object-contain"
           />
+        ) : item.type === "audio" ? (
+          <div className="flex items-center justify-center bg-neutral-800 px-4 py-10">
+            <audio src={item.url} controls className="w-full" />
+          </div>
         ) : (
           <video
             src={item.url}
