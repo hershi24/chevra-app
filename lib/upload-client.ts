@@ -36,12 +36,26 @@ export function createLocalUpload(file: File): LocalUpload {
   };
 }
 
-export function uploadWithProgress(
+function nextPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+export async function uploadWithProgress(
   file: File,
   extras: Record<string, string>,
   onProgress: (info: UploadProgress) => void
 ): Promise<UploadResult> {
-  return new Promise((resolve, reject) => {
+  onProgress({ percent: 0, remainingSeconds: null });
+  await nextPaint();
+
+  const startedAt = Date.now();
+  const result = await new Promise<UploadResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const form = new FormData();
     form.append("file", file);
@@ -49,7 +63,6 @@ export function uploadWithProgress(
       form.append(key, value);
     }
 
-    const startedAt = Date.now();
     xhr.open("POST", "/api/upload");
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
@@ -77,4 +90,8 @@ export function uploadWithProgress(
     xhr.onerror = () => reject(new Error("העלאה נכשלה"));
     xhr.send(form);
   });
+
+  const remain = 450 - (Date.now() - startedAt);
+  if (remain > 0) await wait(remain);
+  return result;
 }
