@@ -28,8 +28,8 @@ export function ChatBubble({
   canDeleteRef.current = canDelete;
 
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
+    const node = rootRef.current;
+    if (!node) return;
 
     let timer: number | null = null;
     let origin: { x: number; y: number } | null = null;
@@ -61,7 +61,7 @@ export function ChatBubble({
       if (event.pointerType === "mouse" && event.button !== 0) return;
       origin = { x: event.clientX, y: event.clientY };
       try {
-        el.setPointerCapture(event.pointerId);
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
       } catch {
         /* ignore */
       }
@@ -82,18 +82,18 @@ export function ChatBubble({
       fire();
     }
 
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("pointermove", onPointerMove);
-    el.addEventListener("pointerup", clearTimer);
-    el.addEventListener("pointercancel", clearTimer);
-    el.addEventListener("contextmenu", onContextMenu);
+    node.addEventListener("pointerdown", onPointerDown);
+    node.addEventListener("pointermove", onPointerMove);
+    node.addEventListener("pointerup", clearTimer);
+    node.addEventListener("pointercancel", clearTimer);
+    node.addEventListener("contextmenu", onContextMenu);
     return () => {
       clearTimer();
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("pointermove", onPointerMove);
-      el.removeEventListener("pointerup", clearTimer);
-      el.removeEventListener("pointercancel", clearTimer);
-      el.removeEventListener("contextmenu", onContextMenu);
+      node.removeEventListener("pointerdown", onPointerDown);
+      node.removeEventListener("pointermove", onPointerMove);
+      node.removeEventListener("pointerup", clearTimer);
+      node.removeEventListener("pointercancel", clearTimer);
+      node.removeEventListener("contextmenu", onContextMenu);
     };
   }, []);
 

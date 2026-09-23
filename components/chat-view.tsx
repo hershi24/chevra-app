@@ -269,6 +269,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       : [];
 
   return (
+    <>
     <div
       className={cn(
         "flex bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5",
@@ -530,54 +531,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
               <div ref={endRef} />
             </div>
 
-            <Sheet
-              open={Boolean(deleteTarget)}
-              onOpenChange={(open) => {
-                if (!open && !deleting) setDeleteTarget(null);
-              }}
-            >
-              <SheetContent
-                side="bottom"
-                showCloseButton={false}
-                className="rounded-t-3xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
-              >
-                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
-                <SheetHeader className="px-0 text-start">
-                  <SheetTitle>למחוק את ההודעה?</SheetTitle>
-                  <SheetDescription>
-                    ההודעה, כולל תמונות, סרטונים והודעות קוליות שצורפו אליה, תימחק מהצ׳אט.
-                    {deleteTarget && deleteTarget.authorId !== me.id
-                      ? " אתם מוחקים הודעה של חבר."
-                      : ""}
-                  </SheetDescription>
-                </SheetHeader>
-                {deleteTarget ? (
-                  <p className="truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-                    {deletePreview(deleteTarget)}
-                  </p>
-                ) : null}
-                <SheetFooter className="px-0">
-                  <Button
-                    variant="destructive"
-                    className="h-12 w-full rounded-xl"
-                    disabled={deleting}
-                    onClick={() => void confirmDelete()}
-                  >
-                    <Trash2 data-icon="inline-start" />
-                    {deleting ? "מוחק…" : "מחק"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-12 w-full rounded-xl"
-                    disabled={deleting}
-                    onClick={() => setDeleteTarget(null)}
-                  >
-                    ביטול
-                  </Button>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
-
             <div className="shrink-0 border-t border-black/5 bg-white px-1.5 py-1.5 md:bg-white/70 md:p-3">
               {quote ? (
                 <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs">
@@ -705,6 +658,54 @@ export function ChatView({ channelId }: { channelId?: string }) {
       </section>
       </div>
     </div>
+    <Sheet
+      open={Boolean(deleteTarget)}
+      onOpenChange={(open) => {
+        if (!open && !deleting) setDeleteTarget(null);
+      }}
+    >
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        className="rounded-t-3xl bg-white px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
+        <SheetHeader className="px-0 text-start">
+          <SheetTitle>למחוק את ההודעה?</SheetTitle>
+          <SheetDescription>
+            ההודעה, כולל תמונות, סרטונים והודעות קוליות שצורפו אליה, תימחק מהצ׳אט.
+            {deleteTarget && deleteTarget.authorId !== me.id
+              ? " אתם מוחקים הודעה של חבר."
+              : ""}
+          </SheetDescription>
+        </SheetHeader>
+        {deleteTarget ? (
+          <p className="truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {deletePreview(deleteTarget)}
+          </p>
+        ) : null}
+        <SheetFooter className="px-0">
+          <Button
+            variant="destructive"
+            className="h-12 w-full rounded-xl"
+            disabled={deleting}
+            onClick={() => void confirmDelete()}
+          >
+            <Trash2 data-icon="inline-start" />
+            {deleting ? "מוחק…" : "מחק"}
+          </Button>
+          <Button
+            variant="outline"
+            className="h-12 w-full rounded-xl"
+            disabled={deleting}
+            onClick={() => setDeleteTarget(null)}
+          >
+            ביטול
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }
 
