@@ -38,6 +38,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isChat = pathname.startsWith("/chat");
+  const isChatThread = pathname.startsWith("/chat/");
 
   if (loading) {
     return (
@@ -110,7 +111,12 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 md:hidden">
+      <header
+        className={cn(
+          "sticky top-0 z-20 items-center justify-between border-b border-black/5 bg-white px-4 py-3 md:hidden",
+          isChatThread ? "hidden" : "flex"
+        )}
+      >
         <div>
           <div className="text-[1.05rem] font-medium tracking-tight">מיין חברה</div>
           <div className="text-[11px] text-muted-foreground">{me.displayName}</div>
