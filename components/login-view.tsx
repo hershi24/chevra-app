@@ -39,14 +39,15 @@ export function LoginView() {
     <div className="flex min-h-dvh items-center justify-center bg-[#f6f4f0] px-4 py-12">
       <div className="w-full max-w-[26rem]">
         <p className="text-center text-[11px] font-light tracking-[0.28em] text-[#8a8478]">
-          CHEVRA
+          אש קודש
         </p>
         <h1 className="mt-3 text-center text-[2.35rem] font-medium tracking-tight text-[#2b2a27] md:text-[2.6rem]">
           מיין חברה
         </h1>
         <div className="mx-auto mt-4 h-px w-12 bg-[#c8c2b6]" />
-        <p className="mx-auto mt-5 max-w-[21rem] text-center text-[15px] font-light leading-7 text-[#6f6a62]">
-          חבורה קרובה של חברים. לימוד, כינוס ושיחה — במקום אחד, בכבוד ובנחת.
+        <p className="mx-auto mt-5 max-w-[24rem] text-center text-[15px] font-light leading-7 text-[#6f6a62]">
+          האתר הרשמי של חבורת &ldquo;אש קודש&rdquo; או בשמה השני מיין חברה.com.
+          <span className="mt-1 block">בהנאה!</span>
         </p>
 
         <div className="mt-8 rounded-[1.5rem] bg-white p-6 ring-1 ring-[#e6e2da] md:p-8">
