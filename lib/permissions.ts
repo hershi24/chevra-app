@@ -4,6 +4,14 @@ export function isAdmin(user?: Member | null) {
   return user?.role === "admin";
 }
 
+export function canDeleteMessage(
+  user: Member | null | undefined,
+  message: { authorId: string }
+) {
+  if (!user) return false;
+  return message.authorId === user.id || isAdmin(user);
+}
+
 export function isLeader(user?: Member | null) {
   return user?.role === "leader" || user?.role === "admin";
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
-import { can } from "@/lib/permissions";
+import { can, canDeleteMessage } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message } from "@/lib/types";
 
@@ -111,6 +111,16 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
         mentions: body.mentions ?? [],
       };
       s.messages.push(message);
+      return;
+    }
+    case "deleteMessage": {
+      if (!can(me, "chat")) throw new Error("forbidden");
+      const message = s.messages.find((m) => m.id === body.messageId);
+      if (!message) throw new Error("ההודעה לא נמצאה");
+      const channel = s.channels.find((c) => c.id === message.channelId);
+      if (!channel?.memberIds.includes(me.id)) throw new Error("forbidden");
+      if (!canDeleteMessage(me, message)) throw new Error("forbidden");
+      s.messages = s.messages.filter((m) => m.id !== message.id);
       return;
     }
     case "react": {

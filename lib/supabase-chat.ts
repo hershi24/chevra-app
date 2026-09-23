@@ -173,6 +173,14 @@ export async function syncChatDiff(before: AppState, after: AppState) {
     }
   }
 
+  const removed = before.messages.filter(
+    (message) => !after.messages.some((item) => item.id === message.id)
+  );
+  for (const message of removed) {
+    const { error } = await db.from("messages").delete().eq("id", message.id);
+    if (error) throw error;
+  }
+
   for (const message of after.messages) {
     const prev = before.messages.find((m) => m.id === message.id);
     if (!prev) {

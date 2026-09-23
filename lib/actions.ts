@@ -27,6 +27,7 @@ export type ActionBody =
       voiceUrl?: string;
     }
   | { type: "react"; messageId: string; emoji: string }
+  | { type: "deleteMessage"; messageId: string }
   | { type: "createDm"; memberId: string }
   | {
       type: "addMember";
