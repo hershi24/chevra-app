@@ -664,7 +664,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
         <div
           role="dialog"
           aria-labelledby="delete-message-title"
-          className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl"
+          className="absolute inset-x-0 bottom-16 rounded-t-3xl bg-white px-4 pt-3 pb-4 shadow-2xl"
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
           <h2 id="delete-message-title" className="text-base font-medium">
