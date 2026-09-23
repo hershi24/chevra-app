@@ -28,7 +28,7 @@ import { formatRelativeHe, memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
 import type { Attachment, Channel, Message } from "@/lib/types";
-import { createLocalUpload, uploadWithProgress } from "@/lib/upload-client";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 type PendingChatUpload = {
@@ -142,6 +142,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
               )
             );
           });
+          await preloadMedia(data.url, item.type);
           attachments.push({
             id: crypto.randomUUID(),
             type: item.type,

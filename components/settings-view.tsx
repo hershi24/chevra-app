@@ -13,7 +13,7 @@ import { roleLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
 import type { Role } from "@/lib/types";
-import { createLocalUpload, uploadWithProgress } from "@/lib/upload-client";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 export function SettingsView() {
@@ -152,6 +152,7 @@ export function SettingsView() {
                       prev ? { ...prev, progress: percent, remainingSeconds } : prev
                     );
                   });
+                  await preloadMedia(data.url, "image");
                   await act({
                     type: "addBackground",
                     url: data.url,

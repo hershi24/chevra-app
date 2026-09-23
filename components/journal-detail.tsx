@@ -19,7 +19,7 @@ import {
 } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { EventMedia } from "@/lib/types";
-import { createLocalUpload, uploadWithProgress } from "@/lib/upload-client";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 
 type PendingMedia = {
   id: string;
@@ -96,6 +96,7 @@ export function JournalDetail({
           );
           const type: EventMedia["type"] =
             item.type === "video" ? "video" : item.type === "audio" ? "audio" : "image";
+          await preloadMedia(data.url, item.type);
           await act({
             type: "uploadMedia",
             eventId: gathering.id,

@@ -26,6 +26,29 @@ export function mediaKind(type: string): LocalUpload["type"] {
   return "file";
 }
 
+export function preloadMedia(url: string, type: LocalUpload["type"]) {
+  return new Promise<void>((resolve) => {
+    const done = () => resolve();
+    window.setTimeout(done, 8000);
+    if (type === "video") {
+      const video = document.createElement("video");
+      video.preload = "auto";
+      video.onloadeddata = done;
+      video.onerror = done;
+      video.src = url;
+      return;
+    }
+    if (type === "image") {
+      const img = new Image();
+      img.onload = done;
+      img.onerror = done;
+      img.src = url;
+      return;
+    }
+    resolve();
+  });
+}
+
 export function createLocalUpload(file: File): LocalUpload {
   return {
     id: crypto.randomUUID(),
