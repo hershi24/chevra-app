@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -650,8 +651,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
       </section>
       </div>
     </div>
-    {deleteTarget ? (
-      <div className="fixed inset-0 z-50 md:hidden">
+    {deleteTarget
+      ? createPortal(
+      <div className="fixed inset-0 z-[80] md:hidden">
         <button
           type="button"
           className="absolute inset-0 bg-black/40"
@@ -695,8 +697,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
             </Button>
           </div>
         </div>
-      </div>
-    ) : null}
+      </div>,
+      document.body
+    )
+      : null}
     </>
   );
 }
