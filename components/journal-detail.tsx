@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
+import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +21,7 @@ import {
 import { can } from "@/lib/permissions";
 import type { EventMedia } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
+import { cn } from "@/lib/utils";
 
 type PendingMedia = {
   id: string;
@@ -176,7 +178,10 @@ export function JournalDetail({
           {event.media.map((item) => (
             <figure
               key={item.id}
-              className="overflow-hidden rounded-2xl bg-black/90 ring-1 ring-black/10"
+              className={cn(
+                "overflow-hidden rounded-2xl ring-1 ring-black/10",
+                item.type === "audio" ? "bg-white" : "bg-black/90"
+              )}
             >
               {item.type === "video" ? (
                 <video
@@ -187,8 +192,8 @@ export function JournalDetail({
                   className="max-h-[420px] w-full bg-black"
                 />
               ) : item.type === "audio" ? (
-                <div className="p-4">
-                  <audio src={item.url} controls className="w-full" />
+                <div className="bg-white px-4 py-5">
+                  <VoiceNotePlayer src={item.url} />
                 </div>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -252,9 +257,7 @@ export function JournalDetail({
           ) : (
             <p className="text-muted-foreground">עדיין אין סיכום לחברה זו.</p>
           )}
-          {event.audioUrl ? (
-            <audio src={event.audioUrl} controls className="w-full" />
-          ) : null}
+          {event.audioUrl ? <VoiceNotePlayer src={event.audioUrl} /> : null}
         </CardContent>
       </Card>
 

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
+import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -379,7 +380,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         ) : null}
                         {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(message.text)}</p> : null}
                         {message.voiceUrl ? (
-                          <audio src={message.voiceUrl} controls className="mt-2 w-full" />
+                          <VoiceNotePlayer src={message.voiceUrl} className="mt-2" />
                         ) : null}
                         {message.attachments.map((file) =>
                           file.type === "image" ? (
@@ -399,12 +400,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               className="mt-2 max-h-64 w-full rounded-xl bg-black"
                             />
                           ) : file.type === "audio" ? (
-                            <audio
-                              key={file.id}
-                              src={file.url}
-                              controls
-                              className="mt-2 w-full"
-                            />
+                            <VoiceNotePlayer key={file.id} src={file.url} className="mt-2" />
                           ) : (
                             <a
                               key={file.id}

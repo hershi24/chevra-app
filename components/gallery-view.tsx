@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Music, Play, X } from "lucide-react";
 import { useApp } from "@/components/app-provider";
+import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import {
   formatDateShortHe,
@@ -239,8 +240,8 @@ function LightboxBody({
             className="mx-auto max-h-[70vh] w-auto max-w-full object-contain"
           />
         ) : item.type === "audio" ? (
-          <div className="flex items-center justify-center bg-neutral-800 px-4 py-10">
-            <audio src={item.url} controls className="w-full" />
+          <div className="flex items-center justify-center bg-[#f7f8f9] px-4 py-10">
+            <VoiceNotePlayer src={item.url} />
           </div>
         ) : (
           <video
