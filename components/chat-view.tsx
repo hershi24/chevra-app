@@ -14,19 +14,29 @@ import {
   Reply,
   Send,
   Smile,
+  Trash2,
   Trees,
   Utensils,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { ChatBubble } from "@/components/chat-bubble";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { formatRelativeHe, memberById } from "@/lib/format";
-import { can } from "@/lib/permissions";
+import { can, canDeleteMessage } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
 import type { Attachment, Channel, Message } from "@/lib/types";
 import {
@@ -59,6 +69,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [recording, setRecording] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
 
@@ -127,6 +139,20 @@ export function ChatView({ channelId }: { channelId?: string }) {
       setQuote(undefined);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "שליחה נכשלה");
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await act({ type: "deleteMessage", messageId: deleteTarget.id });
+      setDeleteTarget(null);
+      toast.success("ההודעה נמחקה");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -368,7 +394,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           {formatRelativeHe(message.createdAt)}
                         </span>
                       </div>
-                      <div
+                      <ChatBubble
+                        canDelete={canDeleteMessage(me, message)}
+                        onLongPress={() => setDeleteTarget(message)}
                         className={cn(
                           "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 shadow-sm",
                           mine ? "bg-accent text-foreground" : "bg-white"
@@ -420,7 +448,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             </a>
                           )
                         )}
-                      </div>
+                      </ChatBubble>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
                         {Object.entries(message.reactions).map(([emoji, ids]) => (
                           <button
@@ -501,6 +529,54 @@ export function ChatView({ channelId }: { channelId?: string }) {
               ))}
               <div ref={endRef} />
             </div>
+
+            <Sheet
+              open={Boolean(deleteTarget)}
+              onOpenChange={(open) => {
+                if (!open && !deleting) setDeleteTarget(null);
+              }}
+            >
+              <SheetContent
+                side="bottom"
+                showCloseButton={false}
+                className="rounded-t-3xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
+              >
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
+                <SheetHeader className="px-0 text-start">
+                  <SheetTitle>למחוק את ההודעה?</SheetTitle>
+                  <SheetDescription>
+                    ההודעה, כולל תמונות, סרטונים והודעות קוליות שצורפו אליה, תימחק מהצ׳אט.
+                    {deleteTarget && deleteTarget.authorId !== me.id
+                      ? " אתם מוחקים הודעה של חבר."
+                      : ""}
+                  </SheetDescription>
+                </SheetHeader>
+                {deleteTarget ? (
+                  <p className="truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {deletePreview(deleteTarget)}
+                  </p>
+                ) : null}
+                <SheetFooter className="px-0">
+                  <Button
+                    variant="destructive"
+                    className="h-12 w-full rounded-xl"
+                    disabled={deleting}
+                    onClick={() => void confirmDelete()}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    {deleting ? "מוחק…" : "מחק"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-xl"
+                    disabled={deleting}
+                    onClick={() => setDeleteTarget(null)}
+                  >
+                    ביטול
+                  </Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
 
             <div className="shrink-0 border-t border-black/5 bg-white px-1.5 py-1.5 md:bg-white/70 md:p-3">
               {quote ? (
@@ -721,6 +797,17 @@ function groupChannels(channels: Channel[]) {
     rooms: channels.filter((c) => c.type !== "dm"),
     dms: channels.filter((c) => c.type === "dm"),
   };
+}
+
+function deletePreview(message: Message) {
+  if (message.text.trim()) return message.text;
+  if (message.voiceUrl) return "הודעה קולית";
+  const type = message.attachments[0]?.type;
+  if (type === "image") return "תמונה";
+  if (type === "video") return "סרטון";
+  if (type === "audio") return "הודעה קולית";
+  if (type) return "קובץ";
+  return "הודעה";
 }
 
 function highlightMentions(text: string) {

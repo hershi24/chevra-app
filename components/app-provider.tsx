@@ -10,7 +10,14 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { ActionBody } from "@/lib/actions";
-import { applyReaction, messageFromRow, upsertMessage, type MessageRow, type ReactionRow } from "@/lib/chat-message";
+import {
+  applyReaction,
+  messageFromRow,
+  removeMessage,
+  upsertMessage,
+  type MessageRow,
+  type ReactionRow,
+} from "@/lib/chat-message";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { Member, PublicState } from "@/lib/types";
 
@@ -93,6 +100,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setState((prev) => {
             if (!prev) return prev;
             return { ...prev, messages: upsertMessage(prev.messages, incoming) };
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages" },
+        (payload) => {
+          const old = payload.old as { id?: string };
+          if (!old?.id) return;
+          setState((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: removeMessage(prev.messages, old.id!) };
           });
         }
       )

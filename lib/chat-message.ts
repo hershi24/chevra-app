@@ -33,6 +33,10 @@ export function messageFromRow(row: MessageRow, reactions: Record<string, string
   };
 }
 
+export function removeMessage(messages: Message[], messageId: string): Message[] {
+  return messages.filter((item) => item.id !== messageId);
+}
+
 export function upsertMessage(messages: Message[], incoming: Message): Message[] {
   const index = messages.findIndex((item) => item.id === incoming.id);
   if (index === -1) return [...messages, incoming];
