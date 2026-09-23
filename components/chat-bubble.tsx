@@ -39,11 +39,15 @@ export function ChatBubble({
 
   return (
     <div
-      className={cn(className, canDelete && "select-none md:select-text")}
+      className={cn(
+        className,
+        canDelete && "touch-manipulation select-none [-webkit-touch-callout:none] md:select-text"
+      )}
       onPointerDown={(event) => {
         if (!enabled()) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
         origin.current = { x: event.clientX, y: event.clientY };
+        event.currentTarget.setPointerCapture(event.pointerId);
         timer.current = window.setTimeout(() => {
           timer.current = null;
           origin.current = null;
@@ -65,10 +69,11 @@ export function ChatBubble({
       }}
       onPointerUp={clearTimer}
       onPointerCancel={clearTimer}
-      onLostPointerCapture={clearTimer}
       onContextMenu={(event) => {
         if (!enabled()) return;
         event.preventDefault();
+        clearTimer();
+        onLongPress();
       }}
     >
       {children}
