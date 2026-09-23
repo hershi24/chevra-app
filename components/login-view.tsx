@@ -45,9 +45,12 @@ export function LoginView() {
           מיין חברה
         </h1>
         <div className="mx-auto mt-4 h-px w-12 bg-[#c8c2b6]" />
-        <p className="mx-auto mt-5 max-w-[24rem] text-center text-[15px] font-light leading-7 text-[#6f6a62]">
-          האתר הרשמי של חבורת &ldquo;אש קודש&rdquo; או בשמה השני מיין חברה.com.
-          <span className="mt-1 block">בהנאה!</span>
+        <p className="mx-auto mt-5 max-w-[26rem] text-center text-[15px] font-light leading-7 text-[#6f6a62]">
+          האתר הרשמי של חבורת &ldquo;אש קודש&rdquo; או בשמה השני{" "}
+          <span className="whitespace-nowrap">
+            מיין חברה<span dir="ltr">.com</span>
+          </span>
+          . בהנאה!
         </p>
 
         <div className="mt-8 rounded-[1.5rem] bg-white p-6 ring-1 ring-[#e6e2da] md:p-8">
