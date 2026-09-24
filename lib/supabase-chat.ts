@@ -143,11 +143,40 @@ export async function syncChatDiff(before: AppState, after: AppState) {
   const newMembers = after.members.filter((member) => !before.members.some((m) => m.id === member.id));
   const changedMembers = after.members.filter((member) => {
     const prev = before.members.find((m) => m.id === member.id);
-    return prev && (prev.role !== member.role || prev.displayName !== member.displayName);
+    return (
+      prev &&
+      (prev.role !== member.role ||
+        prev.displayName !== member.displayName ||
+        prev.username !== member.username ||
+        prev.phone !== member.phone ||
+        prev.email !== member.email)
+    );
   });
   const membersToUpsert = [...newMembers, ...changedMembers];
   if (membersToUpsert.length) {
     const { error } = await db.from("members").upsert(membersToUpsert.map(memberRow));
+    if (error) throw error;
+  }
+
+  const removedMembers = before.members.filter(
+    (member) => !after.members.some((item) => item.id === member.id)
+  );
+  for (const member of removedMembers) {
+    const { error: linkError } = await db.from("channel_members").delete().eq("member_id", member.id);
+    if (linkError) throw linkError;
+    const { error } = await db.from("members").delete().eq("id", member.id);
+    if (error) throw error;
+  }
+
+  const removedChannels = before.channels.filter(
+    (channel) => !after.channels.some((item) => item.id === channel.id)
+  );
+  for (const channel of removedChannels) {
+    const { error: linkError } = await db.from("channel_members").delete().eq("channel_id", channel.id);
+    if (linkError) throw linkError;
+    const { error: messageError } = await db.from("messages").delete().eq("channel_id", channel.id);
+    if (messageError) throw messageError;
+    const { error } = await db.from("channels").delete().eq("id", channel.id);
     if (error) throw error;
   }
 

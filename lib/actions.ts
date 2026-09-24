@@ -37,6 +37,18 @@ export type ActionBody =
       email?: string;
       role?: Role;
     }
+  | {
+      type: "updateMember";
+      memberId: string;
+      patch: {
+        username?: string;
+        displayName?: string;
+        phone?: string;
+        email?: string;
+        role?: Role;
+      };
+    }
+  | { type: "removeMember"; memberId: string }
   | { type: "setRole"; memberId: string; role: Role }
   | { type: "setBackground"; backgroundImageId: string | null }
   | { type: "addBackground"; url: string; label: string; fromGatheringId?: string };

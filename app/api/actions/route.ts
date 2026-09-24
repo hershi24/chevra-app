@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
 import { can, canDeleteMessage } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
-import type { AppState, Channel, Gathering, Member, Message } from "@/lib/types";
+import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -174,9 +174,9 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
         displayName: body.displayName.trim(),
         role: body.role ?? "member",
         phone: body.phone?.trim() || "",
-        email: body.email?.trim() || `${body.username}@chevra.local`,
+        email: body.email?.trim() || `${body.username.trim()}@chevra.local`,
         avatarColor: ["#0F766E", "#B45309", "#1D4ED8", "#7C3AED"][s.members.length % 4],
-        initials: body.displayName.trim().slice(0, 2),
+        initials: initialsFrom(body.displayName),
       };
       s.members.push(member);
       for (const channel of s.channels) {
@@ -187,14 +187,58 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       }
       return;
     }
+    case "updateMember": {
+      if (!can(me, "manageMembers")) throw new Error("forbidden");
+      const member = s.members.find((m) => m.id === body.memberId);
+      if (!member) throw new Error("החבר לא נמצא");
+      const username = body.patch.username?.trim();
+      if (username && username !== member.username) {
+        if (s.members.some((item) => item.id !== member.id && item.username === username)) {
+          throw new Error("שם המשתמש כבר קיים");
+        }
+        member.username = username;
+      }
+      if (body.patch.displayName !== undefined) {
+        const displayName = body.patch.displayName.trim();
+        if (!displayName) throw new Error("נא למלא שם מלא");
+        member.displayName = displayName;
+        member.initials = initialsFrom(displayName);
+      }
+      if (body.patch.phone !== undefined) member.phone = body.patch.phone.trim();
+      if (body.patch.email !== undefined) member.email = body.patch.email.trim();
+      if (body.patch.role !== undefined) {
+        applyRole(s, me, member, body.patch.role);
+      }
+      return;
+    }
+    case "removeMember": {
+      if (!can(me, "manageMembers")) throw new Error("forbidden");
+      const member = s.members.find((m) => m.id === body.memberId);
+      if (!member) throw new Error("החבר לא נמצא");
+      if (member.id === me.id) throw new Error("לא ניתן להסיר את עצמכם");
+      if (member.role === "admin" && s.members.filter((item) => item.role === "admin").length <= 1) {
+        throw new Error("חייב להישאר מנהל אחד לפחות");
+      }
+      s.members = s.members.filter((item) => item.id !== member.id);
+      s.channels = s.channels.filter(
+        (channel) => !(channel.type === "dm" && channel.memberIds.includes(member.id))
+      );
+      for (const channel of s.channels) {
+        channel.memberIds = channel.memberIds.filter((id) => id !== member.id);
+      }
+      const channelIds = new Set(s.channels.map((channel) => channel.id));
+      s.messages = s.messages.filter((message) => channelIds.has(message.channelId));
+      s.tokens = s.tokens.filter((token) => token.memberId !== member.id);
+      for (const event of s.gatherings) {
+        delete event.rsvps[member.id];
+      }
+      return;
+    }
     case "setRole": {
       if (!can(me, "assignRoles")) throw new Error("forbidden");
       const member = s.members.find((m) => m.id === body.memberId);
       if (!member) throw new Error("החבר לא נמצא");
-      if (member.id === me.id && body.role !== "admin") {
-        throw new Error("לא ניתן להסיר מעצמך הרשאת מנהל");
-      }
-      member.role = body.role;
+      applyRole(s, me, member, body.role);
       return;
     }
     case "setBackground": {
@@ -215,4 +259,24 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
     default:
       throw new Error("פעולה לא מוכרת");
   }
+}
+
+function initialsFrom(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]!.slice(0, 1)}${parts[1]!.slice(0, 1)}`;
+  return name.trim().slice(0, 2) || "?";
+}
+
+function applyRole(state: AppState, me: Member, member: Member, role: Role) {
+  if (member.id === me.id && role !== "admin") {
+    throw new Error("לא ניתן להסיר מעצמכם הרשאת מנהל");
+  }
+  if (
+    member.role === "admin" &&
+    role !== "admin" &&
+    state.members.filter((item) => item.role === "admin").length <= 1
+  ) {
+    throw new Error("חייב להישאר מנהל אחד לפחות");
+  }
+  member.role = role;
 }
