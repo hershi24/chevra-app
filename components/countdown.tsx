@@ -25,13 +25,20 @@ export function Countdown({ iso }: { iso: string }) {
   ];
 
   return (
-    <div className="flex divide-x divide-x-reverse divide-black/8">
-      {cells.map((cell) => (
-        <div key={cell.label} className="min-w-[4.5rem] px-4 first:ps-0 last:pe-0">
-          <div className="text-[1.75rem] font-light tabular-nums tracking-tight text-foreground md:text-[2rem]">
-            {String(cell.value).padStart(2, "0")}
+    <div className="flex items-stretch" role="timer" aria-label="ספירה לאחור לחברה">
+      {cells.map((cell, index) => (
+        <div key={cell.label} className="flex items-stretch">
+          {index > 0 ? (
+            <span aria-hidden className="my-0.5 w-px shrink-0 self-stretch bg-[#c5cad3]" />
+          ) : null}
+          <div className="flex w-[4.15rem] flex-col items-center px-3 md:w-[4.6rem] md:px-4">
+            <span className="font-medium tabular-nums text-[1.6rem] leading-none tracking-tight text-foreground md:text-[1.8rem]">
+              {String(cell.value).padStart(2, "0")}
+            </span>
+            <span className="mt-1.5 text-[11px] font-normal leading-none text-muted-foreground">
+              {cell.label}
+            </span>
           </div>
-          <div className="mt-0.5 text-[11px] font-light text-muted-foreground">{cell.label}</div>
         </div>
       ))}
     </div>
