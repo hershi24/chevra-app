@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Music, Play, Upload, X } from "lucide-react";
+import { Music, Play, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { MediaProgressOverlay } from "@/components/media-progress";
@@ -13,7 +13,7 @@ import {
   gatheringLabel,
   memberById,
 } from "@/lib/format";
-import { can } from "@/lib/permissions";
+import { can, canDeleteMedia } from "@/lib/permissions";
 import { galleryItems, upcomingGathering, type GalleryItem } from "@/lib/selectors";
 import type { EventMedia } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
@@ -37,6 +37,8 @@ export function GalleryView() {
   const [memberId, setMemberId] = useState("all");
   const [dateSort, setDateSort] = useState<DateSort>("newest");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const items = useMemo(() => (state ? galleryItems(state) : []), [state]);
 
@@ -70,6 +72,26 @@ export function GalleryView() {
     (a, b) => +new Date(b.startsAt) - +new Date(a.startsAt)
   );
   const targetId = eventId || upcomingGathering(state)?.id || gatherings[0]?.id || "";
+
+  function openItem(id: string, confirm = false) {
+    setActiveId(id);
+    setConfirmDelete(confirm);
+  }
+
+  async function deleteActive() {
+    if (!active || deleting) return;
+    setDeleting(true);
+    try {
+      await act({ type: "deleteMedia", eventId: active.eventId, mediaId: active.id });
+      setActiveId(null);
+      setConfirmDelete(false);
+      toast.success("המדיה נמחקה");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function uploadFile(file: File) {
     if (!me || !targetId) return;
@@ -224,11 +246,11 @@ export function GalleryView() {
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 md:gap-3">
           {filtered.map((item) => (
+            <div key={item.id} className="group relative overflow-hidden rounded-2xl bg-muted">
             <button
-              key={item.id}
               type="button"
-              onClick={() => setActiveId(item.id)}
-              className="group relative overflow-hidden rounded-2xl bg-muted"
+              onClick={() => openItem(item.id)}
+              className="block w-full"
               aria-label={item.caption || item.eventLabel}
             >
               <div className="aspect-square">
@@ -259,6 +281,17 @@ export function GalleryView() {
                 </span>
               ) : null}
             </button>
+            {canDeleteMedia(me, item) ? (
+              <button
+                type="button"
+                aria-label="מחק"
+                className="absolute top-2 start-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/55 text-white"
+                onClick={() => openItem(item.id, true)}
+              >
+                <Trash2 className="size-4" />
+              </button>
+            ) : null}
+            </div>
           ))}
         </div>
       )}
@@ -266,7 +299,10 @@ export function GalleryView() {
       {active ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          onClick={() => setActiveId(null)}
+          onClick={() => {
+            setConfirmDelete(false);
+            setActiveId(null);
+          }}
         >
           <div
             role="dialog"
@@ -277,24 +313,71 @@ export function GalleryView() {
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <h2 className="text-base font-medium">{active.eventLabel}</h2>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="סגירה"
-                onClick={() => setActiveId(null)}
-              >
-                <X className="size-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {canDeleteMedia(me, active) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="מחק"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="סגירה"
+                  onClick={() => setActiveId(null)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
             </div>
+            {confirmDelete && canDeleteMedia(me, active) ? (
+              <div className="mb-3 rounded-xl bg-destructive/10 px-3 py-3">
+                <p className="text-sm font-medium">למחוק את המדיה?</p>
+                <p className="mt-1 text-sm font-light text-muted-foreground">
+                  {active.uploadedBy === me.id
+                    ? "הפריט יוסר מהגלריה."
+                    : "אתם מוחקים מדיה של חבר. הפריט יוסר מהגלריה."}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="h-10 rounded-xl"
+                    disabled={deleting}
+                    onClick={() => void deleteActive()}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    {deleting ? "מוחק…" : "מחק"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    disabled={deleting}
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    ביטול
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <LightboxBody
               item={active}
               authorName={memberById(state.members, active.uploadedBy)?.displayName}
               onPrev={
-                activeIndex > 0 ? () => setActiveId(filtered[activeIndex - 1].id) : undefined
+                activeIndex > 0
+                  ? () => openItem(filtered[activeIndex - 1].id)
+                  : undefined
               }
               onNext={
                 activeIndex < filtered.length - 1
-                  ? () => setActiveId(filtered[activeIndex + 1].id)
+                  ? () => openItem(filtered[activeIndex + 1].id)
                   : undefined
               }
             />

@@ -4,12 +4,23 @@ export function isAdmin(user?: Member | null) {
   return user?.role === "admin";
 }
 
+export function canDeleteOwn(user: Member | null | undefined, ownerId: string) {
+  if (!user) return false;
+  return ownerId === user.id || isAdmin(user);
+}
+
 export function canDeleteMessage(
   user: Member | null | undefined,
   message: { authorId: string }
 ) {
-  if (!user) return false;
-  return message.authorId === user.id || isAdmin(user);
+  return canDeleteOwn(user, message.authorId);
+}
+
+export function canDeleteMedia(
+  user: Member | null | undefined,
+  media: { uploadedBy: string }
+) {
+  return canDeleteOwn(user, media.uploadedBy);
 }
 
 export function isLeader(user?: Member | null) {
