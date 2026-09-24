@@ -169,17 +169,29 @@ export function ChatView({ channelId }: { channelId?: string }) {
     }
   }
 
+  async function deleteMessageById(messageId: string) {
+    await act({ type: "deleteMessage", messageId });
+    toast.success("ההודעה נמחקה");
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await act({ type: "deleteMessage", messageId: deleteTarget.id });
+      await deleteMessageById(deleteTarget.id);
       setDeleteTarget(null);
-      toast.success("ההודעה נמחקה");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function deleteFromHover(message: Message) {
+    try {
+      await deleteMessageById(message.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
     }
   }
 
@@ -451,7 +463,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   ? memberById(state.members, message.quote.authorId)
                   : null;
                 return (
-                  <article key={message.id} className="flex gap-2">
+                  <article key={message.id} className="group/msg flex gap-2">
                     <UserAvatar member={author} size="sm" />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
                       <div className="mb-0.5 flex items-baseline gap-2">
@@ -562,6 +574,19 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           <Reply data-icon="inline-start" />
                           השב
                         </Button>
+                        {canDeleteMessage(me, message) ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            aria-label="מחק"
+                            className="hidden text-destructive hover:bg-destructive/10 hover:text-destructive md:inline-flex md:opacity-0 md:transition-opacity md:group-hover/msg:opacity-100"
+                            onClick={() => void deleteFromHover(message)}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                            מחק
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </article>
