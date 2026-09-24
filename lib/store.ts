@@ -11,6 +11,7 @@ import {
   syncChatDiff,
   upsertMembers,
 } from "./supabase-chat";
+import { ensureMemberSecrets, publicMember } from "./password";
 import type { AppState, Member, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -31,7 +32,9 @@ async function loadJson(): Promise<AppState> {
   if (g.__chevraCache) return g.__chevraCache;
   try {
     const raw = await readFile(FILE, "utf8");
-    g.__chevraCache = JSON.parse(raw) as AppState;
+    const parsed = JSON.parse(raw) as AppState;
+    if (ensureMemberSecrets(parsed.members)) await persist(parsed);
+    g.__chevraCache = parsed;
     return g.__chevraCache;
   } catch {
     const seeded = createSeed();
@@ -43,6 +46,7 @@ async function loadJson(): Promise<AppState> {
 
 export async function readState(): Promise<AppState> {
   const json = await loadJson();
+  if (ensureMemberSecrets(json.members)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
   const state = structuredClone(json);
@@ -53,7 +57,18 @@ export async function readState(): Promise<AppState> {
       loadMembersFromSupabase(),
     ]);
     if (members?.length) {
-      state.members = members;
+      const local = new Map(state.members.map((member) => [member.id, member]));
+      state.members = members.map((member) => {
+        const previous = local.get(member.id);
+        return {
+          ...member,
+          passwordHash: member.passwordHash || previous?.passwordHash,
+          mustChangePassword: member.passwordHash
+            ? member.mustChangePassword
+            : (previous?.mustChangePassword ?? true),
+        };
+      });
+      ensureMemberSecrets(state.members);
     } else if (state.members.length) {
       await upsertMembers(state.members);
     }
@@ -123,7 +138,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
   const channels = state.channels.filter((channel) => canSeeChannel(me, channel));
   const visible = new Set(channels.map((channel) => channel.id));
   return {
-    members: state.members,
+    members: state.members.map(publicMember),
     gatherings: state.gatherings,
     channels,
     messages: state.messages.filter((message) => visible.has(message.channelId)),
@@ -131,7 +146,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     emailLog: state.emailLog,
     ivrLog: state.ivrLog,
     revision: state.revision,
-    me,
+    me: publicMember(me),
   };
 }
 

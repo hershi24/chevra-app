@@ -8,6 +8,8 @@ import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { roleLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
@@ -93,6 +95,8 @@ export function SettingsView() {
           </Button>
         </CardContent>
       </Card>
+
+      <PasswordCard />
 
       {can(me, "manageMembers") ? (
         <Card className="paper-card rounded-[1.75rem]">
@@ -240,5 +244,65 @@ export function SettingsView() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+function PasswordCard() {
+  const { act } = useApp();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <Card id="password" className="paper-card scroll-mt-24 rounded-[1.75rem]">
+      <CardHeader>
+        <CardTitle className="font-medium">החלפת סיסמה</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="grid max-w-md gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSaving(true);
+            try {
+              await act({ type: "changePassword", currentPassword, newPassword });
+              setCurrentPassword("");
+              setNewPassword("");
+              toast.success("הסיסמה הוחלפה");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "ההחלפה נכשלה");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="current-password">סיסמה נוכחית</Label>
+            <Input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="new-password">סיסמה חדשה</Label>
+            <Input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={saving}>
+            {saving ? "שומר…" : "החלפת הסיסמה"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

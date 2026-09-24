@@ -6,6 +6,7 @@ import type {
   Message,
   RsvpStatus,
 } from "./types";
+import { ensureMemberSecrets } from "./password";
 
 function atHour(base: Date, hour: number, minute = 0) {
   const d = new Date(base);
@@ -434,6 +435,8 @@ export function createSeed(): AppState {
     eventId: "g-next",
     memberId: m.id,
   }));
+
+  ensureMemberSecrets(members);
 
   return {
     members,
