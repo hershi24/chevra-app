@@ -119,6 +119,7 @@ export type IvrLog = {
 export type AppState = {
   members: Member[];
   gatherings: Gathering[];
+  gallery: EventMedia[];
   channels: Channel[];
   messages: Message[];
   tokens: RsvpToken[];

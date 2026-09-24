@@ -82,13 +82,27 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
     }
     case "uploadMedia": {
       if (!can(me, "uploadMedia")) throw new Error("forbidden");
+      const media = { ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() };
+      if (!body.eventId) {
+        if (!s.gallery) s.gallery = [];
+        s.gallery.push(media);
+        return;
+      }
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
-      event.media.push({ ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() });
+      event.media.push(media);
       return;
     }
     case "deleteMedia": {
       if (!can(me, "uploadMedia")) throw new Error("forbidden");
+      if (!body.eventId) {
+        if (!s.gallery) s.gallery = [];
+        const media = s.gallery.find((item) => item.id === body.mediaId);
+        if (!media) throw new Error("המדיה לא נמצאה");
+        if (!canDeleteMedia(me, media)) throw new Error("forbidden");
+        s.gallery = s.gallery.filter((item) => item.id !== media.id);
+        return;
+      }
       const event = s.gatherings.find((g) => g.id === body.eventId);
       const media = event?.media.find((item) => item.id === body.mediaId);
       if (!event || !media) throw new Error("המדיה לא נמצאה");

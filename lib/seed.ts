@@ -441,6 +441,7 @@ export function createSeed(): AppState {
   return {
     members,
     gatherings,
+    gallery: [],
     channels,
     messages,
     tokens,
