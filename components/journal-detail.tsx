@@ -20,7 +20,6 @@ import {
   rsvpLabel,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
-import { isPastGathering } from "@/lib/selectors";
 import type { EventMedia } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
@@ -146,7 +145,7 @@ export function JournalDetail({
           {lecturer ? ` · שיעור: ${lecturer.displayName}` : ""}
         </p>
         </div>
-        {isAdmin(me) && isPastGathering(event) ? (
+        {isAdmin(me) ? (
           <Button
             type="button"
             variant="ghost"
