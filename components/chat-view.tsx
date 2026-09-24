@@ -28,7 +28,6 @@ import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   guideChatTitle,
   isGuideChannel,
@@ -117,6 +116,32 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const canWrite =
     active &&
     (active.type !== "announcements" || can(me, "postAnnouncement"));
+
+  async function openPersonalChat(member: Member) {
+    const existing = channels.find(
+      (channel) =>
+        channel.type === "dm" &&
+        channel.memberIds.includes(me.id) &&
+        channel.memberIds.includes(member.id) &&
+        channel.memberIds.length === 2
+    );
+    if (existing) {
+      router.push(`/chat/${existing.id}`);
+      return;
+    }
+    try {
+      const next = await act({ type: "createDm", memberId: member.id });
+      const dm = next.channels.find(
+        (channel) =>
+          channel.type === "dm" &&
+          channel.memberIds.includes(me.id) &&
+          channel.memberIds.includes(member.id)
+      );
+      if (dm) router.push(`/chat/${dm.id}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "לא הצלחנו לפתוח שיחה");
+    }
+  }
 
   async function send(extra?: Partial<Message>) {
     if (!active || !me || !state) return;
@@ -274,22 +299,44 @@ export function ChatView({ channelId }: { channelId?: string }) {
       className={cn(
         "flex bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5",
         active
-          ? "h-[calc(100dvh-4rem)] pb-[env(safe-area-inset-bottom)]"
-          : "h-[calc(100dvh-7.25rem)] pb-16"
+          ? "h-[calc(100dvh-4rem-env(safe-area-inset-bottom))]"
+          : "h-[calc(100dvh-8.25rem-env(safe-area-inset-bottom))]"
       )}
     >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
         className={cn(
-          "w-full shrink-0 border-e border-black/5 bg-white/90 md:w-80 md:bg-transparent",
-          active ? "hidden md:flex md:flex-col" : "flex flex-col"
+          "w-full min-h-0 shrink-0 border-e border-black/5 bg-white/90 md:w-80 md:bg-transparent",
+          active ? "hidden md:flex md:flex-col" : "flex min-h-0 flex-col"
         )}
       >
         <div className="border-b border-black/5 px-4 py-4">
           <h1 className="text-xl font-medium tracking-tight">צ׳אט החבורה</h1>
           <p className="text-xs font-light text-muted-foreground">ערוצים, הודעות ושיחות אישיות</p>
         </div>
-        <ScrollArea className="flex-1">
+        <div className="border-b border-black/5 px-4 py-3 md:hidden">
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+            פתח שיחה אישית
+          </p>
+          <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {state.members
+              .filter((member) => member.id !== me.id)
+              .map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="flex w-14 shrink-0 flex-col items-center gap-1"
+                  onClick={() => void openPersonalChat(member)}
+                >
+                  <UserAvatar member={member} size="sm" />
+                  <span className="w-full truncate text-center text-[11px] leading-4">
+                    {member.displayName.split(" ")[0]}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <RoomGroup title="ערוצים">
             {groups.rooms.map((channel) => (
               <RoomRow
@@ -330,32 +377,29 @@ export function ChatView({ channelId }: { channelId?: string }) {
               ))}
             </RoomGroup>
           ) : null}
-          <div className="p-3">
-            <p className="mb-2 px-1 text-[11px] text-muted-foreground">פתח שיחה עם</p>
-            <div className="flex flex-wrap gap-1">
+          <div className="hidden md:block">
+            <RoomGroup title="פתח שיחה אישית">
               {state.members
                 .filter((member) => member.id !== me.id)
                 .map((member) => (
                   <button
                     key={member.id}
-                    className="rounded-full bg-secondary px-2 py-1 text-[11px] text-secondary-foreground"
-                    onClick={async () => {
-                      const next = await act({ type: "createDm", memberId: member.id });
-                      const dm = next.channels.find(
-                        (c) =>
-                          c.type === "dm" &&
-                          c.memberIds.includes(me.id) &&
-                          c.memberIds.includes(member.id)
-                      );
-                      if (dm) router.push(`/chat/${dm.id}`);
-                    }}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-start text-sm hover:bg-black/5"
+                    onClick={() => void openPersonalChat(member)}
                   >
-                    {member.displayName.split(" ")[0]}
+                    <UserAvatar member={member} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{member.displayName}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {isRoshChevra(member) ? "ראש החברה" : "שיחה אישית"}
+                      </div>
+                    </div>
                   </button>
                 ))}
-            </div>
+            </RoomGroup>
           </div>
-        </ScrollArea>
+        </div>
       </aside>
 
       <section
