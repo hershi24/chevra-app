@@ -94,6 +94,26 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
+      {can(me, "manageMembers") ? (
+        <Card className="paper-card rounded-[1.75rem]">
+          <CardHeader>
+            <CardTitle className="font-medium">ניהול חברים והרשאות</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MemberAdmin />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="paper-card rounded-[1.75rem]">
+          <CardHeader>
+            <CardTitle className="font-medium">חברי החבורה</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MemberDirectory members={state.members} />
+          </CardContent>
+        </Card>
+      )}
+
       {can(me, "uploadBackground") ? (
         <Card className="paper-card rounded-[1.75rem]">
           <CardHeader>
@@ -173,26 +193,6 @@ export function SettingsView() {
           </CardContent>
         </Card>
       ) : null}
-
-      {can(me, "manageMembers") ? (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">ניהול חברים והרשאות</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MemberAdmin />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">חברי החבורה</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MemberDirectory members={state.members} />
-          </CardContent>
-        </Card>
-      )}
 
       {can(me, "sendInvites") ? (
         <Card className="paper-card rounded-[1.75rem]">

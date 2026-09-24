@@ -463,7 +463,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   ? memberById(state.members, message.quote.authorId)
                   : null;
                 return (
-                  <article key={message.id} className="group/msg flex gap-2">
+                  <article key={message.id} className="group flex gap-2">
                     <UserAvatar member={author} size="sm" />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
                       <div className="mb-0.5 flex items-baseline gap-2">
@@ -580,7 +580,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             variant="ghost"
                             size="xs"
                             aria-label="מחק"
-                            className="hidden text-destructive hover:bg-destructive/10 hover:text-destructive md:inline-flex md:opacity-0 md:transition-opacity md:group-hover/msg:opacity-100"
+                            className="hidden text-destructive opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 md:inline-flex"
                             onClick={() => void deleteFromHover(message)}
                           >
                             <Trash2 data-icon="inline-start" />
