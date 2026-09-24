@@ -71,7 +71,8 @@ export function GalleryView() {
   const gatherings = [...state.gatherings].sort(
     (a, b) => +new Date(b.startsAt) - +new Date(a.startsAt)
   );
-  const targetId = eventId || upcomingGathering(state)?.id || gatherings[0]?.id || "";
+  const unassigned = eventId === "none";
+  const targetId = unassigned ? "" : eventId || upcomingGathering(state)?.id || gatherings[0]?.id || "";
 
   function openItem(id: string, confirm = false) {
     setActiveId(id);
@@ -82,7 +83,11 @@ export function GalleryView() {
     if (!active || deleting) return;
     setDeleting(true);
     try {
-      await act({ type: "deleteMedia", eventId: active.eventId, mediaId: active.id });
+      await act({
+        type: "deleteMedia",
+        eventId: active.eventId || undefined,
+        mediaId: active.id,
+      });
       setActiveId(null);
       setConfirmDelete(false);
       toast.success("המדיה נמחקה");
@@ -94,7 +99,7 @@ export function GalleryView() {
   }
 
   async function uploadFile(file: File) {
-    if (!me || !targetId) return;
+    if (!me || (!unassigned && !targetId)) return;
     const local = createLocalUpload(file);
     const type: EventMedia["type"] =
       local.type === "video" ? "video" : local.type === "audio" ? "audio" : "image";
@@ -105,13 +110,17 @@ export function GalleryView() {
       remainingSeconds: null,
     });
     try {
-      const data = await uploadWithProgress(file, { gatheringId: targetId }, ({ percent, remainingSeconds }) => {
-        setPending((prev) => (prev ? { ...prev, progress: percent, remainingSeconds } : prev));
-      });
+      const data = await uploadWithProgress(
+        file,
+        unassigned ? {} : { gatheringId: targetId },
+        ({ percent, remainingSeconds }) => {
+          setPending((prev) => (prev ? { ...prev, progress: percent, remainingSeconds } : prev));
+        }
+      );
       await preloadMedia(data.url, local.type);
       await act({
         type: "uploadMedia",
-        eventId: targetId,
+        eventId: unassigned ? undefined : targetId,
         media: {
           id: crypto.randomUUID(),
           type,
@@ -160,26 +169,25 @@ export function GalleryView() {
               className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
             />
           </label>
-          {gatherings.length > 1 ? (
-            <label className="grid gap-1.5 text-[13px] font-light text-muted-foreground">
-              לשייך לחברה
-              <select
-                value={targetId}
-                onChange={(e) => setEventId(e.target.value)}
-                className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
-              >
-                {gatherings.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {gatheringLabel(event)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+          <label className="grid gap-1.5 text-[13px] font-light text-muted-foreground">
+            לשייך לחברה
+            <select
+              value={unassigned ? "none" : targetId}
+              onChange={(e) => setEventId(e.target.value)}
+              className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
+            >
+              <option value="none">ללא שיוך</option>
+              {gatherings.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {gatheringLabel(event)}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
             type="button"
             className="h-11 w-full rounded-xl md:w-auto"
-            disabled={!targetId || Boolean(pending)}
+            disabled={(!unassigned && !targetId) || Boolean(pending)}
             onClick={() => fileRef.current?.click()}
           >
             <Upload data-icon="inline-start" />
@@ -458,9 +466,13 @@ function LightboxBody({
           {formatDateShortHe(item.createdAt)}
           {item.caption ? ` · ${item.caption}` : ""}
         </div>
-        <Link href={`/journal/${item.eventId}`} className="text-primary/80 hover:text-primary">
-          לחברה ביומן
-        </Link>
+        {item.eventId ? (
+          <Link href={`/journal/${item.eventId}`} className="text-primary/80 hover:text-primary">
+            לחברה ביומן
+          </Link>
+        ) : (
+          <span>ללא שיוך</span>
+        )}
       </div>
       <div className="flex justify-between gap-2">
         <button

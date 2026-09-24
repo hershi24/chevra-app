@@ -46,6 +46,10 @@ async function loadJson(): Promise<AppState> {
 
 export async function readState(): Promise<AppState> {
   const json = await loadJson();
+  if (!Array.isArray(json.gallery)) {
+    json.gallery = [];
+    await persist(json);
+  }
   if (ensureMemberSecrets(json.members)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
@@ -140,6 +144,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
   return {
     members: state.members.map(publicMember),
     gatherings: state.gatherings,
+    gallery: state.gallery ?? [],
     channels,
     messages: state.messages.filter((message) => visible.has(message.channelId)),
     settings: state.settings,
