@@ -580,7 +580,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             variant="ghost"
                             size="xs"
                             aria-label="מחק"
-                            className="hidden text-destructive opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 md:inline-flex"
+                            data-delete-msg=""
+                            className="hidden text-destructive opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive md:inline-flex"
                             onClick={() => void deleteFromHover(message)}
                           >
                             <Trash2 data-icon="inline-start" />

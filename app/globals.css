@@ -113,5 +113,11 @@
     background: var(--paper-card);
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 22px rgb(15 23 42 / 0.05);
   }
+
+  @media (min-width: 768px) {
+    article.group:hover [data-delete-msg] {
+      opacity: 1;
+    }
+  }
 }
 
