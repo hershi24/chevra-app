@@ -41,27 +41,35 @@ export function formatDateTimeHe(iso: string) {
   return `${formatDateHe(iso)} · ${formatTimeHe(iso)}`;
 }
 
-function hebrewYear(year: number) {
-  const letters: [number, string][] = [
-    [400, "ת"], [300, "ש"], [200, "ר"], [100, "ק"],
-    [90, "צ"], [80, "פ"], [70, "ע"], [60, "ס"], [50, "נ"],
-    [40, "מ"], [30, "ל"], [20, "כ"], [10, "י"],
-    [9, "ט"], [8, "ח"], [7, "ז"], [6, "ו"], [5, "ה"], [4, "ד"], [3, "ג"], [2, "ב"], [1, "א"],
-  ];
-  const thousands = Math.floor(year / 1000);
-  let rest = year % 1000;
+const hebrewLetters: [number, string][] = [
+  [400, "ת"], [300, "ש"], [200, "ר"], [100, "ק"],
+  [90, "צ"], [80, "פ"], [70, "ע"], [60, "ס"], [50, "נ"],
+  [40, "מ"], [30, "ל"], [20, "כ"], [10, "י"],
+  [9, "ט"], [8, "ח"], [7, "ז"], [6, "ו"], [5, "ה"], [4, "ד"], [3, "ג"], [2, "ב"], [1, "א"],
+];
+
+function hebrewLettersFor(value: number) {
+  let rest = value;
   let out = "";
-  for (const [value, letter] of letters) {
-    while (rest >= value) {
+  for (const [amount, letter] of hebrewLetters) {
+    while (rest >= amount) {
       out += letter;
-      rest -= value;
+      rest -= amount;
     }
   }
-  out = out.replace("יה", "טו").replace("יו", "טז");
+  return out.replace("יה", "טו").replace("יו", "טז");
+}
+
+function hebrewDay(day: number) {
+  return `${hebrewLettersFor(day)}׳`;
+}
+
+function hebrewYear(year: number) {
+  const thousands = Math.floor(year / 1000);
+  let out = hebrewLettersFor(year % 1000);
   if (out.length > 1) out = `${out.slice(0, -1)}״${out.slice(-1)}`;
   else if (out) out = `${out}׳`;
-  const prefix = thousands === 5 ? "ה׳" : "";
-  return `${prefix}${out}`;
+  return `${thousands === 5 ? "ה׳" : ""}${out}`;
 }
 
 export function formatHebrewDate(iso: string) {
@@ -71,10 +79,9 @@ export function formatHebrewDate(iso: string) {
     month: "long",
     year: "numeric",
   }).format(date);
-  const year = Number(
-    new Intl.DateTimeFormat("en-u-ca-hebrew", { year: "numeric" }).format(date)
-  );
-  return Number.isFinite(year) ? formatted.replace(String(year), hebrewYear(year)) : formatted;
+  const day = Number(new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric" }).format(date));
+  const year = Number(new Intl.DateTimeFormat("en-u-ca-hebrew", { year: "numeric" }).format(date));
+  return formatted.replace(String(year), hebrewYear(year)).replace(String(day), hebrewDay(day));
 }
 
 export function formatRelativeHe(iso: string) {
