@@ -298,12 +298,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   return (
     <>
     <div
-      className={cn(
-        "flex bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5",
-        active
-          ? "h-[calc(100dvh-4rem-env(safe-area-inset-bottom))]"
-          : "h-[calc(100dvh-8.25rem-env(safe-area-inset-bottom))]"
-      )}
+      className="flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
