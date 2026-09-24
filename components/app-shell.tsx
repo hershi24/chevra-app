@@ -38,7 +38,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isChat = pathname.startsWith("/chat");
-  const isChatThread = pathname.startsWith("/chat/");
+  const isDashboard = pathname === "/";
 
   if (loading) {
     return (
@@ -114,7 +114,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <header
         className={cn(
           "sticky top-0 z-20 items-center justify-between border-b border-black/5 bg-white px-4 py-3 md:hidden",
-          isChatThread ? "hidden" : "flex"
+          isDashboard ? "flex" : "hidden"
         )}
       >
         <div>
