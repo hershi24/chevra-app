@@ -220,7 +220,7 @@ function HeroEvent({
           </ul>
         ) : (
           <p className="mt-4 text-[12px] font-light text-muted-foreground">
-            פירוט מלא גלוי למנהל ולמגיד השיעור.
+            פירוט מלא גלוי למנהל ולראש החברה.
           </p>
         )}
       </div>

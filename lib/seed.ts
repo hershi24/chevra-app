@@ -266,13 +266,13 @@ export function createSeed(): AppState {
       name: "כללי",
       type: "group",
       description: "שיחת החבורה היומיומית",
-      memberIds: ids,
+      memberIds: ids.filter((id) => id !== "m-moshe"),
     },
     {
       id: "c-announce",
       name: "הודעות רשמיות",
       type: "announcements",
-      description: "עדכונים ממנהל המערכת ומגיד השיעור",
+      description: "עדכונים ממנהל המערכת ומראש החברה",
       memberIds: ids,
     },
     {
@@ -291,10 +291,21 @@ export function createSeed(): AppState {
     },
     {
       id: "c-dm-david-moshe",
-      name: "דוד ומשה",
+      name: "דוד כהן וראש החברה",
       type: "dm",
+      description: "ראש החברה",
       memberIds: ["m-david", "m-moshe"],
     },
+    ...["m-yossi", "m-avraham", "m-yaakov", "m-shlomo", "m-natan", "m-chaim"].map((memberId) => {
+      const member = members.find((item) => item.id === memberId)!;
+      return {
+        id: `c-guide-m-moshe-${memberId}`,
+        name: `${member.displayName} וראש החברה`,
+        type: "dm" as const,
+        description: "ראש החברה",
+        memberIds: ["m-moshe", memberId],
+      };
+    }),
     {
       id: "c-dm-david-yossi",
       name: "דוד ויוסף",

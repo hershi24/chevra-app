@@ -207,7 +207,7 @@ export function SettingsView() {
                     }
                   >
                     <option value="admin">מנהל מערכת</option>
-                    <option value="leader">מגיד שיעור</option>
+                    <option value="leader">ראש החברה</option>
                     <option value="member">חבר</option>
                   </select>
                 </li>

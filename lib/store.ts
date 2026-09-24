@@ -3,6 +3,7 @@ import path from "path";
 import { createSeed } from "./seed";
 import { emitUpdate } from "./realtime";
 import { isSupabaseEnabled } from "./supabase";
+import { canSeeChannel } from "./channels";
 import { bootstrapChatIfEmpty, loadChatFromSupabase, syncChatDiff } from "./supabase-chat";
 import type { AppState, Member, PublicState } from "./types";
 
@@ -81,11 +82,13 @@ export async function updateState(
 }
 
 export function toPublicState(state: AppState, me: Member): PublicState {
+  const channels = state.channels.filter((channel) => canSeeChannel(me, channel));
+  const visible = new Set(channels.map((channel) => channel.id));
   return {
     members: state.members,
     gatherings: state.gatherings,
-    channels: state.channels,
-    messages: state.messages,
+    channels,
+    messages: state.messages.filter((message) => visible.has(message.channelId)),
     settings: state.settings,
     emailLog: state.emailLog,
     ivrLog: state.ivrLog,

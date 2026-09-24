@@ -99,6 +99,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const incoming = messageFromRow(payload.new as MessageRow);
           setState((prev) => {
             if (!prev) return prev;
+            if (!prev.channels.some((channel) => channel.id === incoming.channelId)) return prev;
             return { ...prev, messages: upsertMessage(prev.messages, incoming) };
           });
         }

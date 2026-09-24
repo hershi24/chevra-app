@@ -101,7 +101,7 @@ export function EventDialog({
           <Field label="מיקום / מארח" name="location" placeholder="כתובת או שם הבית" required />
           <SelectField label="מארח" name="hostId" members={members} />
           <SelectField label="אחראי כיבוד" name="kibudId" members={members} optional />
-          <SelectField label="מגיד השיעור" name="lecturerId" members={members} optional />
+          <SelectField label="ראש החברה" name="lecturerId" members={members} optional />
           <Field label="נושא השיעור" name="topic" />
           <div className="grid gap-1.5">
             <Label htmlFor="notes">הערות</Label>
