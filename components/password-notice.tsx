@@ -31,10 +31,14 @@ export function PasswordNotice() {
       {open ? (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 md:items-center">
           <div role="dialog" aria-labelledby="password-alert-title" className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl">
-            <h2 id="password-alert-title" className="text-lg font-medium">
-              הסיסמה עדיין 1234
+            <h2 id="password-alert-title" className="text-lg font-medium leading-7">
+              ברוכים הבאים לאתר{" "}
+              <span className="whitespace-nowrap">
+                מיין חברה<span dir="ltr">.com</span>
+              </span>
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              הסיסמה עדיין 1234.{" "}
               זו הכניסה הראשונה עם סיסמת ברירת המחדל שנפתחה לחשבון. מומלץ להחליף אותה עכשיו לסיסמה שרק אתם מכירים.
             </p>
             <div className="mt-4 flex flex-col gap-2">
