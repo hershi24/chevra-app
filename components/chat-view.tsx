@@ -69,6 +69,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef<number | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
 
@@ -116,6 +118,18 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const canWrite =
     active &&
     (active.type !== "announcements" || can(me, "postAnnouncement"));
+
+  function jumpToMessage(messageId: string) {
+    const el = document.getElementById(`message-${messageId}`);
+    if (!el) {
+      toast.message("ההודעה המקורית לא נמצאת בשיחה");
+      return;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(messageId);
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashId(null), 1600);
+  }
 
   async function openPersonalChat(member: Member) {
     if (!me) return;
@@ -463,7 +477,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   ? memberById(state.members, message.quote.authorId)
                   : null;
                 return (
-                  <article key={message.id} className="group flex gap-2">
+                  <article
+                    key={message.id}
+                    id={`message-${message.id}`}
+                    className={cn(
+                      "group flex scroll-my-4 gap-2 rounded-2xl transition-colors",
+                      flashId === message.id && "bg-[#ece8e0]"
+                    )}
+                  >
                     <UserAvatar member={author} size="sm" />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
                       <div className="mb-0.5 flex items-baseline gap-2">
@@ -475,6 +496,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       <ChatBubble
                         canDelete={canDeleteMessage(me, message)}
                         onLongPress={() => setDeleteTarget(message)}
+                        onShortClick={
+                          message.quote
+                            ? () => jumpToMessage(message.quote!.messageId)
+                            : undefined
+                        }
                         className={cn(
                           "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 shadow-sm",
                           mine ? "bg-accent text-foreground" : "bg-white"

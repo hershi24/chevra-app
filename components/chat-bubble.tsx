@@ -13,17 +13,20 @@ function isMobileView() {
 export function ChatBubble({
   canDelete,
   onLongPress,
+  onShortClick,
   className,
   children,
 }: {
   canDelete: boolean;
   onLongPress: () => void;
+  onShortClick?: () => void;
   className?: string;
   children: React.ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onLongPressRef = useRef(onLongPress);
   const canDeleteRef = useRef(canDelete);
+  const blockClickRef = useRef(false);
   onLongPressRef.current = onLongPress;
   canDeleteRef.current = canDelete;
 
@@ -48,6 +51,7 @@ export function ChatBubble({
 
     function fire() {
       clearTimer();
+      blockClickRef.current = true;
       try {
         navigator.vibrate?.(12);
       } catch {
@@ -102,8 +106,19 @@ export function ChatBubble({
       ref={rootRef}
       data-chat-bubble=""
       data-can-delete={canDelete ? "true" : "false"}
+      onClick={(event) => {
+        if (blockClickRef.current) {
+          blockClickRef.current = false;
+          return;
+        }
+        if (!onShortClick) return;
+        const target = event.target as HTMLElement;
+        if (target.closest("a, button, video, audio, input, textarea")) return;
+        onShortClick();
+      }}
       className={cn(
         className,
+        onShortClick && "cursor-pointer",
         canDelete && "touch-manipulation select-none [-webkit-touch-callout:none] md:select-text"
       )}
     >
