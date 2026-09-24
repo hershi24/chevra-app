@@ -314,29 +314,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
           <h1 className="text-xl font-medium tracking-tight">צ׳אט החבורה</h1>
           <p className="text-xs font-light text-muted-foreground">ערוצים, הודעות ושיחות אישיות</p>
         </div>
-        <div className="border-b border-black/5 px-4 py-3 md:hidden">
-          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
-            פתח שיחה אישית
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {state.members
-              .filter((member) => member.id !== me.id)
-              .map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="flex w-14 shrink-0 flex-col items-center gap-1"
-                  onClick={() => void openPersonalChat(member)}
-                >
-                  <UserAvatar member={member} size="sm" />
-                  <span className="w-full truncate text-center text-[11px] leading-4">
-                    {member.displayName.split(" ")[0]}
-                  </span>
-                </button>
-              ))}
-          </div>
-        </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="md:hidden">
+            <StartChatGroup
+              members={state.members}
+              meId={me.id}
+              onOpen={openPersonalChat}
+            />
+          </div>
           <RoomGroup title="ערוצים">
             {groups.rooms.map((channel) => (
               <RoomRow
@@ -378,26 +363,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
             </RoomGroup>
           ) : null}
           <div className="hidden md:block">
-            <RoomGroup title="פתח שיחה אישית">
-              {state.members
-                .filter((member) => member.id !== me.id)
-                .map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-start text-sm hover:bg-black/5"
-                    onClick={() => void openPersonalChat(member)}
-                  >
-                    <UserAvatar member={member} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{member.displayName}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {isRoshChevra(member) ? "ראש החברה" : "שיחה אישית"}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-            </RoomGroup>
+            <StartChatGroup
+              members={state.members}
+              meId={me.id}
+              onOpen={openPersonalChat}
+            />
           </div>
         </div>
       </aside>
@@ -797,6 +767,39 @@ function RoomGroup({ title, children }: { title: string; children: React.ReactNo
       </div>
       <div className="space-y-0.5">{children}</div>
     </div>
+  );
+}
+
+function StartChatGroup({
+  members,
+  meId,
+  onOpen,
+}: {
+  members: Member[];
+  meId: string;
+  onOpen: (member: Member) => void;
+}) {
+  return (
+    <RoomGroup title="פתח שיחה אישית">
+      {members
+        .filter((member) => member.id !== meId)
+        .map((member) => (
+          <button
+            key={member.id}
+            type="button"
+            className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-start text-sm hover:bg-black/5"
+            onClick={() => onOpen(member)}
+          >
+            <UserAvatar member={member} size="sm" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{member.displayName}</div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {isRoshChevra(member) ? "ראש החברה" : "שיחה אישית"}
+              </div>
+            </div>
+          </button>
+        ))}
+    </RoomGroup>
   );
 }
 
