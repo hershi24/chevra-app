@@ -70,6 +70,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const flashTimer = useRef<number | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
@@ -484,6 +485,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       "group flex scroll-my-4 gap-2 rounded-2xl transition-colors",
                       flashId === message.id && "bg-[#ece8e0]"
                     )}
+                    onMouseEnter={() => setHoveredMessageId(message.id)}
+                    onMouseLeave={() =>
+                      setHoveredMessageId((current) => (current === message.id ? null : current))
+                    }
                   >
                     <UserAvatar member={author} size="sm" />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
@@ -607,7 +612,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             size="xs"
                             aria-label="מחק"
                             data-delete-msg=""
-                            className="hidden text-destructive opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive md:inline-flex"
+                            className={cn(
+                              "text-destructive hover:bg-destructive/10 hover:text-destructive",
+                              hoveredMessageId === message.id ? "hidden md:inline-flex" : "hidden"
+                            )}
                             onClick={() => void deleteFromHover(message)}
                           >
                             <Trash2 data-icon="inline-start" />
