@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Hash,
   Megaphone,
   Mic,
@@ -28,10 +29,15 @@ import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  guideChatTitle,
+  isGuideChannel,
+  isRoshChevra,
+} from "@/lib/channels";
 import { formatRelativeHe, memberById } from "@/lib/format";
 import { can, canDeleteMessage } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
-import type { Attachment, Channel, Message } from "@/lib/types";
+import type { Attachment, Channel, Member, Message } from "@/lib/types";
 import {
   microphoneErrorMessage,
   pickRecorderMime,
@@ -106,7 +112,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
   if (!state || !me) return null;
 
-  const groups = groupChannels(channels);
+  const groups = groupChannels(channels, state.members);
+  const guideActive = Boolean(active && isGuideChannel(active, state.members));
   const canWrite =
     active &&
     (active.type !== "announcements" || can(me, "postAnnouncement"));
@@ -289,24 +296,40 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 key={channel.id}
                 channel={channel}
                 active={channel.id === active?.id}
-                meId={me.id}
+                me={me}
                 members={state.members}
                 last={lastMessage(state.messages, channel.id)}
               />
             ))}
           </RoomGroup>
-          <RoomGroup title="שיחות אישיות">
-            {groups.dms.map((channel) => (
-              <RoomRow
-                key={channel.id}
-                channel={channel}
-                active={channel.id === active?.id}
-                meId={me.id}
-                members={state.members}
-                last={lastMessage(state.messages, channel.id)}
-              />
-            ))}
-          </RoomGroup>
+          {groups.guides.length ? (
+            <RoomGroup title={isRoshChevra(me) ? "שיחות עם חברים" : "ראש החברה"}>
+              {groups.guides.map((channel) => (
+                <RoomRow
+                  key={channel.id}
+                  channel={channel}
+                  active={channel.id === active?.id}
+                  me={me}
+                  members={state.members}
+                  last={lastMessage(state.messages, channel.id)}
+                />
+              ))}
+            </RoomGroup>
+          ) : null}
+          {groups.dms.length ? (
+            <RoomGroup title="שיחות אישיות">
+              {groups.dms.map((channel) => (
+                <RoomRow
+                  key={channel.id}
+                  channel={channel}
+                  active={channel.id === active?.id}
+                  me={me}
+                  members={state.members}
+                  last={lastMessage(state.messages, channel.id)}
+                />
+              ))}
+            </RoomGroup>
+          ) : null}
           <div className="p-3">
             <p className="mb-2 px-1 text-[11px] text-muted-foreground">פתח שיחה עם</p>
             <div className="flex flex-wrap gap-1">
@@ -337,26 +360,39 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
       <section
         className={cn(
-          "min-w-0 flex-1 flex-col bg-muted md:bg-muted/80",
+          "min-w-0 flex-1 flex-col",
+          guideActive ? "bg-[#f4f2ee] md:bg-[#f4f2ee]" : "bg-muted md:bg-muted/80",
           active ? "flex" : "hidden md:flex"
         )}
       >
         {active ? (
           <>
-            <header className="flex shrink-0 items-center gap-3 border-b border-black/5 bg-white px-3 py-3 md:bg-white/70">
+            <header
+              className={cn(
+                "flex shrink-0 items-center gap-3 border-b px-3 py-3",
+                guideActive
+                  ? "border-[#ded8ce] bg-[#f7f5f1]"
+                  : "border-black/5 bg-white md:bg-white/70"
+              )}
+            >
               <Link href="/chat" className="md:hidden" aria-label="חזרה">
                 <ArrowRight className="size-5" />
               </Link>
-              <RoomIcon channel={active} />
+              <RoomIcon channel={active} members={state.members} />
               <div className="min-w-0">
                 <div className="truncate font-medium">
-                  {active.type === "dm"
-                    ? dmName(active.name, active.memberIds, me.id, (id) => memberById(state.members, id)?.displayName ?? "")
-                    : active.name}
+                  {guideActive
+                    ? guideChatTitle(active, me, state.members)
+                    : active.type === "dm"
+                      ? dmName(active.name, active.memberIds, me.id, (id) => memberById(state.members, id)?.displayName ?? "")
+                      : active.name}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  {active.memberIds.length} חברים
-                  {active.description ? ` · ${active.description}` : ""}
+                  {guideActive
+                    ? isRoshChevra(me)
+                      ? "שיחה פרטית — רק אתם והחבר רואים אותה"
+                      : "שיחה פרטית עם ראש החברה"
+                    : `${active.memberIds.length} חברים${active.description ? ` · ${active.description}` : ""}`}
                 </div>
               </div>
               <div className="ms-2 hidden -space-x-2 space-x-reverse sm:flex">
@@ -586,7 +622,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       placeholder={
                         active.type === "announcements"
                           ? "עדכון לחבורה…"
-                          : "כתבו הודעה…"
+                          : guideActive
+                            ? isRoshChevra(me)
+                              ? "כתבו לחבר…"
+                              : "כתבו לראש החברה…"
+                            : "כתבו הודעה…"
                       }
                       className="h-9 max-h-28 min-h-9 w-full resize-none overflow-hidden rounded-full border border-input bg-white px-3 py-1.5 text-sm leading-5 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring/40 md:h-10 md:min-h-10 md:px-4 md:py-2 md:leading-6 [&::-webkit-scrollbar]:hidden"
                       onChange={(e) => {
@@ -638,7 +678,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 </form>
               ) : (
                 <p className="px-3 py-2 text-center text-sm text-muted-foreground">
-                  רק מנהל המערכת ומגיד השיעור יכולים לכתוב בערוץ ההודעות הרשמיות.
+                  רק מנהל המערכת וראש החברה יכולים לכתוב בערוץ ההודעות הרשמיות.
                 </p>
               )}
             </div>
@@ -719,39 +759,56 @@ function RoomGroup({ title, children }: { title: string; children: React.ReactNo
 function RoomRow({
   channel,
   active,
-  meId,
+  me,
   members,
   last,
 }: {
   channel: Channel;
   active: boolean;
-  meId: string;
-  members: { id: string; displayName: string; initials: string; avatarColor: string }[];
+  me: Member;
+  members: Member[];
   last?: Message;
 }) {
-  const label =
-    channel.type === "dm"
-      ? dmName(channel.name, channel.memberIds, meId, (id) => members.find((m) => m.id === id)?.displayName ?? "")
+  const guide = isGuideChannel(channel, members);
+  const label = guide
+    ? guideChatTitle(channel, me, members)
+    : channel.type === "dm"
+      ? dmName(channel.name, channel.memberIds, me.id, (id) => members.find((m) => m.id === id)?.displayName ?? "")
       : channel.name;
   return (
     <Link
       href={`/chat/${channel.id}`}
       className={cn(
         "flex items-center gap-2 rounded-xl px-2 py-2 text-sm",
-        active ? "bg-primary/10 text-primary" : "hover:bg-black/5"
+        guide && !active && "bg-[#f3f1ec] hover:bg-[#ece8e0]",
+        guide && active && "bg-[#ece8e0] text-[#3f3a34]",
+        !guide && active && "bg-primary/10 text-primary",
+        !guide && !active && "hover:bg-black/5"
       )}
     >
-      <RoomIcon channel={channel} />
+      <RoomIcon channel={channel} members={members} />
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{label}</div>
-        <div className="truncate text-[11px] text-muted-foreground">{last?.text || "אין הודעות עדיין"}</div>
+        <div className="truncate text-[11px] text-muted-foreground">
+          {guide ? last?.text || "שיחה פרטית" : last?.text || "אין הודעות עדיין"}
+        </div>
       </div>
     </Link>
   );
 }
 
-function RoomIcon({ channel }: { channel: Channel }) {
-  const cls = "size-8 rounded-lg bg-secondary text-primary flex items-center justify-center";
+function RoomIcon({ channel, members = [] }: { channel: Channel; members?: Member[] }) {
+  const guide = isGuideChannel(channel, members);
+  const cls = cn(
+    "flex size-8 items-center justify-center rounded-lg",
+    guide ? "bg-[#ece8e0] text-[#5c564c]" : "bg-secondary text-primary"
+  );
+  if (guide)
+    return (
+      <span className={cls}>
+        <BookOpen className="size-4" />
+      </span>
+    );
   if (channel.type === "announcements")
     return (
       <span className={cls}>
@@ -789,10 +846,11 @@ function lastMessage(messages: Message[], channelId: string) {
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
 }
 
-function groupChannels(channels: Channel[]) {
+function groupChannels(channels: Channel[], members: Member[]) {
   return {
     rooms: channels.filter((c) => c.type !== "dm"),
-    dms: channels.filter((c) => c.type === "dm"),
+    guides: channels.filter((c) => isGuideChannel(c, members)),
+    dms: channels.filter((c) => c.type === "dm" && !isGuideChannel(c, members)),
   };
 }
 

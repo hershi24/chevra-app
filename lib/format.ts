@@ -54,7 +54,7 @@ export function formatRelativeHe(iso: string) {
 
 export function roleLabel(role: Role) {
   if (role === "admin") return "מנהל מערכת";
-  if (role === "leader") return "מגיד שיעור";
+  if (role === "leader") return "ראש החברה";
   return "חבר חבורה";
 }
 

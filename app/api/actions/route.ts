@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
+import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
 import { can, canDeleteMessage } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message } from "@/lib/types";
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
   const body = (await request.json()) as ActionBody;
 
   try {
-    const state = await updateState((s) => applyAction(s, me, body));
+    const state = await updateState((s) => {
+      applyAction(s, me, body);
+      ensureGuideChannels(s);
+    });
     const fresh = state.members.find((m) => m.id === me.id)!;
     return NextResponse.json(toPublicState(state, fresh));
   } catch (error) {
@@ -94,9 +98,9 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!can(me, "chat")) throw new Error("forbidden");
       const channel = s.channels.find((c) => c.id === body.channelId);
       if (!channel) throw new Error("הערוץ לא נמצא");
-      if (!channel.memberIds.includes(me.id)) throw new Error("forbidden");
+      if (!canSeeChannel(me, channel)) throw new Error("forbidden");
       if (channel.type === "announcements" && !can(me, "postAnnouncement")) {
-        throw new Error("רק מנהל או מגיד שיעור יכולים לכתוב בהודעות רשמיות");
+        throw new Error("רק מנהל או ראש החברה יכולים לכתוב בהודעות רשמיות");
       }
       const message: Message = {
         id: crypto.randomUUID(),
@@ -118,7 +122,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       const message = s.messages.find((m) => m.id === body.messageId);
       if (!message) throw new Error("ההודעה לא נמצאה");
       const channel = s.channels.find((c) => c.id === message.channelId);
-      if (!channel?.memberIds.includes(me.id)) throw new Error("forbidden");
+      if (!channel || !canSeeChannel(me, channel)) throw new Error("forbidden");
       if (!canDeleteMessage(me, message)) throw new Error("forbidden");
       s.messages = s.messages.filter((m) => m.id !== message.id);
       return;
@@ -127,6 +131,8 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!can(me, "chat")) throw new Error("forbidden");
       const message = s.messages.find((m) => m.id === body.messageId);
       if (!message) throw new Error("ההודעה לא נמצאה");
+      const channel = s.channels.find((c) => c.id === message.channelId);
+      if (!channel || !canSeeChannel(me, channel)) throw new Error("forbidden");
       const list = message.reactions[body.emoji] ?? [];
       message.reactions[body.emoji] = list.includes(me.id)
         ? list.filter((id) => id !== me.id)
