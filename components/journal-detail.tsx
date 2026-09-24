@@ -2,7 +2,8 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { MediaProgressOverlay } from "@/components/media-progress";
@@ -18,7 +19,8 @@ import {
   memberById,
   rsvpLabel,
 } from "@/lib/format";
-import { can } from "@/lib/permissions";
+import { can, isAdmin } from "@/lib/permissions";
+import { isPastGathering } from "@/lib/selectors";
 import type { EventMedia } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
@@ -38,8 +40,11 @@ export function JournalDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const { state, me, act } = useApp();
   const [summary, setSummary] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [pending, setPending] = useState<PendingMedia[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef<HTMLDivElement>(null);
@@ -130,7 +135,8 @@ export function JournalDetail({
         <ArrowRight className="size-4" />
         חזרה ליומן
       </Link>
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
         <p className="text-[13px] font-light text-muted-foreground">{formatDateTimeHe(event.startsAt)}</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">
           {gatheringTitle(event) ?? gatheringLabel(event)}
@@ -139,7 +145,58 @@ export function JournalDetail({
           {event.location} · מארח {host?.displayName}
           {lecturer ? ` · שיעור: ${lecturer.displayName}` : ""}
         </p>
+        </div>
+        {isAdmin(me) && isPastGathering(event) ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 data-icon="inline-start" />
+            מחק חברה
+          </Button>
+        ) : null}
       </div>
+      {confirmDelete ? (
+        <div className="rounded-2xl bg-destructive/10 px-4 py-3">
+          <p className="text-sm font-medium">למחוק את החברה?</p>
+          <p className="mt-1 text-sm font-light text-muted-foreground">
+            החברה תוסר מהיומן, כולל התמונות, הסיכום וההזמנות שלה.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10 rounded-xl"
+              disabled={deleting}
+              onClick={() => {
+                setDeleting(true);
+                void act({ type: "deleteGathering", eventId: event.id })
+                  .then(() => {
+                    toast.success("החברה נמחקה");
+                    router.push("/journal");
+                  })
+                  .catch((error: unknown) => {
+                    toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
+                    setDeleting(false);
+                  });
+              }}
+            >
+              {deleting ? "מוחק…" : "מחק"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-xl"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(false)}
+            >
+              ביטול
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {event.topic ? (
         <p className="paper-card rounded-[1.75rem] px-5 py-4 text-sm font-light">
