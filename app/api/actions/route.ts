@@ -46,7 +46,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
         id: crypto.randomUUID(),
         title: body.title?.trim() ?? "",
         startsAt: body.startsAt,
-        location: body.location.trim(),
+        location: body.location?.trim() ?? "",
         hostId: body.hostId,
         kibudId: body.kibudId,
         lecturerId: body.lecturerId,
@@ -84,6 +84,10 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
+      if (!s.gallery) s.gallery = [];
+      for (const item of event.media) {
+        if (!s.gallery.some((media) => media.id === item.id)) s.gallery.push(item);
+      }
       s.gatherings = s.gatherings.filter((item) => item.id !== event.id);
       s.tokens = s.tokens.filter((token) => token.eventId !== event.id);
       s.emailLog = s.emailLog.filter((entry) => entry.eventId !== event.id);
@@ -92,18 +96,32 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
     }
     case "uploadMedia": {
       if (!can(me, "uploadMedia")) throw new Error("forbidden");
+      const media = { ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() };
+      if (!body.eventId) {
+        if (!s.gallery) s.gallery = [];
+        s.gallery.push(media);
+        return;
+      }
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
-      event.media.push({ ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() });
+      event.media.push(media);
       return;
     }
     case "deleteMedia": {
       if (!can(me, "uploadMedia")) throw new Error("forbidden");
-      const event = s.gatherings.find((g) => g.id === body.eventId);
+      if (!s.gallery) s.gallery = [];
+      const loose = s.gallery.find((item) => item.id === body.mediaId);
+      if (loose && (!body.eventId || !s.gatherings.some((event) => event.media.some((item) => item.id === body.mediaId)))) {
+        if (!canDeleteMedia(me, loose)) throw new Error("forbidden");
+        s.gallery = s.gallery.filter((item) => item.id !== loose.id);
+        return;
+      }
+      const event = s.gatherings.find((g) => g.id === body.eventId) ?? s.gatherings.find((g) => g.media.some((item) => item.id === body.mediaId));
       const media = event?.media.find((item) => item.id === body.mediaId);
       if (!event || !media) throw new Error("המדיה לא נמצאה");
       if (!canDeleteMedia(me, media)) throw new Error("forbidden");
       event.media = event.media.filter((item) => item.id !== media.id);
+      s.gallery = s.gallery.filter((item) => item.id !== media.id);
       return;
     }
     case "saveSummary": {

@@ -3,9 +3,10 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Trash2, Upload } from "lucide-react";
+import { ArrowRight, Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { EventDialog } from "@/components/event-dialog";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
@@ -14,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   formatDateTimeHe,
+  formatHebrewDate,
   gatheringLabel,
   gatheringTitle,
   memberById,
@@ -136,7 +138,10 @@ export function JournalDetail({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-        <p className="text-[13px] font-light text-muted-foreground">{formatDateTimeHe(event.startsAt)}</p>
+        <p className="text-[13px] font-light leading-6 text-muted-foreground">
+          <span className="block">{formatDateTimeHe(event.startsAt)}</span>
+          <span className="block">{formatHebrewDate(event.startsAt)}</span>
+        </p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">
           {gatheringTitle(event) ?? gatheringLabel(event)}
         </h1>
@@ -146,22 +151,33 @@ export function JournalDetail({
         </p>
         </div>
         {isAdmin(me) ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setConfirmDelete(true)}
-          >
-            <Trash2 data-icon="inline-start" />
-            מחק חברה
-          </Button>
+          <div className="flex gap-1">
+            <EventDialog
+              event={event}
+              trigger={
+                <Button type="button" variant="ghost">
+                  <Pencil data-icon="inline-start" />
+                  עריכה
+                </Button>
+              }
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 data-icon="inline-start" />
+              מחק חברה
+            </Button>
+          </div>
         ) : null}
       </div>
       {confirmDelete ? (
         <div className="rounded-2xl bg-destructive/10 px-4 py-3">
           <p className="text-sm font-medium">למחוק את החברה?</p>
           <p className="mt-1 text-sm font-light text-muted-foreground">
-            החברה תוסר מהיומן, כולל התמונות, הסיכום וההזמנות שלה.
+            החברה תוסר מהיומן. המדיה בגלריה נשארת.
           </p>
           <div className="mt-3 flex gap-2">
             <Button

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BookOpen, Home, MapPin, Plus, UtensilsCrossed } from "lucide-react";
+import { BookOpen, Home, MapPin, Pencil, Plus, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { Countdown } from "@/components/countdown";
@@ -11,6 +11,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   formatDateHe,
+  formatHebrewDate,
   formatTimeHe,
   gatheringTitle,
   memberById,
@@ -141,9 +142,23 @@ function HeroEvent({
     >
       <div className="min-w-0 space-y-7">
         <div>
-          <p className="text-[12px] font-light tracking-[0.14em] text-muted-foreground">
-            {formatDateHe(event.startsAt)} · {formatTimeHe(event.startsAt)}
+          <p className="text-[12px] font-light leading-5 tracking-[0.04em] text-muted-foreground">
+            <span className="block">{formatDateHe(event.startsAt)} · {formatTimeHe(event.startsAt)}</span>
+            <span className="block">{formatHebrewDate(event.startsAt)}</span>
           </p>
+          {can(me, "editEvent") ? (
+            <div className="mt-3">
+              <EventDialog
+                event={event}
+                trigger={
+                  <Button type="button" variant="ghost" size="xs" className="rounded-full">
+                    <Pencil data-icon="inline-start" />
+                    עריכה
+                  </Button>
+                }
+              />
+            </div>
+          ) : null}
           {heading ? (
             <h2 className="mt-3 text-[1.85rem] font-medium leading-tight tracking-tight md:text-[2.15rem]">
               {heading}

@@ -6,7 +6,7 @@ export type ActionBody =
       type: "createEvent";
       title?: string;
       startsAt: string;
-      location: string;
+      location?: string;
       hostId: string;
       kibudId?: string;
       lecturerId?: string;
@@ -16,8 +16,8 @@ export type ActionBody =
   | { type: "updateEvent"; eventId: string; patch: Partial<Gathering> }
   | { type: "cancelEvent"; eventId: string }
   | { type: "deleteGathering"; eventId: string }
-  | { type: "uploadMedia"; eventId: string; media: Gathering["media"][number] }
-  | { type: "deleteMedia"; eventId: string; mediaId: string }
+  | { type: "uploadMedia"; eventId?: string; media: Gathering["media"][number] }
+  | { type: "deleteMedia"; eventId?: string; mediaId: string }
   | { type: "saveSummary"; eventId: string; summary?: string; audioUrl?: string }
   | {
       type: "sendMessage";

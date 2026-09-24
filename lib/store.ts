@@ -47,6 +47,7 @@ async function loadJson(): Promise<AppState> {
 
 export async function readState(): Promise<AppState> {
   const json = await loadJson();
+  if (!json.gallery) json.gallery = [];
   if (ensureMemberSecrets(json.members)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
@@ -77,10 +78,12 @@ export async function readState(): Promise<AppState> {
       state.channels = chat.channels;
       state.messages = chat.messages;
     }
-    const gatherings = await loadGatheringsFromSupabase();
-    if (gatherings) {
-      if (gatherings.length) {
-        state.gatherings = gatherings;
+    if (!state.gallery) state.gallery = [];
+    const cloud = await loadGatheringsFromSupabase();
+    if (cloud) {
+      state.gallery = cloud.gallery;
+      if (cloud.gatherings.length) {
+        state.gatherings = cloud.gatherings;
       } else {
         const seedIds = new Set(["g-next", "g-past-1", "g-past-2", "g-past-3"]);
         const custom = state.gatherings.filter((event) => !seedIds.has(event.id));
@@ -156,6 +159,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
   return {
     members: state.members.map(publicMember),
     gatherings: state.gatherings,
+    gallery: state.gallery ?? [],
     channels,
     messages: state.messages.filter((message) => visible.has(message.channelId)),
     settings: state.settings,

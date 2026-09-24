@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { formatDateHe, gatheringLabel, memberById } from "@/lib/format";
-import { isAdmin } from "@/lib/permissions";
+import { EventDialog } from "@/components/event-dialog";
+import { formatDateHe, formatHebrewDate, gatheringLabel, memberById } from "@/lib/format";
+import { can, isAdmin } from "@/lib/permissions";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 
@@ -68,23 +69,41 @@ export function JournalView() {
               </div>
               <div className="mt-2.5 space-y-0.5">
                 <div className="truncate text-[13px] font-normal">{gatheringLabel(event)}</div>
-                <div className="text-[12px] font-light text-muted-foreground">
-                  {formatDateHe(event.startsAt)}
-                  {host ? ` · ${host.displayName}` : ""}
+                <div className="text-[12px] font-light leading-5 text-muted-foreground">
+                  <div>
+                    {formatDateHe(event.startsAt)}
+                    {host ? ` · ${host.displayName}` : ""}
+                  </div>
+                  <div>{formatHebrewDate(event.startsAt)}</div>
                 </div>
               </div>
             </Link>
-            {canDelete ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="mt-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setConfirmId(event.id)}
-              >
-                <Trash2 data-icon="inline-start" />
-                מחק
-              </Button>
+            {can(me, "editEvent") || canDelete ? (
+              <div className="mt-1 flex gap-1">
+                {can(me, "editEvent") ? (
+                  <EventDialog
+                    event={event}
+                    trigger={
+                      <Button type="button" variant="ghost" size="xs">
+                        <Pencil data-icon="inline-start" />
+                        עריכה
+                      </Button>
+                    }
+                  />
+                ) : null}
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setConfirmId(event.id)}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    מחק
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
             </div>
           );
@@ -95,7 +114,7 @@ export function JournalView() {
           <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
             <h2 className="text-base font-medium">למחוק את החברה?</h2>
             <p className="mt-1 text-sm font-light leading-6 text-muted-foreground">
-              {gatheringLabel(confirm)} תוסר מהיומן, כולל התמונות, הסיכום וההזמנות שלה.
+              {gatheringLabel(confirm)} תוסר מהיומן. המדיה בגלריה נשארת.
             </p>
             <div className="mt-4 flex gap-2">
               <Button

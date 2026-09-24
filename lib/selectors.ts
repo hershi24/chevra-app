@@ -19,16 +19,26 @@ export type GalleryItem = EventMedia & {
   eventLabel: string;
 };
 
-export function galleryItems(state: AppState | { gatherings: Gathering[] }): GalleryItem[] {
-  return state.gatherings.flatMap((event) =>
+export function galleryItems(
+  state: AppState | { gatherings: Gathering[]; gallery?: EventMedia[] }
+): GalleryItem[] {
+  const loose = (state.gallery ?? []).map((item) => ({
+    ...item,
+    eventId: "",
+    eventLabel: "גלריה",
+  }));
+  const seen = new Set(loose.map((item) => item.id));
+  const attached = state.gatherings.flatMap((event) =>
     event.media
       .filter((item) => item.type === "image" || item.type === "video" || item.type === "audio")
+      .filter((item) => !seen.has(item.id))
       .map((item) => ({
         ...item,
         eventId: event.id,
         eventLabel: gatheringLabel(event),
       }))
   );
+  return [...loose, ...attached];
 }
 
 export function dmName(
