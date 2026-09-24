@@ -46,6 +46,7 @@ async function loadJson(): Promise<AppState> {
 
 export async function readState(): Promise<AppState> {
   const json = await loadJson();
+  if (ensureMemberSecrets(json.members)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
   const state = structuredClone(json);
