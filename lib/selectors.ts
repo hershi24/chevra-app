@@ -14,10 +14,6 @@ export function upcomingGathering(state: AppState | { gatherings: Gathering[] })
   );
 }
 
-export function isPastGathering(event: { status: string }) {
-  return event.status !== "upcoming";
-}
-
 export type GalleryItem = EventMedia & {
   eventId: string;
   eventLabel: string;

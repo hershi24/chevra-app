@@ -4,7 +4,6 @@ import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { can, canDeleteMedia, canDeleteMessage } from "@/lib/permissions";
-import { isPastGathering } from "@/lib/selectors";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
 
@@ -85,7 +84,6 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
-      if (!isPastGathering(event)) throw new Error("אפשר למחוק רק חברה קודמת");
       s.gatherings = s.gatherings.filter((item) => item.id !== event.id);
       s.tokens = s.tokens.filter((token) => token.eventId !== event.id);
       s.emailLog = s.emailLog.filter((entry) => entry.eventId !== event.id);
