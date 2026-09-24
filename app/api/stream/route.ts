@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { subscribe } from "@/lib/realtime";
+import { onlineMemberIds, subscribe } from "@/lib/realtime";
 import { readState } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -14,17 +14,33 @@ export async function GET() {
 
   const encoder = new TextEncoder();
   let cleanup: (() => void) | undefined;
+  let ping: ReturnType<typeof setInterval> | undefined;
 
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: string) => {
         controller.enqueue(encoder.encode(data));
       };
-      cleanup = subscribe({ send });
+      cleanup = subscribe({ send, memberId: me.id });
+      ping = setInterval(() => {
+        try {
+          send(`: ping\n\n`);
+        } catch {
+          clearInterval(ping);
+          cleanup?.();
+        }
+      }, 25_000);
       const state = await readState();
-      send(`data: ${JSON.stringify({ type: "hello", revision: state.revision })}\n\n`);
+      send(
+        `data: ${JSON.stringify({
+          type: "hello",
+          revision: state.revision,
+          ids: onlineMemberIds(),
+        })}\n\n`
+      );
     },
     cancel() {
+      clearInterval(ping);
       cleanup?.();
     },
   });

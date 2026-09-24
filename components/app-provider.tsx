@@ -26,6 +26,7 @@ type AppContextValue = {
   loading: boolean;
   error: string | null;
   me: Member | null;
+  onlineIds: string[];
   refresh: () => Promise<void>;
   act: (body: ActionBody) => Promise<PublicState>;
   logout: () => Promise<void>;
@@ -38,6 +39,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PublicState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [onlineIds, setOnlineIds] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/state", { cache: "no-store" });
@@ -80,7 +82,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const es = new EventSource("/api/stream");
-    es.onmessage = () => {
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as { type?: string; ids?: string[] };
+        if ((data.type === "presence" || data.type === "hello") && Array.isArray(data.ids)) {
+          setOnlineIds(data.ids);
+          if (data.type === "presence") return;
+        }
+      } catch {
+        // keep refreshing on malformed payloads
+      }
       void refresh();
     };
     return () => es.close();
@@ -160,11 +171,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       loading,
       error,
       me: state?.me ?? null,
+      onlineIds,
       refresh,
       act,
       logout,
     }),
-    [state, loading, error, refresh, act, logout]
+    [state, loading, error, onlineIds, refresh, act, logout]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
