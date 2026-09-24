@@ -57,7 +57,7 @@ type PendingChatUpload = {
 const EMOJIS = ["❤️", "👍", "😂", "🙏", "🔥", "✨", "🎉", "☕"];
 
 export function ChatView({ channelId }: { channelId?: string }) {
-  const { state, me, act } = useApp();
+  const { state, me, act, onlineIds } = useApp();
   const router = useRouter();
   const [draft, setDraft] = useState("");
   const [quote, setQuote] = useState<Message["quote"]>();
@@ -309,7 +309,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
       >
         <div className="border-b border-black/5 px-4 py-4">
           <h1 className="text-xl font-medium tracking-tight">צ׳אט החבורה</h1>
-          <p className="text-xs font-light text-muted-foreground">ערוצים, הודעות ושיחות אישיות</p>
+          <p className="text-xs font-light text-muted-foreground">
+            {onlineLabel(onlineIds.length)}
+          </p>
         </div>
         <div className="border-b border-black/5 px-4 py-3 md:hidden">
           <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
@@ -429,17 +431,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       : active.name}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  {guideActive
-                    ? isRoshChevra(me)
-                      ? "שיחה פרטית — רק אתם והחבר רואים אותה"
-                      : "שיחה פרטית עם ראש החברה"
-                    : `${active.memberIds.length} חברים${active.description ? ` · ${active.description}` : ""}`}
+                  {onlineLabel(
+                    active.memberIds.filter((id) => onlineIds.includes(id)).length
+                  )}
                 </div>
-              </div>
-              <div className="ms-2 hidden -space-x-2 space-x-reverse sm:flex">
-                {active.memberIds.slice(0, 5).map((id) => (
-                  <UserAvatar key={id} member={memberById(state.members, id)} size="sm" />
-                ))}
               </div>
             </header>
 
@@ -879,6 +874,11 @@ function RoomIcon({ channel, members = [] }: { channel: Channel; members?: Membe
       <Hash className="size-4" />
     </span>
   );
+}
+
+function onlineLabel(count: number) {
+  if (count === 1) return "מחובר אחד כעת";
+  return `${count} מחוברים כעת`;
 }
 
 function lastMessage(messages: Message[], channelId: string) {
