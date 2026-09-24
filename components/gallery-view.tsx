@@ -1,24 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Music, Play, X } from "lucide-react";
+import { Music, Play, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { MediaProgressOverlay } from "@/components/media-progress";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
 import {
   formatDateShortHe,
+  gatheringLabel,
   memberById,
 } from "@/lib/format";
-import { galleryItems, type GalleryItem } from "@/lib/selectors";
+import { can } from "@/lib/permissions";
+import { galleryItems, upcomingGathering, type GalleryItem } from "@/lib/selectors";
+import type { EventMedia } from "@/lib/types";
+import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 type KindFilter = "all" | "image" | "video" | "audio";
 type DateSort = "newest" | "oldest";
 
 export function GalleryView() {
-  const { state } = useApp();
+  const { state, me, act } = useApp();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<KindFilter>("all");
+  const [caption, setCaption] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [pending, setPending] = useState<{
+    previewUrl: string;
+    type: "image" | "video" | "audio" | "file";
+    progress: number;
+    remainingSeconds: number | null;
+  } | null>(null);
   const [memberId, setMemberId] = useState("all");
   const [dateSort, setDateSort] = useState<DateSort>("newest");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -49,7 +64,51 @@ export function GalleryView() {
   const activeIndex = filtered.findIndex((item) => item.id === activeId);
   const active = activeIndex >= 0 ? filtered[activeIndex] : null;
 
-  if (!state) return null;
+  if (!state || !me) return null;
+
+  const gatherings = [...state.gatherings].sort(
+    (a, b) => +new Date(b.startsAt) - +new Date(a.startsAt)
+  );
+  const targetId = eventId || upcomingGathering(state)?.id || gatherings[0]?.id || "";
+
+  async function uploadFile(file: File) {
+    if (!me || !targetId) return;
+    const local = createLocalUpload(file);
+    const type: EventMedia["type"] =
+      local.type === "video" ? "video" : local.type === "audio" ? "audio" : "image";
+    setPending({
+      previewUrl: local.previewUrl,
+      type: local.type,
+      progress: 0,
+      remainingSeconds: null,
+    });
+    try {
+      const data = await uploadWithProgress(file, { gatheringId: targetId }, ({ percent, remainingSeconds }) => {
+        setPending((prev) => (prev ? { ...prev, progress: percent, remainingSeconds } : prev));
+      });
+      await preloadMedia(data.url, local.type);
+      await act({
+        type: "uploadMedia",
+        eventId: targetId,
+        media: {
+          id: crypto.randomUUID(),
+          type,
+          url: data.url,
+          caption: caption.trim() || undefined,
+          uploadedBy: me.id,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      setCaption("");
+      toast.success("המדיה נוספה לגלריה");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "העלאה נכשלה");
+    } finally {
+      URL.revokeObjectURL(local.previewUrl);
+      setPending(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -57,6 +116,64 @@ export function GalleryView() {
         <p className="text-[13px] font-light text-muted-foreground">כל התמונות, הסרטונים והאודיו של החבורה</p>
         <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">גלריה</h1>
       </div>
+
+      {can(me, "uploadMedia") ? (
+        <div className="paper-card space-y-3 rounded-[1.75rem] px-4 py-4 md:px-5">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadFile(file);
+            }}
+          />
+          <label className="grid gap-1.5 text-[13px] font-light text-muted-foreground">
+            תיאור
+            <input
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="מה רואים כאן?"
+              className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
+            />
+          </label>
+          {gatherings.length > 1 ? (
+            <label className="grid gap-1.5 text-[13px] font-light text-muted-foreground">
+              לשייך לחברה
+              <select
+                value={targetId}
+                onChange={(e) => setEventId(e.target.value)}
+                className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
+              >
+                {gatherings.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {gatheringLabel(event)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <Button
+            type="button"
+            className="h-11 w-full rounded-xl md:w-auto"
+            disabled={!targetId || Boolean(pending)}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload data-icon="inline-start" />
+            {pending ? "מעלה…" : "העלאת מדיה"}
+          </Button>
+          {pending ? (
+            <MediaProgressOverlay
+              src={pending.previewUrl}
+              type={pending.type}
+              progress={pending.progress}
+              remainingSeconds={pending.remainingSeconds}
+              mediaClassName="max-h-48"
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="paper-card flex flex-col gap-3 rounded-[1.75rem] px-4 py-4 md:flex-row md:flex-wrap md:items-center md:gap-4 md:px-5">
         <FilterPills
