@@ -41,12 +41,40 @@ export function formatDateTimeHe(iso: string) {
   return `${formatDateHe(iso)} · ${formatTimeHe(iso)}`;
 }
 
+function hebrewYear(year: number) {
+  const letters: [number, string][] = [
+    [400, "ת"], [300, "ש"], [200, "ר"], [100, "ק"],
+    [90, "צ"], [80, "פ"], [70, "ע"], [60, "ס"], [50, "נ"],
+    [40, "מ"], [30, "ל"], [20, "כ"], [10, "י"],
+    [9, "ט"], [8, "ח"], [7, "ז"], [6, "ו"], [5, "ה"], [4, "ד"], [3, "ג"], [2, "ב"], [1, "א"],
+  ];
+  const thousands = Math.floor(year / 1000);
+  let rest = year % 1000;
+  let out = "";
+  for (const [value, letter] of letters) {
+    while (rest >= value) {
+      out += letter;
+      rest -= value;
+    }
+  }
+  out = out.replace("יה", "טו").replace("יו", "טז");
+  if (out.length > 1) out = `${out.slice(0, -1)}״${out.slice(-1)}`;
+  else if (out) out = `${out}׳`;
+  const prefix = thousands === 5 ? "ה׳" : "";
+  return `${prefix}${out}`;
+}
+
 export function formatHebrewDate(iso: string) {
-  return new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
+  const date = new Date(iso);
+  const formatted = new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date(iso));
+  }).format(date);
+  const year = Number(
+    new Intl.DateTimeFormat("en-u-ca-hebrew", { year: "numeric" }).format(date)
+  );
+  return Number.isFinite(year) ? formatted.replace(String(year), hebrewYear(year)) : formatted;
 }
 
 export function formatRelativeHe(iso: string) {
