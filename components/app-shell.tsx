@@ -11,6 +11,7 @@ import {
   Settings,
 } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-provider";
+import { PasswordNotice } from "@/components/password-notice";
 import { BackgroundLayer } from "@/components/background-layer";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <BackgroundLayer />
+      <PasswordNotice />
 
       <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-white md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">

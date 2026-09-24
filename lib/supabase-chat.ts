@@ -22,6 +22,8 @@ function memberRow(member: Member) {
     email: member.email || null,
     avatar_color: member.avatarColor,
     initials: member.initials,
+    password_hash: member.passwordHash ?? null,
+    must_change_password: Boolean(member.mustChangePassword),
   };
 }
 
@@ -62,14 +64,21 @@ export async function loadMembersFromSupabase(): Promise<Member[] | null> {
     email: (row.email as string | null) ?? "",
     avatarColor: (row.avatar_color as string) || "#0F766E",
     initials: (row.initials as string) || "?",
+    passwordHash: (row.password_hash as string | null) || undefined,
+    mustChangePassword: (row.must_change_password as boolean | null) ?? undefined,
   }));
 }
 
 export async function upsertMembers(members: Member[]) {
   const db = getServiceSupabase();
   if (!db || !members.length) return;
-  const { error } = await db.from("members").upsert(members.map(memberRow));
-  if (error) throw error;
+  const rows = members.map(memberRow);
+  const { error } = await db.from("members").upsert(rows);
+  if (!error) return;
+  if (!/password_hash|must_change_password|column/i.test(error.message)) throw error;
+  const stripped = rows.map(({ password_hash: _hash, must_change_password: _flag, ...rest }) => rest);
+  const retry = await db.from("members").upsert(stripped);
+  if (retry.error) throw retry.error;
 }
 
 export async function loadChatFromSupabase(): Promise<{
@@ -173,7 +182,9 @@ export async function syncChatDiff(before: AppState, after: AppState) {
         prev.displayName !== member.displayName ||
         prev.username !== member.username ||
         prev.phone !== member.phone ||
-        prev.email !== member.email)
+        prev.email !== member.email ||
+        prev.passwordHash !== member.passwordHash ||
+        prev.mustChangePassword !== member.mustChangePassword)
     );
   });
   const membersToUpsert = [...newMembers, ...changedMembers];

@@ -6,29 +6,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const QUICK = ["דוד", "משה", "יוסף", "אברהם", "יעקב", "שלמה", "נתן", "חיים"];
+type Choice = { id: string; displayName: string; initials: string; avatarColor: string };
 
 export function LoginView() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [choices, setChoices] = useState<Choice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function submit(name = username) {
+  async function submit(memberId?: string) {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name }),
+        body: JSON.stringify({ password, memberId }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "הכניסה נכשלה");
         return;
       }
-      router.push("/");
+      if (data.choices) {
+        setChoices(data.choices as Choice[]);
+        return;
+      }
+      if (data.mustChangePassword) {
+        sessionStorage.setItem("chevra-password-alert", "1");
+      }
+      router.push(data.mustChangePassword ? "/?password=1" : "/");
       router.refresh();
     } finally {
       setLoading(false);
@@ -58,19 +66,25 @@ export function LoginView() {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
+              setChoices(null);
               void submit();
             }}
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="username" className="font-light text-[#6f6a62]">
-                שם פרטי
+              <Label htmlFor="password" className="font-light text-[#6f6a62]">
+                סיסמה
               </Label>
               <Input
-                id="username"
+                id="password"
+                type="password"
                 autoFocus
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="כפי שאתם מוכרים בחבורה"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setChoices(null);
+                }}
+                placeholder="הסיסמה שלכם"
                 className="h-12 rounded-xl border-[#e6e2da] bg-[#faf9f7] px-4 text-base"
               />
             </div>
@@ -78,33 +92,38 @@ export function LoginView() {
             <Button
               type="submit"
               className="h-12 w-full rounded-xl bg-[#3f4650] text-base text-white hover:bg-[#333940]"
-              disabled={loading}
+              disabled={loading || !password}
             >
               {loading ? "נכנס…" : "כניסה לחבורה"}
             </Button>
           </form>
 
-          <div className="mt-7 border-t border-[#eeeae3] pt-5">
-            <p className="mb-3 text-[12px] font-light text-[#8a8478]">כניסה בשם חבר</p>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => {
-                    setUsername(name);
-                    void submit(name);
-                  }}
-                  className="rounded-full px-3 py-1.5 text-[13px] text-[#3f4650] ring-1 ring-[#e6e2da] transition hover:bg-[#f6f4f0]"
-                >
-                  {name}
-                </button>
-              ))}
+          {choices ? (
+            <div className="mt-6 border-t border-[#eeeae3] pt-5">
+              <p className="mb-3 text-[13px] font-light leading-6 text-[#6f6a62]">
+                הסיסמה הזו פתוחה לכמה חברים. בחרו את השם שלכם.
+              </p>
+              <div className="flex flex-col gap-2">
+                {choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void submit(choice.id)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-start ring-1 ring-[#e6e2da] hover:bg-[#f6f4f0]"
+                  >
+                    <span
+                      className="flex size-8 items-center justify-center rounded-full text-xs text-white"
+                      style={{ background: choice.avatarColor }}
+                    >
+                      {choice.initials}
+                    </span>
+                    <span className="text-sm">{choice.displayName}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="mt-4 text-[11px] leading-5 text-[#9a958c]">
-              דוד — מנהל המערכת · משה — ראש החברה · השאר חברי החבורה. בלי סיסמה.
-            </p>
-          </div>
+          ) : null}
         </div>
       </div>
     </div>

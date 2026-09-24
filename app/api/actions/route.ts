@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
+import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { can, canDeleteMessage } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
@@ -177,6 +178,8 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
         email: body.email?.trim() || `${body.username.trim()}@chevra.local`,
         avatarColor: ["#0F766E", "#B45309", "#1D4ED8", "#7C3AED"][s.members.length % 4],
         initials: initialsFrom(body.displayName),
+        passwordHash: hashPassword(DEFAULT_PASSWORD),
+        mustChangePassword: true,
       };
       s.members.push(member);
       for (const channel of s.channels) {
@@ -232,6 +235,26 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       for (const event of s.gatherings) {
         delete event.rsvps[member.id];
       }
+      return;
+    }
+    case "changePassword": {
+      const member = s.members.find((item) => item.id === me.id);
+      if (!member) throw new Error("החבר לא נמצא");
+      if (!verifyPassword(body.currentPassword, member.passwordHash)) {
+        throw new Error("הסיסמה הנוכחית לא נכונה");
+      }
+      const next = body.newPassword.trim();
+      if (next.length < 4) throw new Error("הסיסמה החדשה צריכה לפחות 4 תווים");
+      member.passwordHash = hashPassword(next);
+      member.mustChangePassword = next === DEFAULT_PASSWORD;
+      return;
+    }
+    case "resetMemberPassword": {
+      if (!can(me, "manageMembers")) throw new Error("forbidden");
+      const member = s.members.find((item) => item.id === body.memberId);
+      if (!member) throw new Error("החבר לא נמצא");
+      member.passwordHash = hashPassword(DEFAULT_PASSWORD);
+      member.mustChangePassword = true;
       return;
     }
     case "setRole": {

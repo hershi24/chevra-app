@@ -50,5 +50,7 @@ export type ActionBody =
     }
   | { type: "removeMember"; memberId: string }
   | { type: "setRole"; memberId: string; role: Role }
+  | { type: "changePassword"; currentPassword: string; newPassword: string }
+  | { type: "resetMemberPassword"; memberId: string }
   | { type: "setBackground"; backgroundImageId: string | null }
   | { type: "addBackground"; url: string; label: string; fromGatheringId?: string };

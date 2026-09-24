@@ -255,7 +255,7 @@ function MemberRow({
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(member.username);
-              toast.success("שם המשתמש הועתק — כך נכנסים לאתר");
+              toast.success("השם הועתק");
             } catch {
               toast.error("ההעתקה נכשלה");
             }
@@ -285,7 +285,7 @@ function MemberRow({
               onChange={(value) => setDraft((prev) => ({ ...prev, displayName: value }))}
             />
             <Field
-              label="שם משתמש לכניסה"
+              label="שם בחבורה"
               value={draft.username}
               onChange={(value) => setDraft((prev) => ({ ...prev, username: value }))}
             />
@@ -340,6 +340,24 @@ function MemberRow({
             ) : (
               <p className="text-[12px] text-muted-foreground">לא ניתן להסיר את עצמכם.</p>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await act({ type: "resetMemberPassword", memberId: member.id });
+                  toast.success("הסיסמה אופסה ל-1234. בכניסה הבאה תופיע בקשה להחליף.");
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "האיפוס נכשל");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              איפוס סיסמה ל-1234
+            </Button>
           </div>
         </div>
       ) : null}
@@ -394,7 +412,7 @@ function AddMemberForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <div className="grid gap-1.5">
-        <Label htmlFor="new-username">שם משתמש לכניסה</Label>
+        <Label htmlFor="new-username">שם בחבורה</Label>
         <Input id="new-username" name="username" required placeholder="למשל: יוסי" />
       </div>
       <div className="grid gap-1.5">

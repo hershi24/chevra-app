@@ -20,6 +20,8 @@ create table public.members (
   email text,
   avatar_color text not null default '#0F766E',
   initials text not null,
+  password_hash text,
+  must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );
 

@@ -13,6 +13,8 @@ export type Member = {
   email: string;
   avatarColor: string;
   initials: string;
+  passwordHash?: string;
+  mustChangePassword?: boolean;
 };
 
 export type EventMedia = {
