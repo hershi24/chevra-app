@@ -118,10 +118,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
     (active.type !== "announcements" || can(me, "postAnnouncement"));
 
   async function openPersonalChat(member: Member) {
+    if (!me) return;
+    const myId = me.id;
     const existing = channels.find(
       (channel) =>
         channel.type === "dm" &&
-        channel.memberIds.includes(me.id) &&
+        channel.memberIds.includes(myId) &&
         channel.memberIds.includes(member.id) &&
         channel.memberIds.length === 2
     );
@@ -134,7 +136,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       const dm = next.channels.find(
         (channel) =>
           channel.type === "dm" &&
-          channel.memberIds.includes(me.id) &&
+          channel.memberIds.includes(myId) &&
           channel.memberIds.includes(member.id)
       );
       if (dm) router.push(`/chat/${dm.id}`);
