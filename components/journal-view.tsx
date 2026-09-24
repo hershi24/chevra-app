@@ -6,7 +6,6 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateHe, gatheringLabel, memberById } from "@/lib/format";
 import { isAdmin } from "@/lib/permissions";
-import { isPastGathering } from "@/lib/selectors";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 
@@ -46,7 +45,7 @@ export function JournalView() {
           const cover = event.media.find((m) => m.type === "image");
           const host = memberById(state.members, event.hostId);
           const isUpcoming = event.status === "upcoming";
-          const canDelete = isAdmin(me) && isPastGathering(event);
+          const canDelete = isAdmin(me);
           return (
             <div key={event.id}>
             <Link href={`/journal/${event.id}`} className="group block">
