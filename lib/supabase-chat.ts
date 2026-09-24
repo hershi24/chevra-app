@@ -154,21 +154,38 @@ export async function syncChatDiff(before: AppState, after: AppState) {
   for (const channel of after.channels) {
     const prev = before.channels.find((c) => c.id === channel.id);
     if (!prev) {
-      const { error } = await db.from("channels").insert(channelRow(channel));
+      const { error } = await db.from("channels").upsert(channelRow(channel));
       if (error) throw error;
       if (channel.memberIds.length) {
         const { error: linkError } = await db
           .from("channel_members")
-          .insert(channel.memberIds.map((memberId) => ({ channel_id: channel.id, member_id: memberId })));
+          .upsert(channel.memberIds.map((memberId) => ({ channel_id: channel.id, member_id: memberId })));
         if (linkError) throw linkError;
       }
       continue;
+    }
+    if (
+      prev.name !== channel.name ||
+      prev.type !== channel.type ||
+      prev.description !== channel.description
+    ) {
+      const { error } = await db.from("channels").update(channelRow(channel)).eq("id", channel.id);
+      if (error) throw error;
     }
     const added = channel.memberIds.filter((id) => !prev.memberIds.includes(id));
     if (added.length) {
       const { error } = await db
         .from("channel_members")
         .upsert(added.map((memberId) => ({ channel_id: channel.id, member_id: memberId })));
+      if (error) throw error;
+    }
+    const removedMembers = prev.memberIds.filter((id) => !channel.memberIds.includes(id));
+    if (removedMembers.length) {
+      const { error } = await db
+        .from("channel_members")
+        .delete()
+        .eq("channel_id", channel.id)
+        .in("member_id", removedMembers);
       if (error) throw error;
     }
   }
