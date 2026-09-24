@@ -53,6 +53,30 @@ export async function readState(): Promise<AppState> {
   return state;
 }
 
+export async function persistQuietly(
+  mutator: (state: AppState) => boolean
+): Promise<void> {
+  const run = (g.__chevraWrite ?? Promise.resolve()).then(async () => {
+    const current = structuredClone(await readState());
+    const before = structuredClone(current);
+    if (!mutator(current)) return;
+    g.__chevraCache = current;
+    await persist(current);
+    if (isSupabaseEnabled()) {
+      try {
+        await syncChatDiff(before, current);
+      } catch (error) {
+        console.error("Supabase chat write failed", error);
+      }
+    }
+  });
+  g.__chevraWrite = run.then(
+    () => undefined,
+    () => undefined
+  );
+  await run;
+}
+
 export async function updateState(
   mutator: (state: AppState) => void
 ): Promise<AppState> {
