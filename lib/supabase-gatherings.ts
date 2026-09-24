@@ -24,7 +24,7 @@ type RsvpRow = {
 
 type MediaRow = {
   id: string;
-  gathering_id: string;
+  gathering_id: string | null;
   type: string;
   url: string;
   caption: string | null;
@@ -65,7 +65,10 @@ function sameMedia(a: EventMedia[], b: EventMedia[]) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export async function loadGatheringsFromSupabase(): Promise<Gathering[] | null> {
+export async function loadGatheringsFromSupabase(): Promise<{
+  gatherings: Gathering[];
+  gallery: EventMedia[];
+} | null> {
   if (!isSupabaseEnabled()) return null;
   const db = getServiceSupabase();
   if (!db) return null;
@@ -87,21 +90,27 @@ export async function loadGatheringsFromSupabase(): Promise<Gathering[] | null> 
   }
 
   const media = new Map<string, EventMedia[]>();
+  const gallery: EventMedia[] = [];
   for (const row of (mediaRes.data ?? []) as MediaRow[]) {
     if (row.type !== "image" && row.type !== "video" && row.type !== "audio") continue;
-    const list = media.get(row.gathering_id) ?? [];
-    list.push({
+    const item: EventMedia = {
       id: row.id,
       type: row.type,
       url: row.url,
       caption: row.caption ?? undefined,
       uploadedBy: row.uploaded_by ?? "",
       createdAt: row.created_at,
-    });
+    };
+    if (!row.gathering_id) {
+      gallery.push(item);
+      continue;
+    }
+    const list = media.get(row.gathering_id) ?? [];
+    list.push(item);
     media.set(row.gathering_id, list);
   }
 
-  return ((gatheringsRes.data ?? []) as GatheringRow[]).map((row) => ({
+  const gatherings = ((gatheringsRes.data ?? []) as GatheringRow[]).map((row) => ({
     id: row.id,
     title: row.title,
     startsAt: row.starts_at,
@@ -117,6 +126,7 @@ export async function loadGatheringsFromSupabase(): Promise<Gathering[] | null> 
     rsvps: rsvps.get(row.id) ?? {},
     media: (media.get(row.id) ?? []).sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)),
   }));
+  return { gatherings, gallery };
 }
 
 export async function syncGatheringsDiff(before: AppState, after: AppState) {
@@ -128,6 +138,7 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
     (event) => !after.gatherings.some((item) => item.id === event.id)
   );
   for (const event of removed) {
+    await db.from("media").update({ gathering_id: null }).eq("gathering_id", event.id);
     await db.from("email_log").delete().eq("gathering_id", event.id);
     await db.from("ivr_log").delete().eq("gathering_id", event.id);
     const { error } = await db.from("gatherings").delete().eq("id", event.id);
@@ -146,6 +157,36 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
     if (!prev || !sameMedia(prev.media, event.media)) {
       await replaceMedia(prev?.media ?? [], event);
     }
+  }
+
+  await syncLooseGallery(before.gallery ?? [], after.gallery ?? []);
+}
+
+async function syncLooseGallery(before: EventMedia[], after: EventMedia[]) {
+  const db = getServiceSupabase();
+  if (!db) return;
+  const kept = new Set(after.map((item) => item.id));
+  for (const item of before) {
+    if (kept.has(item.id)) continue;
+    const { error } = await db.from("media").delete().eq("id", item.id);
+    if (error) throw error;
+  }
+  for (const item of after) {
+    const row = {
+      id: item.id,
+      gathering_id: null,
+      type: item.type,
+      url: item.url,
+      caption: item.caption || null,
+      uploaded_by: item.uploadedBy || null,
+      created_at: item.createdAt,
+    };
+    let { error } = await db.from("media").upsert(row);
+    if (error && row.uploaded_by) {
+      const retry = await db.from("media").upsert({ ...row, uploaded_by: null });
+      error = retry.error;
+    }
+    if (error) throw error;
   }
 }
 

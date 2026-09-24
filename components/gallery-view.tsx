@@ -8,13 +8,9 @@ import { useApp } from "@/components/app-provider";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
-import {
-  formatDateShortHe,
-  gatheringLabel,
-  memberById,
-} from "@/lib/format";
+import { formatDateShortHe, memberById } from "@/lib/format";
 import { can, canDeleteMedia } from "@/lib/permissions";
-import { galleryItems, upcomingGathering, type GalleryItem } from "@/lib/selectors";
+import { galleryItems, type GalleryItem } from "@/lib/selectors";
 import type { EventMedia } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
@@ -27,7 +23,6 @@ export function GalleryView() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<KindFilter>("all");
   const [caption, setCaption] = useState("");
-  const [eventId, setEventId] = useState("");
   const [pending, setPending] = useState<{
     previewUrl: string;
     type: "image" | "video" | "audio" | "file";
@@ -68,11 +63,6 @@ export function GalleryView() {
 
   if (!state || !me) return null;
 
-  const gatherings = [...state.gatherings].sort(
-    (a, b) => +new Date(b.startsAt) - +new Date(a.startsAt)
-  );
-  const targetId = eventId || upcomingGathering(state)?.id || gatherings[0]?.id || "";
-
   function openItem(id: string, confirm = false) {
     setActiveId(id);
     setConfirmDelete(confirm);
@@ -82,7 +72,11 @@ export function GalleryView() {
     if (!active || deleting) return;
     setDeleting(true);
     try {
-      await act({ type: "deleteMedia", eventId: active.eventId, mediaId: active.id });
+      await act({
+        type: "deleteMedia",
+        eventId: active.eventId || undefined,
+        mediaId: active.id,
+      });
       setActiveId(null);
       setConfirmDelete(false);
       toast.success("המדיה נמחקה");
@@ -94,7 +88,7 @@ export function GalleryView() {
   }
 
   async function uploadFile(file: File) {
-    if (!me || !targetId) return;
+    if (!me) return;
     const local = createLocalUpload(file);
     const type: EventMedia["type"] =
       local.type === "video" ? "video" : local.type === "audio" ? "audio" : "image";
@@ -105,13 +99,12 @@ export function GalleryView() {
       remainingSeconds: null,
     });
     try {
-      const data = await uploadWithProgress(file, { gatheringId: targetId }, ({ percent, remainingSeconds }) => {
+      const data = await uploadWithProgress(file, {}, ({ percent, remainingSeconds }) => {
         setPending((prev) => (prev ? { ...prev, progress: percent, remainingSeconds } : prev));
       });
       await preloadMedia(data.url, local.type);
       await act({
         type: "uploadMedia",
-        eventId: targetId,
         media: {
           id: crypto.randomUUID(),
           type,
@@ -160,26 +153,10 @@ export function GalleryView() {
               className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
             />
           </label>
-          {gatherings.length > 1 ? (
-            <label className="grid gap-1.5 text-[13px] font-light text-muted-foreground">
-              לשייך לחברה
-              <select
-                value={targetId}
-                onChange={(e) => setEventId(e.target.value)}
-                className="h-10 rounded-xl border border-black/8 bg-white px-3 text-sm text-foreground"
-              >
-                {gatherings.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {gatheringLabel(event)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <Button
             type="button"
             className="h-11 w-full rounded-xl md:w-auto"
-            disabled={!targetId || Boolean(pending)}
+            disabled={Boolean(pending)}
             onClick={() => fileRef.current?.click()}
           >
             <Upload data-icon="inline-start" />
@@ -458,9 +435,13 @@ function LightboxBody({
           {formatDateShortHe(item.createdAt)}
           {item.caption ? ` · ${item.caption}` : ""}
         </div>
-        <Link href={`/journal/${item.eventId}`} className="text-primary/80 hover:text-primary">
-          לחברה ביומן
-        </Link>
+        {item.eventId ? (
+          <Link href={`/journal/${item.eventId}`} className="text-primary/80 hover:text-primary">
+            לחברה ביומן
+          </Link>
+        ) : (
+          <span>גלריה</span>
+        )}
       </div>
       <div className="flex justify-between gap-2">
         <button

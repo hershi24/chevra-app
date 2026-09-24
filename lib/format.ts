@@ -41,6 +41,14 @@ export function formatDateTimeHe(iso: string) {
   return `${formatDateHe(iso)} · ${formatTimeHe(iso)}`;
 }
 
+export function formatHebrewDate(iso: string) {
+  return new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function formatRelativeHe(iso: string) {
   const then = new Date(iso).getTime();
   const now = Date.now();

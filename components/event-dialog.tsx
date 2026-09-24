@@ -15,41 +15,71 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/components/app-provider";
-import type { Member } from "@/lib/types";
+import { formatHebrewDate } from "@/lib/format";
+import type { Gathering, Member } from "@/lib/types";
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function dateValue(iso?: string) {
+  const date = iso ? new Date(iso) : new Date();
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function timeValue(iso?: string) {
+  const date = iso ? new Date(iso) : new Date();
+  if (!iso) return "20:30";
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export function EventDialog({
   trigger,
+  event,
   onCreated,
 }: {
   trigger: React.ReactNode;
+  event?: Gathering;
   onCreated?: () => void;
 }) {
   const { state, act } = useApp();
   const members = state?.members ?? [];
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [withTitle, setWithTitle] = useState(false);
+  const [withTitle, setWithTitle] = useState(Boolean(event?.title?.trim()));
+  const [date, setDate] = useState(dateValue(event?.startsAt));
+  const [time, setTime] = useState(timeValue(event?.startsAt));
 
   async function onSubmit(formData: FormData) {
     setSaving(true);
     try {
-      const date = String(formData.get("date"));
-      const time = String(formData.get("time"));
       const startsAt = new Date(`${date}T${time}`).toISOString();
-      await act({
-        type: "createEvent",
-        title: withTitle ? String(formData.get("title") ?? "").trim() : "",
-        startsAt,
-        location: String(formData.get("location")),
-        hostId: String(formData.get("hostId")),
-        kibudId: String(formData.get("kibudId") || "") || undefined,
-        lecturerId: String(formData.get("lecturerId") || "") || undefined,
-        topic: String(formData.get("topic") || "") || undefined,
-        notes: String(formData.get("notes") || "") || undefined,
-      });
-      toast.success("החברה נקבעה");
+      const title = withTitle ? String(formData.get("title") ?? "").trim() : "";
+      const hostId = String(formData.get("hostId"));
+      const kibudId = String(formData.get("kibudId") || "") || undefined;
+      const topic = String(formData.get("topic") || "") || undefined;
+      const notes = String(formData.get("notes") || "") || undefined;
+      if (event) {
+        await act({
+          type: "updateEvent",
+          eventId: event.id,
+          patch: { title, startsAt, hostId, kibudId, topic, notes },
+        });
+        toast.success("החברה עודכנה");
+      } else {
+        await act({
+          type: "createEvent",
+          title,
+          startsAt,
+          hostId,
+          kibudId,
+          topic,
+          notes,
+        });
+        toast.success("החברה נקבעה");
+      }
       setOpen(false);
-      setWithTitle(false);
+      if (!event) setWithTitle(false);
       onCreated?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "שמירה נכשלה");
@@ -63,13 +93,13 @@ export function EventDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setWithTitle(false);
+        if (!next && !event) setWithTitle(false);
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>קביעת חברה חדשה</DialogTitle>
+          <DialogTitle>{event ? "עריכת חברה" : "קביעת חברה חדשה"}</DialogTitle>
         </DialogHeader>
         <form action={onSubmit} className="grid gap-3">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3 py-2.5">
@@ -92,23 +122,48 @@ export function EventDialog({
               label="כותרת"
               name="title"
               placeholder="למשל: חברותא · פרשת השבוע"
+              defaultValue={event?.title}
             />
           ) : null}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="תאריך" name="date" type="date" required />
-            <Field label="שעה" name="time" type="time" defaultValue="20:30" required />
+            <Field
+              label="תאריך"
+              name="date"
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <Field
+              label="שעה"
+              name="time"
+              type="time"
+              required
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
           </div>
-          <Field label="מיקום / מארח" name="location" placeholder="כתובת או שם הבית" required />
-          <SelectField label="מארח" name="hostId" members={members} />
-          <SelectField label="אחראי כיבוד" name="kibudId" members={members} optional />
-          <SelectField label="ראש החברה" name="lecturerId" members={members} optional />
-          <Field label="נושא השיעור" name="topic" />
+          {date ? (
+            <p className="rounded-xl bg-muted/60 px-3 py-2 text-sm font-light leading-6">
+              <span className="block">{new Date(`${date}T${time || "00:00"}`).toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+              <span className="block text-muted-foreground">{formatHebrewDate(`${date}T${time || "00:00"}`)}</span>
+            </p>
+          ) : null}
+          <SelectField label="מארח" name="hostId" members={members} defaultValue={event?.hostId} />
+          <SelectField
+            label="אחראי כיבוד"
+            name="kibudId"
+            members={members}
+            optional
+            defaultValue={event?.kibudId}
+          />
+          <Field label="נושא השיעור" name="topic" defaultValue={event?.topic} />
           <div className="grid gap-1.5">
             <Label htmlFor="notes">הערות</Label>
-            <Textarea id="notes" name="notes" rows={3} />
+            <Textarea id="notes" name="notes" rows={3} defaultValue={event?.notes} />
           </div>
           <Button type="submit" disabled={saving} className="mt-2">
-            {saving ? "שומר…" : "שמירת חברה"}
+            {saving ? "שומר…" : event ? "שמירת שינויים" : "שמירת חברה"}
           </Button>
         </form>
       </DialogContent>
@@ -134,11 +189,13 @@ function SelectField({
   name,
   members,
   optional,
+  defaultValue,
 }: {
   label: string;
   name: string;
   members: Member[];
   optional?: boolean;
+  defaultValue?: string;
 }) {
   return (
     <div className="grid gap-1.5">
@@ -147,7 +204,7 @@ function SelectField({
         id={name}
         name={name}
         className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-        defaultValue={optional ? "" : members[0]?.id}
+        defaultValue={defaultValue || (optional ? "" : members[0]?.id)}
       >
         {optional ? <option value="">ללא</option> : null}
         {members.map((member) => (
