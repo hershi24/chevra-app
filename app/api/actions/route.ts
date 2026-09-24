@@ -3,7 +3,7 @@ import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
-import { can, canDeleteMessage } from "@/lib/permissions";
+import { can, canDeleteMedia, canDeleteMessage } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
 
@@ -85,6 +85,15 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
       event.media.push({ ...body.media, uploadedBy: me.id, createdAt: new Date().toISOString() });
+      return;
+    }
+    case "deleteMedia": {
+      if (!can(me, "uploadMedia")) throw new Error("forbidden");
+      const event = s.gatherings.find((g) => g.id === body.eventId);
+      const media = event?.media.find((item) => item.id === body.mediaId);
+      if (!event || !media) throw new Error("המדיה לא נמצאה");
+      if (!canDeleteMedia(me, media)) throw new Error("forbidden");
+      event.media = event.media.filter((item) => item.id !== media.id);
       return;
     }
     case "saveSummary": {
