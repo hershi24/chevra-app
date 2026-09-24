@@ -15,6 +15,7 @@ export type ActionBody =
     }
   | { type: "updateEvent"; eventId: string; patch: Partial<Gathering> }
   | { type: "cancelEvent"; eventId: string }
+  | { type: "deleteGathering"; eventId: string }
   | { type: "uploadMedia"; eventId: string; media: Gathering["media"][number] }
   | { type: "deleteMedia"; eventId: string; mediaId: string }
   | { type: "saveSummary"; eventId: string; summary?: string; audioUrl?: string }

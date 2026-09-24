@@ -14,6 +14,13 @@ export function upcomingGathering(state: AppState | { gatherings: Gathering[] })
   );
 }
 
+export function isPastGathering(event: { status: string; startsAt: string }) {
+  return (
+    event.status !== "upcoming" ||
+    new Date(event.startsAt).getTime() < Date.now() - 3 * 3600_000
+  );
+}
+
 export type GalleryItem = EventMedia & {
   eventId: string;
   eventLabel: string;
