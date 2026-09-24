@@ -12,6 +12,7 @@ import {
   upsertMembers,
 } from "./supabase-chat";
 import { ensureMemberSecrets, publicMember } from "./password";
+import { loadGatheringsFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
 import type { AppState, Member, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -76,6 +77,19 @@ export async function readState(): Promise<AppState> {
       state.channels = chat.channels;
       state.messages = chat.messages;
     }
+    const gatherings = await loadGatheringsFromSupabase();
+    if (gatherings) {
+      if (gatherings.length) {
+        state.gatherings = gatherings;
+      } else {
+        const seedIds = new Set(["g-next", "g-past-1", "g-past-2", "g-past-3"]);
+        const custom = state.gatherings.filter((event) => !seedIds.has(event.id));
+        state.gatherings = custom;
+        if (custom.length) {
+          await syncGatheringsDiff({ ...state, gatherings: [] }, state);
+        }
+      }
+    }
   } catch (error) {
     console.error("Supabase chat read failed", error);
   }
@@ -94,6 +108,7 @@ export async function persistQuietly(
     if (isSupabaseEnabled()) {
       try {
         await syncChatDiff(before, current);
+        await syncGatheringsDiff(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -119,9 +134,10 @@ export async function updateState(
     if (isSupabaseEnabled()) {
       try {
         await syncChatDiff(before, current);
+        await syncGatheringsDiff(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
-        throw new Error("ההודעה לא נשמרה בענן. נסו שוב.");
+        throw new Error("השמירה בענן נכשלה. נסו שוב.");
       }
     }
     emitUpdate(current.revision);
