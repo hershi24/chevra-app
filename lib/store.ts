@@ -4,7 +4,13 @@ import { createSeed } from "./seed";
 import { emitUpdate } from "./realtime";
 import { isSupabaseEnabled } from "./supabase";
 import { canSeeChannel } from "./channels";
-import { bootstrapChatIfEmpty, loadChatFromSupabase, syncChatDiff } from "./supabase-chat";
+import {
+  bootstrapChatIfEmpty,
+  loadChatFromSupabase,
+  loadMembersFromSupabase,
+  syncChatDiff,
+  upsertMembers,
+} from "./supabase-chat";
 import type { AppState, Member, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -42,7 +48,15 @@ export async function readState(): Promise<AppState> {
   const state = structuredClone(json);
   try {
     await bootstrapChatIfEmpty(state);
-    const chat = await loadChatFromSupabase();
+    const [chat, members] = await Promise.all([
+      loadChatFromSupabase(),
+      loadMembersFromSupabase(),
+    ]);
+    if (members?.length) {
+      state.members = members;
+    } else if (state.members.length) {
+      await upsertMembers(state.members);
+    }
     if (chat) {
       state.channels = chat.channels;
       state.messages = chat.messages;

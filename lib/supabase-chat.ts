@@ -48,6 +48,30 @@ function messageRow(message: Message) {
   };
 }
 
+export async function loadMembersFromSupabase(): Promise<Member[] | null> {
+  const db = getServiceSupabase();
+  if (!db) return null;
+  const { data, error } = await db.from("members").select("*");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    username: row.username as string,
+    displayName: row.display_name as string,
+    role: row.role as Member["role"],
+    phone: (row.phone as string | null) ?? "",
+    email: (row.email as string | null) ?? "",
+    avatarColor: (row.avatar_color as string) || "#0F766E",
+    initials: (row.initials as string) || "?",
+  }));
+}
+
+export async function upsertMembers(members: Member[]) {
+  const db = getServiceSupabase();
+  if (!db || !members.length) return;
+  const { error } = await db.from("members").upsert(members.map(memberRow));
+  if (error) throw error;
+}
+
 export async function loadChatFromSupabase(): Promise<{
   channels: Channel[];
   messages: Message[];
