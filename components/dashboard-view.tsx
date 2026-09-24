@@ -68,7 +68,7 @@ export function DashboardView() {
           }}
         />
       ) : (
-        <section className="paper-card rounded-[1.75rem] px-6 py-12">
+        <section className="paper-card rounded-[1.75rem] border border-black/15 px-6 py-12">
           <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
           {can(me, "createEvent") ? (
             <div className="mt-4">
@@ -137,7 +137,7 @@ function HeroEvent({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="paper-card grid min-w-0 gap-8 rounded-[1.75rem] px-5 py-7 md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
+      className="paper-card grid min-w-0 gap-8 rounded-[1.75rem] border border-black/15 px-5 py-7 md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
     >
       <div className="min-w-0 space-y-7">
         <div>
