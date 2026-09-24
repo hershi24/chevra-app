@@ -65,23 +65,23 @@ function hebrewDay(day: number) {
 }
 
 function hebrewYear(year: number) {
-  const thousands = Math.floor(year / 1000);
   let out = hebrewLettersFor(year % 1000);
   if (out.length > 1) out = `${out.slice(0, -1)}״${out.slice(-1)}`;
   else if (out) out = `${out}׳`;
-  return `${thousands === 5 ? "ה׳" : ""}${out}`;
+  return out;
 }
 
 export function formatHebrewDate(iso: string) {
   const date = new Date(iso);
-  const formatted = new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
+  const parts = new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(date);
-  const day = Number(new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric" }).format(date));
-  const year = Number(new Intl.DateTimeFormat("en-u-ca-hebrew", { year: "numeric" }).format(date));
-  return formatted.replace(String(year), hebrewYear(year)).replace(String(day), hebrewDay(day));
+  }).formatToParts(date);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  return `${hebrewDay(day)} ב${month} ${hebrewYear(year)}`;
 }
 
 export function formatRelativeHe(iso: string) {
