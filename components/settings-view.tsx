@@ -10,14 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { roleLabel } from "@/lib/format";
-import { can } from "@/lib/permissions";
+import { memberById, roleLabel } from "@/lib/format";
+import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
+import type { Member } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 export function SettingsView() {
-  const { state, me, act, logout } = useApp();
+  const { state, me, act, logout, onlineIds } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [invitePreview, setInvitePreview] = useState<
     { to: string; yesUrl: string; noUrl: string }[] | null
@@ -97,6 +98,8 @@ export function SettingsView() {
       </Card>
 
       <PasswordCard />
+
+      {isAdmin(me) ? <OnlineNow members={state.members} onlineIds={onlineIds} /> : null}
 
       {can(me, "manageMembers") ? (
         <Card className="paper-card rounded-[1.75rem]">
@@ -302,6 +305,44 @@ function PasswordCard() {
             {saving ? "שומר…" : "החלפת הסיסמה"}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OnlineNow({ members, onlineIds }: { members: Member[]; onlineIds: string[] }) {
+  const online = onlineIds
+    .map((id) => memberById(members, id))
+    .filter((member): member is Member => Boolean(member))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "he"));
+
+  return (
+    <Card className="paper-card rounded-[1.75rem]">
+      <CardHeader>
+        <CardTitle className="font-medium">מחוברים עכשיו</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm font-light text-muted-foreground">
+          {online.length === 1 ? "מחובר אחד כעת" : `${online.length} מחוברים כעת`}
+        </p>
+        {online.length === 0 ? (
+          <p className="mt-3 text-sm font-light text-muted-foreground">אין אף אחד מחובר כרגע.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {online.map((member) => (
+              <li key={member.id} className="flex items-center gap-3 rounded-xl bg-secondary px-3 py-2">
+                <span className="relative">
+                  <UserAvatar member={member} />
+                  <span className="absolute -bottom-0.5 start-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                </span>
+                <div>
+                  <div className="text-sm font-medium">{member.displayName}</div>
+                  <div className="text-[12px] font-light text-muted-foreground">{roleLabel(member.role)}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
