@@ -21,6 +21,7 @@ export type ActionBody =
   | { type: "saveSummary"; eventId: string; summary?: string; audioUrl?: string }
   | {
       type: "sendMessage";
+      id?: string;
       channelId: string;
       text: string;
       quote?: Message["quote"];

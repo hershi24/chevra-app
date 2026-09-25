@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -14,12 +15,13 @@ import {
   applyReaction,
   messageFromRow,
   removeMessage,
+  toggleReaction,
   upsertMessage,
   type MessageRow,
   type ReactionRow,
 } from "@/lib/chat-message";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-import type { Member, PublicState } from "@/lib/types";
+import type { Member, Message, PublicState } from "@/lib/types";
 
 type AppContextValue = {
   state: PublicState | null;
@@ -40,6 +42,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<string[]>([]);
+  const pendingIds = useRef(new Set<string>());
+
+  const applyServerState = useCallback((data: PublicState, prev: PublicState | null) => {
+    const serverIds = new Set(data.messages.map((message) => message.id));
+    for (const id of pendingIds.current) {
+      if (serverIds.has(id)) pendingIds.current.delete(id);
+    }
+    const extras = (prev?.messages ?? []).filter(
+      (message) => pendingIds.current.has(message.id) && !serverIds.has(message.id)
+    );
+    return extras.length ? { ...data, messages: [...data.messages, ...extras] } : data;
+  }, []);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/state", { cache: "no-store" });
@@ -52,9 +66,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const data = (await res.json()) as PublicState;
-    setState(data);
+    setState((prev) => applyServerState(data, prev));
     setError(null);
-  }, [router]);
+  }, [router, applyServerState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,16 +162,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const act = useCallback(async (body: ActionBody) => {
-    const res = await fetch("/api/actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "הפעולה נכשלה");
-    setState(data as PublicState);
-    return data as PublicState;
-  }, []);
+    let staged: Message | null = null;
+    let reaction: { messageId: string; emoji: string } | null = null;
+    if (body.type === "sendMessage") {
+      const id = body.id && body.id.length > 0 ? body.id : crypto.randomUUID();
+      body = { ...body, id };
+      staged = {
+        id,
+        channelId: body.channelId,
+        authorId: "",
+        text: body.text.trim(),
+        createdAt: new Date().toISOString(),
+        quote: body.quote,
+        reactions: {},
+        attachments: body.attachments ?? [],
+        voiceUrl: body.voiceUrl,
+        mentions: body.mentions ?? [],
+      };
+      pendingIds.current.add(id);
+      setState((prev) => {
+        if (!prev?.me || prev.messages.some((message) => message.id === id)) return prev;
+        return { ...prev, messages: [...prev.messages, { ...staged!, authorId: prev.me.id }] };
+      });
+    } else if (body.type === "react") {
+      const { messageId, emoji } = body;
+      reaction = { messageId, emoji };
+      setState((prev) => {
+        if (!prev?.me) return prev;
+        return {
+          ...prev,
+          messages: toggleReaction(prev.messages, messageId, emoji, prev.me.id),
+        };
+      });
+    }
+    try {
+      const res = await fetch("/api/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json()) as PublicState & { error?: string };
+      if (!res.ok) throw new Error(data.error || "הפעולה נכשלה");
+      setState((prev) => applyServerState(data, prev));
+      return data;
+    } catch (error) {
+      if (staged) {
+        pendingIds.current.delete(staged.id);
+        setState((prev) =>
+          prev ? { ...prev, messages: prev.messages.filter((message) => message.id !== staged.id) } : prev
+        );
+      } else if (reaction) {
+        const undo = reaction;
+        setState((prev) => {
+          if (!prev?.me) return prev;
+          return {
+            ...prev,
+            messages: toggleReaction(prev.messages, undo.messageId, undo.emoji, prev.me.id),
+          };
+        });
+      }
+      throw error;
+    }
+  }, [applyServerState]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth", { method: "DELETE" });
