@@ -8,9 +8,10 @@ export function invitationHtml(opts: {
   kibudName?: string;
   lecturerName?: string;
   yesUrl: string;
+  maybeUrl: string;
   noUrl: string;
 }) {
-  const { member, event, hostName, kibudName, lecturerName, yesUrl, noUrl } = opts;
+  const { member, event, hostName, kibudName, lecturerName, yesUrl, maybeUrl, noUrl } = opts;
   const align = "direction:rtl;text-align:right;";
   return `<!doctype html>
 <html lang="he" dir="rtl">
@@ -52,6 +53,9 @@ export function invitationHtml(opts: {
                   <tr>
                     <td dir="rtl" align="right" style="padding-left:10px;">
                       <a href="${yesUrl}" style="display:inline-block;background:#0f5f59;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;">מאשר הגעה</a>
+                    </td>
+                    <td dir="rtl" align="right" style="padding-left:10px;">
+                      <a href="${maybeUrl}" style="display:inline-block;background:#fff;color:#2c2118;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #ead9c4;">אולי</a>
                     </td>
                     <td dir="rtl" align="right">
                       <a href="${noUrl}" style="display:inline-block;background:#fff;color:#8a3b2b;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #e4c7be;">לא אוכל להגיע</a>
