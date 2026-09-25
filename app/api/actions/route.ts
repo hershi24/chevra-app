@@ -140,8 +140,14 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (channel.type === "announcements" && !can(me, "postAnnouncement")) {
         throw new Error("רק מנהל או ראש החברה יכולים לכתוב בהודעות רשמיות");
       }
+      const clientId = body.id?.trim();
+      const id =
+        clientId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId)
+          ? clientId
+          : crypto.randomUUID();
+      if (s.messages.some((item) => item.id === id)) return;
       const message: Message = {
-        id: crypto.randomUUID(),
+        id,
         channelId: body.channelId,
         authorId: me.id,
         text: body.text.trim(),

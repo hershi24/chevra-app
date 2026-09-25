@@ -45,6 +45,24 @@ export function upsertMessage(messages: Message[], incoming: Message): Message[]
   return next;
 }
 
+export function toggleReaction(
+  messages: Message[],
+  messageId: string,
+  emoji: string,
+  memberId: string
+): Message[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    const ids = new Set(message.reactions[emoji] ?? []);
+    if (ids.has(memberId)) ids.delete(memberId);
+    else ids.add(memberId);
+    const reactions = { ...message.reactions };
+    if (ids.size === 0) delete reactions[emoji];
+    else reactions[emoji] = [...ids];
+    return { ...message, reactions };
+  });
+}
+
 export function applyReaction(
   messages: Message[],
   row: ReactionRow,

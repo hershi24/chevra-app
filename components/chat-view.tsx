@@ -167,19 +167,23 @@ export function ChatView({ channelId }: { channelId?: string }) {
     const mentions = state.members
       .filter((member) => text.includes(`@${member.displayName}`))
       .map((member) => member.id);
+    const quoted = quote;
+    setDraft("");
+    setQuote(undefined);
     try {
       await act({
         type: "sendMessage",
+        id: crypto.randomUUID(),
         channelId: active.id,
         text,
-        quote,
+        quote: quoted,
         mentions,
         attachments: extra?.attachments,
         voiceUrl: extra?.voiceUrl,
       });
-      setDraft("");
-      setQuote(undefined);
     } catch (error) {
+      setDraft(text);
+      setQuote(quoted);
       toast.error(error instanceof Error ? error.message : "שליחה נכשלה");
     }
   }
