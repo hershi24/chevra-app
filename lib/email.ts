@@ -1,5 +1,5 @@
 import type { Gathering, Member } from "./types";
-import { formatDateTimeHe, gatheringLabel, rsvpLabel } from "./format";
+import { formatDateTimeHe, formatHebrewDate, gatheringLabel, rsvpLabel } from "./format";
 
 export function invitationHtml(opts: {
   member: Member;
@@ -10,8 +10,10 @@ export function invitationHtml(opts: {
   yesUrl: string;
   maybeUrl: string;
   noUrl: string;
+  note?: string;
 }) {
-  const { member, event, hostName, kibudName, lecturerName, yesUrl, maybeUrl, noUrl } = opts;
+  const { member, event, hostName, kibudName, lecturerName, yesUrl, maybeUrl, noUrl, note } = opts;
+  const personal = note?.trim() ? escapeHtml(note.trim()).replaceAll("\n", "<br>") : "";
   const align = "direction:rtl;text-align:right;";
   return `<!doctype html>
 <html lang="he" dir="rtl">
@@ -35,13 +37,15 @@ export function invitationHtml(opts: {
               <td dir="rtl" align="right" style="padding:28px 32px 8px;${align}">
                 <p style="margin:0 0 16px;font-size:16px;${align}">שלום ${member.displayName},</p>
                 <p style="margin:0 0 18px;line-height:1.7;${align}">
-                  מחכים לך ב<strong>${gatheringLabel(event)}</strong>.
+                  מחכים לך ב<strong>${escapeHtml(gatheringLabel(event))}</strong>.
                   לחיצה אחת על הכפתור מעדכנת את ההגעה — בלי צורך להתחבר.
                 </p>
+                ${personal ? `<p style="margin:0 0 18px;line-height:1.7;${align}">${personal}</p>` : ""}
                 <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;${align}">
                   <tr>
                     <td dir="rtl" align="right" style="padding:18px 20px;font-size:15px;line-height:1.8;${align}">
-                      <div style="${align}"><strong>מתי:</strong> ${formatDateTimeHe(event.startsAt)}</div>
+                      <div style="${align}"><strong>מתי:</strong> ${formatHebrewDate(event.startsAt)}</div>
+                      <div style="${align}">${formatDateTimeHe(event.startsAt)}</div>
                       ${event.location ? `<div style="${align}"><strong>איפה:</strong> ${event.location}</div>` : ""}
                       <div style="${align}"><strong>מארח:</strong> ${hostName}</div>
                       ${lecturerName ? `<div style="${align}"><strong>שיעור:</strong> ${event.topic ?? ""} · ${lecturerName}</div>` : ""}
@@ -62,7 +66,6 @@ export function invitationHtml(opts: {
                     </td>
                   </tr>
                 </table>
-                <p style="margin:28px 0 0;font-size:13px;color:#7b6a5a;${align}">עם אהבה, החבורה</p>
               </td>
             </tr>
             <tr>
@@ -74,6 +77,14 @@ export function invitationHtml(opts: {
     </table>
   </body>
 </html>`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 export async function sendEmail(opts: {

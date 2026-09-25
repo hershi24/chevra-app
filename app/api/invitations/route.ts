@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "רק מנהל מערכת יכול לשלוח הזמנות" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { eventId?: string };
+  const body = (await request.json()) as { eventId?: string; note?: string };
+  const note = body.note?.trim().slice(0, 1000) ?? "";
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
   if (!event) {
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       yesUrl,
       maybeUrl,
       noUrl,
+      note,
     });
     const result = await sendEmail({
       to: address,

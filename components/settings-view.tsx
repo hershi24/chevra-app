@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeHe, memberById, roleLabel } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
@@ -21,6 +22,7 @@ export function SettingsView() {
   const { state, me, act, logout, onlineIds } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState(false);
+  const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
   const [pendingBg, setPendingBg] = useState<{
     previewUrl: string;
@@ -39,7 +41,7 @@ export function SettingsView() {
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: event.id }),
+        body: JSON.stringify({ eventId: event.id, note: inviteNote }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -217,6 +219,16 @@ export function SettingsView() {
               שליחת HTML עם כפתורי [מאשר הגעה] / [אולי] / [לא אוכל להגיע]. כל קישור מעדכן את היומן בלי התחברות.
               בלי מפתח Resend ההזמנות נשמרות כאן עם קישורים לבדיקה.
             </p>
+            <div className="grid gap-2">
+              <Label htmlFor="invite-note">הודעה אישית למייל</Label>
+              <Textarea
+                id="invite-note"
+                rows={4}
+                value={inviteNote}
+                onChange={(e) => setInviteNote(e.target.value)}
+                placeholder="אפשר לכתוב כאן משהו שיופיע בכל הזמנה. אם משאירים ריק, נשלחת ההזמנה בלי תוספת."
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void sendInvites()} disabled={!event || sending}>
                 {sending ? "שולח…" : "שליחת הזמנות לחברה הקרובה"}
