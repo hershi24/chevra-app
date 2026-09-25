@@ -3,7 +3,9 @@ import { getSessionUser } from "@/lib/auth";
 import { invitationHtml, sendEmail } from "@/lib/email";
 import { gatheringLabel, memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
+import { signRsvpToken } from "@/lib/rsvp-link";
 import { readState, updateState } from "@/lib/store";
+import type { EmailDelivery } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -21,16 +23,20 @@ export async function POST(request: Request) {
   }
 
   const origin = inviteOrigin(request);
-  const sent: { memberId: string; to: string; yesUrl: string; maybeUrl: string; noUrl: string; mock: boolean }[] = [];
+  const deliveries: EmailDelivery[] = [];
 
   for (const member of state.members) {
-    let token = state.tokens.find((t) => t.eventId === event.id && t.memberId === member.id)?.token;
-    if (!token) {
-      token = `tok-${member.id}-${event.id}-${Math.random().toString(36).slice(2, 10)}`;
-      await updateState((s) => {
-        s.tokens.push({ token: token!, eventId: event.id, memberId: member.id });
+    const address = member.email?.trim() ?? "";
+    if (!address || address.endsWith("@chevra.local")) {
+      deliveries.push({
+        to: address || "—",
+        name: member.displayName,
+        status: "skipped",
+        error: address ? "כתובת הדגמה לא נשלחת" : "אין כתובת מייל",
       });
+      continue;
     }
+    const token = signRsvpToken(member.id, event.id);
     const yesUrl = `${origin}/rsvp/${token}?c=yes`;
     const maybeUrl = `${origin}/rsvp/${token}?c=maybe`;
     const noUrl = `${origin}/rsvp/${token}?c=no`;
@@ -45,31 +51,45 @@ export async function POST(request: Request) {
       noUrl,
     });
     const result = await sendEmail({
-      to: member.email,
+      to: address,
       subject: `הזמנה: ${gatheringLabel(event)}`,
       html,
     });
-    sent.push({
-      memberId: member.id,
-      to: member.email,
-      yesUrl,
-      maybeUrl,
-      noUrl,
-      mock: Boolean((result as { mock?: boolean }).mock),
+    if ("mock" in result) {
+      deliveries.push({
+        to: address,
+        name: member.displayName,
+        status: "failed",
+        error: "אין מפתח Resend בשרת, המייל לא יצא",
+      });
+      continue;
+    }
+    deliveries.push({
+      to: address,
+      name: member.displayName,
+      status: result.ok ? "sent" : "failed",
+      error: result.ok ? undefined : result.error || "השליחה נכשלה",
     });
   }
 
-  await updateState((s) => {
-    s.emailLog.unshift({
-      id: crypto.randomUUID(),
-      eventId: event.id,
-      sentAt: new Date().toISOString(),
-      recipients: sent.map((row) => row.to),
-      subject: `הזמנה: ${gatheringLabel(event)}`,
+  const sentCount = deliveries.filter((row) => row.status === "sent").length;
+  const failedCount = deliveries.filter((row) => row.status === "failed").length;
+  try {
+    await updateState((s) => {
+      s.emailLog.unshift({
+        id: crypto.randomUUID(),
+        eventId: event.id,
+        sentAt: new Date().toISOString(),
+        recipients: deliveries.filter((row) => row.status === "sent").map((row) => row.to),
+        subject: `הזמנה: ${gatheringLabel(event)}`,
+        deliveries,
+      });
     });
-  });
+  } catch {
+    // The send report still goes back even if the log could not be stored.
+  }
 
-  return NextResponse.json({ sent, mock: sent.every((row) => row.mock) });
+  return NextResponse.json({ deliveries, sentCount, failedCount });
 }
 
 function inviteOrigin(request: Request) {

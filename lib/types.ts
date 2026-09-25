@@ -98,12 +98,20 @@ export type AppSettings = {
   backgrounds: BackgroundImage[];
 };
 
+export type EmailDelivery = {
+  to: string;
+  name: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+};
+
 export type EmailLog = {
   id: string;
   eventId: string;
   sentAt: string;
   recipients: string[];
   subject: string;
+  deliveries?: EmailDelivery[];
 };
 
 export type IvrLog = {

@@ -84,7 +84,7 @@ export async function sendEmail(opts: {
   const key = process.env.RESEND_API_KEY2 || process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM || "מיין חברה <chevra@localhost>";
   if (!key) {
-    return { id: `mock-${Date.now()}`, mock: true as const };
+    return { id: `mock-${Date.now()}`, mock: true as const, ok: false as const };
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -96,7 +96,8 @@ export async function sendEmail(opts: {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Resend failed: ${text}`);
+    return { ok: false as const, error: text.slice(0, 180) };
   }
-  return res.json();
+  const data = (await res.json()) as { id?: string };
+  return { ok: true as const, id: data.id };
 }
