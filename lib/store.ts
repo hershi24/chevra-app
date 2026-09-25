@@ -95,7 +95,8 @@ export async function readState(): Promise<AppState> {
       const cloudTokens = await loadTokensFromSupabase();
       if (cloudTokens) {
         const known = new Set(cloudTokens.map((row) => row.token));
-        const extras = state.tokens.filter((row) => !known.has(row.token));
+        const live = new Set(state.gatherings.map((event) => event.id));
+        const extras = state.tokens.filter((row) => live.has(row.eventId) && !known.has(row.token));
         state.tokens = [...cloudTokens, ...extras];
         if (extras.length) {
           await syncGatheringsDiff({ ...state, tokens: cloudTokens }, state);

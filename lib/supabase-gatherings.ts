@@ -160,7 +160,12 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
   }
 
   await syncLooseGallery(before.gallery ?? [], after.gallery ?? []);
-  await syncTokens(before.tokens ?? [], after.tokens ?? []);
+  try {
+    const gatheringIds = new Set(after.gatherings.map((event) => event.id));
+    await syncTokens(before.tokens ?? [], after.tokens ?? [], gatheringIds);
+  } catch (error) {
+    console.error("RSVP token sync skipped", error);
+  }
 }
 
 export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
@@ -168,7 +173,10 @@ export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
   const db = getServiceSupabase();
   if (!db) return null;
   const { data, error } = await db.from("rsvp_tokens").select("token, gathering_id, member_id");
-  if (error) throw error;
+  if (error) {
+    if (isMissingTokenTable(error)) return null;
+    throw error;
+  }
   return ((data ?? []) as { token: string; gathering_id: string; member_id: string }[]).map((row) => ({
     token: row.token,
     eventId: row.gathering_id,
@@ -176,18 +184,29 @@ export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
   }));
 }
 
-async function syncTokens(before: RsvpToken[], after: RsvpToken[]) {
+function isMissingTokenTable(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    (/rsvp_tokens/i.test(message) && /does not exist|schema cache|Could not find/i.test(message))
+  );
+}
+
+async function syncTokens(before: RsvpToken[], after: RsvpToken[], gatheringIds: Set<string>) {
   const db = getServiceSupabase();
   if (!db) return;
-  const kept = new Set(after.map((row) => row.token));
-  for (const row of before) {
+  const live = (row: RsvpToken) => gatheringIds.has(row.eventId);
+  const next = after.filter(live);
+  const kept = new Set(next.map((row) => row.token));
+  for (const row of before.filter(live)) {
     if (kept.has(row.token)) continue;
     const { error } = await db.from("rsvp_tokens").delete().eq("token", row.token);
     if (error) throw error;
   }
-  if (!after.length) return;
+  if (!next.length) return;
   const { error } = await db.from("rsvp_tokens").upsert(
-    after.map((row) => ({
+    next.map((row) => ({
       token: row.token,
       gathering_id: row.eventId,
       member_id: row.memberId,
