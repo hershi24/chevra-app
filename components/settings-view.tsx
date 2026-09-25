@@ -10,19 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { memberById, roleLabel } from "@/lib/format";
+import { formatDateTimeHe, memberById, roleLabel } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { EmailDelivery, Member } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 export function SettingsView() {
   const { state, me, act, logout, onlineIds } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [invitePreview, setInvitePreview] = useState<
-    { to: string; yesUrl: string; maybeUrl: string; noUrl: string }[] | null
-  >(null);
+  const [sending, setSending] = useState(false);
+  const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
   const [pendingBg, setPendingBg] = useState<{
     previewUrl: string;
     progress: number;
@@ -34,19 +33,26 @@ export function SettingsView() {
   const event = upcomingGathering(state);
 
   async function sendInvites() {
-    if (!event) return;
-    const res = await fetch("/api/invitations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId: event.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.error || "שליחה נכשלה");
-      return;
+    if (!event || sending) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "שליחה נכשלה");
+        return;
+      }
+      setDeliveries(data.deliveries ?? []);
+      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
+      else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
+      else toast.error("אף מייל לא נשלח");
+    } finally {
+      setSending(false);
     }
-    setInvitePreview(data.sent);
-    toast.success(data.mock ? "ההזמנות מוכנות (מצב הדגמה, בלי Resend)" : "ההזמנות נשלחו");
   }
 
   async function pingIvr() {
@@ -212,8 +218,8 @@ export function SettingsView() {
               בלי מפתח Resend ההזמנות נשמרות כאן עם קישורים לבדיקה.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void sendInvites()} disabled={!event}>
-                שליחת הזמנות לחברה הקרובה
+              <Button onClick={() => void sendInvites()} disabled={!event || sending}>
+                {sending ? "שולח…" : "שליחת הזמנות לחברה הקרובה"}
               </Button>
               {can(me, "triggerIvr") ? (
                 <Button variant="outline" onClick={() => void pingIvr()}>
@@ -221,26 +227,10 @@ export function SettingsView() {
                 </Button>
               ) : null}
             </div>
-            {invitePreview?.length ? (
-              <ul className="space-y-2 text-sm">
-                {invitePreview.map((row) => (
-                  <li key={row.to} className="rounded-xl bg-secondary p-3">
-                    <div className="font-medium">{row.to}</div>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <a className="text-primary underline" href={row.yesUrl}>
-                        מאשר הגעה
-                      </a>
-                      <a className="underline" href={row.maybeUrl}>
-                        אולי
-                      </a>
-                      <a className="text-destructive underline" href={row.noUrl}>
-                        לא אוכל להגיע
-                      </a>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            <InviteReport
+              deliveries={deliveries ?? state.emailLog.find((entry) => entry.eventId === event?.id)?.deliveries ?? null}
+              sentAt={deliveries ? null : state.emailLog.find((entry) => entry.eventId === event?.id)?.sentAt}
+            />
             {state.ivrLog[0] ? (
               <p className="text-xs text-muted-foreground">
                 IVR אחרון: {state.ivrLog[0].result} · {state.ivrLog[0].phone}
@@ -310,6 +300,45 @@ function PasswordCard() {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+function InviteReport({
+  deliveries,
+  sentAt,
+}: {
+  deliveries: EmailDelivery[] | null;
+  sentAt?: string | null;
+}) {
+  if (!deliveries?.length) return null;
+  const sent = deliveries.filter((row) => row.status === "sent").length;
+  const failed = deliveries.filter((row) => row.status === "failed").length;
+  const skipped = deliveries.filter((row) => row.status === "skipped").length;
+  return (
+    <div className="rounded-xl bg-secondary p-3 text-sm">
+      <p className="font-medium">
+        {sent} נשלחו
+        {failed ? ` · ${failed} נכשלו` : ""}
+        {skipped ? ` · ${skipped} לא נשלחו` : ""}
+      </p>
+      {sentAt ? (
+        <p className="mt-1 text-xs text-muted-foreground">שליחה אחרונה: {formatDateTimeHe(sentAt)}</p>
+      ) : null}
+      <ul className="mt-2 space-y-1">
+        {deliveries.map((row) => (
+          <li key={`${row.name}-${row.to}`} className="flex flex-wrap items-baseline justify-between gap-2">
+            <span>
+              {row.name}
+              <span className="text-muted-foreground"> · {row.to}</span>
+            </span>
+            <span className={row.status === "failed" ? "text-destructive" : "text-muted-foreground"}>
+              {row.status === "sent" ? "נשלח" : row.status === "failed" ? "נכשל" : "לא נשלח"}
+              {row.error ? ` — ${row.error}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

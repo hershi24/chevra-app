@@ -1,4 +1,5 @@
 import { publicMember } from "./password";
+import { readSignedToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
 import type { Gathering, Member, RsvpStatus } from "./types";
 
@@ -9,9 +10,17 @@ export type RsvpResult = {
   member: Member;
 };
 
+function tokenRow(state: Awaited<ReturnType<typeof readState>>, token: string) {
+  const stored = state.tokens.find((item) => item.token === token);
+  if (stored) return stored;
+  const signed = readSignedToken(token);
+  if (!signed) return null;
+  return { token, memberId: signed.memberId, eventId: signed.eventId };
+}
+
 export async function readRsvp(token: string): Promise<RsvpResult | null> {
   const state = await readState();
-  const row = state.tokens.find((item) => item.token === token);
+  const row = tokenRow(state, token);
   if (!row) return null;
   const event = state.gatherings.find((item) => item.id === row.eventId);
   const member = state.members.find((item) => item.id === row.memberId);
@@ -21,7 +30,7 @@ export async function readRsvp(token: string): Promise<RsvpResult | null> {
 
 export async function applyRsvp(token: string, choice: RsvpStatus): Promise<RsvpResult | null> {
   const updated = await updateState((state) => {
-    const row = state.tokens.find((item) => item.token === token);
+    const row = tokenRow(state, token);
     if (!row) throw new Error("missing");
     const event = state.gatherings.find((item) => item.id === row.eventId);
     if (!event) throw new Error("missing-event");
@@ -33,7 +42,7 @@ export async function applyRsvp(token: string, choice: RsvpStatus): Promise<Rsvp
     throw error;
   });
   if (!updated) return null;
-  const row = updated.tokens.find((item) => item.token === token);
+  const row = tokenRow(updated, token);
   const event = row ? updated.gatherings.find((item) => item.id === row.eventId) : undefined;
   const member = row ? updated.members.find((item) => item.id === row.memberId) : undefined;
   if (!row || !event || !member) return null;
