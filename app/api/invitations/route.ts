@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   const origin = inviteOrigin(request);
-  const sent: { memberId: string; to: string; yesUrl: string; noUrl: string; mock: boolean }[] = [];
+  const sent: { memberId: string; to: string; yesUrl: string; maybeUrl: string; noUrl: string; mock: boolean }[] = [];
 
   for (const member of state.members) {
     let token = state.tokens.find((t) => t.eventId === event.id && t.memberId === member.id)?.token;
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       });
     }
     const yesUrl = `${origin}/rsvp/${token}?c=yes`;
+    const maybeUrl = `${origin}/rsvp/${token}?c=maybe`;
     const noUrl = `${origin}/rsvp/${token}?c=no`;
     const html = invitationHtml({
       member,
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       kibudName: memberById(state.members, event.kibudId)?.displayName,
       lecturerName: memberById(state.members, event.lecturerId)?.displayName,
       yesUrl,
+      maybeUrl,
       noUrl,
     });
     const result = await sendEmail({
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
       memberId: member.id,
       to: member.email,
       yesUrl,
+      maybeUrl,
       noUrl,
       mock: Boolean((result as { mock?: boolean }).mock),
     });

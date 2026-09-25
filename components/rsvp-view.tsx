@@ -81,6 +81,9 @@ export function RsvpView({
             </p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void pick("yes")}>מאשר הגעה</Button>
+              <Button variant="outline" onClick={() => void pick("maybe")}>
+                אולי
+              </Button>
               <Button variant="outline" onClick={() => void pick("no")}>
                 לא אוכל להגיע
               </Button>

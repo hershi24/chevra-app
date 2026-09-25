@@ -21,7 +21,7 @@ export function SettingsView() {
   const { state, me, act, logout, onlineIds } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [invitePreview, setInvitePreview] = useState<
-    { to: string; yesUrl: string; noUrl: string }[] | null
+    { to: string; yesUrl: string; maybeUrl: string; noUrl: string }[] | null
   >(null);
   const [pendingBg, setPendingBg] = useState<{
     previewUrl: string;
@@ -208,7 +208,7 @@ export function SettingsView() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              שליחת HTML עם כפתורי [מאשר הגעה] / [לא אוכל להגיע]. כל קישור מעדכן את היומן בלי התחברות.
+              שליחת HTML עם כפתורי [מאשר הגעה] / [אולי] / [לא אוכל להגיע]. כל קישור מעדכן את היומן בלי התחברות.
               בלי מפתח Resend ההזמנות נשמרות כאן עם קישורים לבדיקה.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -229,6 +229,9 @@ export function SettingsView() {
                     <div className="mt-1 flex flex-wrap gap-2">
                       <a className="text-primary underline" href={row.yesUrl}>
                         מאשר הגעה
+                      </a>
+                      <a className="underline" href={row.maybeUrl}>
+                        אולי
                       </a>
                       <a className="text-destructive underline" href={row.noUrl}>
                         לא אוכל להגיע
