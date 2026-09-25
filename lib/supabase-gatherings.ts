@@ -161,7 +161,8 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
 
   await syncLooseGallery(before.gallery ?? [], after.gallery ?? []);
   try {
-    await syncTokens(before.tokens ?? [], after.tokens ?? []);
+    const gatheringIds = new Set(after.gatherings.map((event) => event.id));
+    await syncTokens(before.tokens ?? [], after.tokens ?? [], gatheringIds);
   } catch (error) {
     console.error("RSVP token sync skipped", error);
   }
@@ -192,18 +193,20 @@ function isMissingTokenTable(error: { code?: string; message?: string }) {
   );
 }
 
-async function syncTokens(before: RsvpToken[], after: RsvpToken[]) {
+async function syncTokens(before: RsvpToken[], after: RsvpToken[], gatheringIds: Set<string>) {
   const db = getServiceSupabase();
   if (!db) return;
-  const kept = new Set(after.map((row) => row.token));
-  for (const row of before) {
+  const live = (row: RsvpToken) => gatheringIds.has(row.eventId);
+  const next = after.filter(live);
+  const kept = new Set(next.map((row) => row.token));
+  for (const row of before.filter(live)) {
     if (kept.has(row.token)) continue;
     const { error } = await db.from("rsvp_tokens").delete().eq("token", row.token);
     if (error) throw error;
   }
-  if (!after.length) return;
+  if (!next.length) return;
   const { error } = await db.from("rsvp_tokens").upsert(
-    after.map((row) => ({
+    next.map((row) => ({
       token: row.token,
       gathering_id: row.eventId,
       member_id: row.memberId,
