@@ -1,5 +1,5 @@
 import { getServiceSupabase, isSupabaseEnabled } from "./supabase";
-import type { AppState, EventMedia, Gathering, RsvpStatus } from "./types";
+import type { AppState, EventMedia, Gathering, RsvpStatus, RsvpToken } from "./types";
 
 type GatheringRow = {
   id: string;
@@ -160,6 +160,40 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
   }
 
   await syncLooseGallery(before.gallery ?? [], after.gallery ?? []);
+  await syncTokens(before.tokens ?? [], after.tokens ?? []);
+}
+
+export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
+  if (!isSupabaseEnabled()) return null;
+  const db = getServiceSupabase();
+  if (!db) return null;
+  const { data, error } = await db.from("rsvp_tokens").select("token, gathering_id, member_id");
+  if (error) throw error;
+  return ((data ?? []) as { token: string; gathering_id: string; member_id: string }[]).map((row) => ({
+    token: row.token,
+    eventId: row.gathering_id,
+    memberId: row.member_id,
+  }));
+}
+
+async function syncTokens(before: RsvpToken[], after: RsvpToken[]) {
+  const db = getServiceSupabase();
+  if (!db) return;
+  const kept = new Set(after.map((row) => row.token));
+  for (const row of before) {
+    if (kept.has(row.token)) continue;
+    const { error } = await db.from("rsvp_tokens").delete().eq("token", row.token);
+    if (error) throw error;
+  }
+  if (!after.length) return;
+  const { error } = await db.from("rsvp_tokens").upsert(
+    after.map((row) => ({
+      token: row.token,
+      gathering_id: row.eventId,
+      member_id: row.memberId,
+    }))
+  );
+  if (error) throw error;
 }
 
 async function syncLooseGallery(before: EventMedia[], after: EventMedia[]) {

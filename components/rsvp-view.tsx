@@ -6,30 +6,28 @@ import { Button } from "@/components/ui/button";
 import { formatDateTimeHe, gatheringLabel } from "@/lib/format";
 import type { Gathering, Member, RsvpStatus } from "@/lib/types";
 
-export function RsvpView({ token, choice }: { token: string; choice?: string }) {
-  const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
-  const [result, setResult] = useState<RsvpStatus | null>(null);
-  const [event, setEvent] = useState<Gathering | null>(null);
-  const [member, setMember] = useState<Member | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function RsvpView({
+  token,
+  initial,
+  initialError,
+}: {
+  token: string;
+  initial: { status: RsvpStatus; event: Gathering; member: Member } | null;
+  initialError: string | null;
+}) {
+  const [status, setStatus] = useState<"loading" | "done" | "error">(
+    initial || initialError ? (initial ? "done" : "error") : "loading"
+  );
+  const [result, setResult] = useState<RsvpStatus | null>(initial?.status ?? null);
+  const [event, setEvent] = useState<Gathering | null>(initial?.event ?? null);
+  const [member, setMember] = useState<Member | null>(initial?.member ?? null);
+  const [error, setError] = useState<string | null>(initialError);
+  const [saved, setSaved] = useState(Boolean(initial));
 
   useEffect(() => {
+    if (initial || initialError) return;
     async function run() {
       try {
-        if (choice === "yes" || choice === "no" || choice === "maybe") {
-          const res = await fetch(`/api/rsvp/${token}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ choice }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error);
-          setEvent(data.event);
-          setMember(data.member);
-          setResult(data.status);
-          setStatus("done");
-          return;
-        }
         const res = await fetch(`/api/rsvp/${token}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -43,7 +41,7 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
       }
     }
     void run();
-  }, [token, choice]);
+  }, [token, initial, initialError]);
 
   async function pick(next: RsvpStatus) {
     const res = await fetch(`/api/rsvp/${token}`, {
@@ -58,6 +56,8 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
     }
     setResult(data.status);
     setEvent(data.event);
+    setSaved(true);
+    setStatus("done");
   }
 
   return (
@@ -75,6 +75,7 @@ export function RsvpView({ token, choice }: { token: string; choice?: string }) 
             </p>
             <p className="text-sm text-muted-foreground">{event.location}</p>
             <p className="rounded-xl bg-secondary px-3 py-2 text-sm">
+              {saved ? "ההגעה עודכנה. " : ""}
               הסטטוס שלך:{" "}
               {result === "yes" ? "מגיע" : result === "no" ? "לא מגיע" : result === "maybe" ? "אולי" : "טרם השיב"}
             </p>
