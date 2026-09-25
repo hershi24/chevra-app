@@ -76,7 +76,7 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
 }) {
-  const key = process.env.RESEND_API_KEY;
+  const key = process.env.RESEND_API_KEY2 || process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM || "מיין חברה <chevra@localhost>";
   if (!key) {
     return { id: `mock-${Date.now()}`, mock: true as const };
