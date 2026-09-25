@@ -12,7 +12,7 @@ import {
   upsertMembers,
 } from "./supabase-chat";
 import { ensureMemberSecrets, publicMember } from "./password";
-import { loadGatheringsFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
+import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
 import type { AppState, Member, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -90,6 +90,15 @@ export async function readState(): Promise<AppState> {
         state.gatherings = custom;
         if (custom.length) {
           await syncGatheringsDiff({ ...state, gatherings: [] }, state);
+        }
+      }
+      const cloudTokens = await loadTokensFromSupabase();
+      if (cloudTokens) {
+        const known = new Set(cloudTokens.map((row) => row.token));
+        const extras = state.tokens.filter((row) => !known.has(row.token));
+        state.tokens = [...cloudTokens, ...extras];
+        if (extras.length) {
+          await syncGatheringsDiff({ ...state, tokens: cloudTokens }, state);
         }
       }
     }
