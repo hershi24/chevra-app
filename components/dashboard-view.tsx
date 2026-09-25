@@ -127,6 +127,7 @@ function HeroEvent({
   const lecturer = memberById(members, event.lecturerId);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
+  const maybe = members.filter((m) => event.rsvps[m.id] === "maybe");
   const showList = can(me, "viewRsvps");
   const title = gatheringTitle(event);
   const topic = event.topic?.trim() || null;
@@ -214,7 +215,10 @@ function HeroEvent({
       <div className="min-w-0 border-t border-black/6 pt-6 lg:border-t-0 lg:border-s lg:pt-0 lg:ps-8">
         <div className="flex items-baseline justify-between gap-3">
           <h3 className="text-sm font-normal text-muted-foreground">מי מגיע</h3>
-          <span className="text-[13px] font-light text-muted-foreground">{coming.length} אישרו</span>
+          <span className="text-[13px] font-light text-muted-foreground">
+            {coming.length} אישרו
+            {maybe.length ? ` · ${maybe.length} אולי` : ""}
+          </span>
         </div>
         <div className="mt-4 flex -space-x-2 space-x-reverse">
           {coming.slice(0, 8).map((member) => (
@@ -228,6 +232,9 @@ function HeroEvent({
                 <UserAvatar member={member} size="sm" />
                 <span className="min-w-0 truncate text-[13px] font-light">
                   {member.displayName}
+                </span>
+                <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
+                  {rsvpLabel(event.rsvps[member.id] ?? "pending")}
                 </span>
                 <StatusDot status={event.rsvps[member.id] ?? "pending"} />
               </li>
