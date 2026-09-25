@@ -11,57 +11,58 @@ export function invitationHtml(opts: {
   noUrl: string;
 }) {
   const { member, event, hostName, kibudName, lecturerName, yesUrl, noUrl } = opts;
+  const align = "direction:rtl;text-align:right;";
   return `<!doctype html>
 <html lang="he" dir="rtl">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>הזמנה לחברותא</title>
+    <title>הזמנה לחברה</title>
   </head>
-  <body style="margin:0;background:#f4eee4;font-family:Arial,Helvetica,sans-serif;color:#2c2118;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4eee4;padding:24px 0;">
+  <body dir="rtl" style="margin:0;background:#f4eee4;font-family:Arial,Helvetica,sans-serif;color:#2c2118;${align}">
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f4eee4;padding:24px 0;${align}">
       <tr>
-        <td align="center">
-          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#fffaf4;border-radius:18px;overflow:hidden;border:1px solid #ead9c4;">
+        <td align="center" dir="rtl">
+          <table role="presentation" dir="rtl" width="560" cellpadding="0" cellspacing="0" style="background:#fffaf4;border-radius:18px;overflow:hidden;border:1px solid #ead9c4;${align}">
             <tr>
-              <td style="background:#0f5f59;color:#f8f1e6;padding:28px 32px;">
-                <div style="font-size:13px;letter-spacing:0.08em;">מיין חברה</div>
-                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;">הזמנה לחברה</h1>
+              <td dir="rtl" align="right" style="background:#0f5f59;color:#f8f1e6;padding:28px 32px;${align}">
+                <div style="font-size:13px;letter-spacing:0.08em;${align}">מיין חברה</div>
+                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;${align}">הזמנה לחברה</h1>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 32px 8px;">
-                <p style="margin:0 0 16px;font-size:16px;">שלום ${member.displayName},</p>
-                <p style="margin:0 0 18px;line-height:1.7;">
+              <td dir="rtl" align="right" style="padding:28px 32px 8px;${align}">
+                <p style="margin:0 0 16px;font-size:16px;${align}">שלום ${member.displayName},</p>
+                <p style="margin:0 0 18px;line-height:1.7;${align}">
                   מחכים לך ב<strong>${gatheringLabel(event)}</strong>.
                   לחיצה אחת על הכפתור מעדכנת את ההגעה — בלי צורך להתחבר.
                 </p>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;">
+                <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;${align}">
                   <tr>
-                    <td style="padding:18px 20px;font-size:15px;line-height:1.8;">
-                      <div><strong>מתי:</strong> ${formatDateTimeHe(event.startsAt)}</div>
-                      <div><strong>איפה:</strong> ${event.location}</div>
-                      <div><strong>מארח:</strong> ${hostName}</div>
-                      ${lecturerName ? `<div><strong>שיעור:</strong> ${event.topic ?? ""} · ${lecturerName}</div>` : ""}
-                      ${kibudName ? `<div><strong>כיבוד:</strong> ${kibudName}</div>` : ""}
+                    <td dir="rtl" align="right" style="padding:18px 20px;font-size:15px;line-height:1.8;${align}">
+                      <div style="${align}"><strong>מתי:</strong> ${formatDateTimeHe(event.startsAt)}</div>
+                      ${event.location ? `<div style="${align}"><strong>איפה:</strong> ${event.location}</div>` : ""}
+                      <div style="${align}"><strong>מארח:</strong> ${hostName}</div>
+                      ${lecturerName ? `<div style="${align}"><strong>שיעור:</strong> ${event.topic ?? ""} · ${lecturerName}</div>` : ""}
+                      ${kibudName ? `<div style="${align}"><strong>כיבוד:</strong> ${kibudName}</div>` : ""}
                     </td>
                   </tr>
                 </table>
-                <table role="presentation" cellpadding="0" cellspacing="0">
+                <table role="presentation" dir="rtl" align="right" cellpadding="0" cellspacing="0" style="${align}">
                   <tr>
-                    <td style="padding-left:10px;">
+                    <td dir="rtl" align="right" style="padding-left:10px;">
                       <a href="${yesUrl}" style="display:inline-block;background:#0f5f59;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;">מאשר הגעה</a>
                     </td>
-                    <td>
+                    <td dir="rtl" align="right">
                       <a href="${noUrl}" style="display:inline-block;background:#fff;color:#8a3b2b;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #e4c7be;">לא אוכל להגיע</a>
                     </td>
                   </tr>
                 </table>
-                <p style="margin:28px 0 0;font-size:13px;color:#7b6a5a;">עם אהבה, החבורה</p>
+                <p style="margin:28px 0 0;font-size:13px;color:#7b6a5a;${align}">עם אהבה, החבורה</p>
               </td>
             </tr>
             <tr>
-              <td style="padding:0 32px 24px;font-size:12px;color:#9a8876;">הסטטוס הנוכחי שלך: ${rsvpLabel(event.rsvps[member.id] ?? "pending")}</td>
+              <td dir="rtl" align="right" style="padding:0 32px 24px;font-size:12px;color:#9a8876;${align}">הסטטוס הנוכחי שלך: ${rsvpLabel(event.rsvps[member.id] ?? "pending")}</td>
             </tr>
           </table>
         </td>
