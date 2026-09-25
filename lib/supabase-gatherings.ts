@@ -160,7 +160,11 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
   }
 
   await syncLooseGallery(before.gallery ?? [], after.gallery ?? []);
-  await syncTokens(before.tokens ?? [], after.tokens ?? []);
+  try {
+    await syncTokens(before.tokens ?? [], after.tokens ?? []);
+  } catch (error) {
+    console.error("RSVP token sync skipped", error);
+  }
 }
 
 export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
@@ -168,12 +172,24 @@ export async function loadTokensFromSupabase(): Promise<RsvpToken[] | null> {
   const db = getServiceSupabase();
   if (!db) return null;
   const { data, error } = await db.from("rsvp_tokens").select("token, gathering_id, member_id");
-  if (error) throw error;
+  if (error) {
+    if (isMissingTokenTable(error)) return null;
+    throw error;
+  }
   return ((data ?? []) as { token: string; gathering_id: string; member_id: string }[]).map((row) => ({
     token: row.token,
     eventId: row.gathering_id,
     memberId: row.member_id,
   }));
+}
+
+function isMissingTokenTable(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    (/rsvp_tokens/i.test(message) && /does not exist|schema cache|Could not find/i.test(message))
+  );
 }
 
 async function syncTokens(before: RsvpToken[], after: RsvpToken[]) {
