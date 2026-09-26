@@ -66,6 +66,18 @@ export type Attachment = {
   name: string;
 };
 
+export type PollOption = {
+  id: string;
+  label: string;
+  voterIds: string[];
+};
+
+export type Poll = {
+  question: string;
+  options: PollOption[];
+  closed: boolean;
+};
+
 export type Message = {
   id: string;
   channelId: string;
@@ -77,6 +89,7 @@ export type Message = {
   attachments: Attachment[];
   voiceUrl?: string;
   mentions: string[];
+  poll?: Poll;
 };
 
 export type RsvpToken = {

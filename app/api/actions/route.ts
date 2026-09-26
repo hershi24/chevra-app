@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
-import { canSeeChannel, ensureGuideChannels } from "@/lib/channels";
+import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
-import { can, canDeleteMedia, canDeleteMessage } from "@/lib/permissions";
+import { canAccessPoll, castVote } from "@/lib/poll";
+import { can, canDeleteMedia, canDeleteMessage, isLeader } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
 
@@ -169,6 +170,45 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!channel || !canSeeChannel(me, channel)) throw new Error("forbidden");
       if (!canDeleteMessage(me, message)) throw new Error("forbidden");
       s.messages = s.messages.filter((m) => m.id !== message.id);
+      return;
+    }
+    case "createPoll": {
+      if (!isLeader(me)) throw new Error("רק מנהל או ראש החברה יכולים לפתוח סקר");
+      const requested = s.channels.find((c) => c.id === body.channelId);
+      const channel = isRoshChevra(me)
+        ? (s.channels.find((item) => isGeneralChannel(item)) ?? requested)
+        : requested;
+      if (!channel || !canAccessPoll(me, channel)) throw new Error("הערוץ לא נמצא");
+      const question = body.question.trim();
+      const labels = body.options.map((option) => option.trim()).filter(Boolean);
+      if (!question) throw new Error("חסרה שאלה");
+      if (labels.length < 2) throw new Error("צריך לפחות שתי אפשרויות");
+      if (new Set(labels).size !== labels.length) throw new Error("האפשרויות צריכות להיות שונות");
+      const message: Message = {
+        id: crypto.randomUUID(),
+        channelId: channel.id,
+        authorId: me.id,
+        text: question,
+        createdAt: new Date().toISOString(),
+        reactions: {},
+        attachments: [],
+        mentions: [],
+        poll: {
+          question,
+          closed: false,
+          options: labels.map((label) => ({ id: crypto.randomUUID(), label, voterIds: [] })),
+        },
+      };
+      s.messages.push(message);
+      return;
+    }
+    case "votePoll": {
+      if (!can(me, "chat")) throw new Error("forbidden");
+      const message = s.messages.find((item) => item.id === body.messageId);
+      if (!message?.poll) throw new Error("הסקר לא נמצא");
+      const channel = s.channels.find((c) => c.id === message.channelId);
+      if (!channel || !canAccessPoll(me, channel)) throw new Error("forbidden");
+      castVote(message.poll, me.id, body.optionId);
       return;
     }
     case "react": {

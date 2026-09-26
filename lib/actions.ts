@@ -30,6 +30,9 @@ export type ActionBody =
       voiceUrl?: string;
     }
   | { type: "react"; messageId: string; emoji: string }
+  | { type: "createPoll"; channelId: string; question: string; options: string[] }
+  | { type: "votePoll"; messageId: string; optionId: string }
+  | { type: "closePoll"; messageId: string }
   | { type: "deleteMessage"; messageId: string }
   | { type: "createDm"; memberId: string }
   | {
