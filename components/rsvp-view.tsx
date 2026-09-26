@@ -63,7 +63,7 @@ export function RsvpView({
   return (
     <div className="flex min-h-dvh items-center justify-center bg-white px-4">
       <div className="paper-card w-full max-w-md rounded-3xl p-6">
-        <p className="text-sm text-primary">מיין חברה</p>
+        <img src="/brand-logo.png" alt="אש קודש" className="h-10 w-auto" />
         <h1 className="font-heading mt-1 text-2xl font-semibold">אישור הגעה</h1>
         {status === "loading" ? <p className="mt-4 text-muted-foreground">מעדכן…</p> : null}
         {status === "error" ? <p className="mt-4 text-destructive">{error}</p> : null}

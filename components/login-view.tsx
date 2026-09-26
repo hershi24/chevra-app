@@ -44,16 +44,31 @@ export function LoginView() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#f6f4f0] px-4 py-12">
+    <div
+      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-center bg-fixed px-4 pt-[4vh] pb-36"
+      style={{
+        backgroundImage:
+          "linear-gradient(to bottom, rgba(20,12,8,0.12), rgba(20,12,8,0.28)), url(/login-bg.jpg)",
+      }}
+    >
       <div className="w-full max-w-[26rem]">
-        <p className="text-center text-[11px] font-light tracking-[0.28em] text-[#8a8478]">
+        <p
+          className="text-center text-[11px] font-light tracking-[0.28em] text-white"
+          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
+        >
           אש קודש
         </p>
-        <h1 className="mt-3 text-center text-[2.35rem] font-medium tracking-tight text-[#2b2a27] md:text-[2.6rem]">
+        <h1
+          className="mt-3 text-center text-[2.35rem] font-medium tracking-tight text-white md:text-[2.6rem]"
+          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
+        >
           מיין חברה
         </h1>
-        <div className="mx-auto mt-4 h-px w-12 bg-[#c8c2b6]" />
-        <p className="mx-auto mt-5 max-w-[26rem] text-center text-[15px] font-light leading-7 text-[#6f6a62]">
+        <div className="mx-auto mt-4 h-px w-12 bg-white/70" />
+        <p
+          className="mx-auto mt-5 max-w-[26rem] text-center text-[15px] font-light leading-7 text-white"
+          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
+        >
           האתר הרשמי של חבורת &ldquo;אש קודש&rdquo; או בשמה השני{" "}
           <span className="whitespace-nowrap">
             מיין חברה<span dir="ltr">.com</span>
@@ -61,7 +76,10 @@ export function LoginView() {
           . בהנאה!
         </p>
 
-        <div className="mt-8 rounded-[1.5rem] bg-white p-6 ring-1 ring-[#e6e2da] md:p-8">
+        <div
+          className="mt-8 rounded-[1.5rem] bg-white p-6 ring-1 ring-[#e6e2da] md:p-8"
+          style={{ boxShadow: "0 18px 50px rgba(0,0,0,0.28)" }}
+        >
           <form
             className="space-y-4"
             onSubmit={(e) => {
@@ -126,6 +144,11 @@ export function LoginView() {
           ) : null}
         </div>
       </div>
+      <img
+        src="/login-banner.png"
+        alt="אש קודש"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[520px]"
+      />
     </div>
   );
 }

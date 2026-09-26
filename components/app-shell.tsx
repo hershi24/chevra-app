@@ -66,12 +66,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-white md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
           <Link href="/" className="min-w-0 shrink-0">
-            <div className="text-[11px] font-light tracking-[0.22em] text-muted-foreground">
-              CHEVRA
-            </div>
-            <div className="text-[1.15rem] font-medium leading-none tracking-tight text-foreground">
-              מיין חברה
-            </div>
+            <img src="/brand-logo.png" alt="אש קודש" className="h-[46px] w-auto" />
           </Link>
 
           <nav className="flex items-center rounded-full bg-[var(--paper-card)] p-1">
@@ -120,7 +115,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         )}
       >
         <div>
-          <div className="text-[1.05rem] font-medium tracking-tight">מיין חברה</div>
+          <img src="/brand-logo.png" alt="אש קודש" className="h-[34px] w-auto" />
           <div className="text-[11px] text-muted-foreground">{me.displayName}</div>
         </div>
         <UserAvatar member={me} size="sm" />
