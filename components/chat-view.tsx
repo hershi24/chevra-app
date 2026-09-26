@@ -477,7 +477,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
             >
               {messages.map((message) => {
                 const author = memberById(state.members, message.authorId);
-                const mine = message.authorId === me.id;
                 const quoted = message.quote
                   ? memberById(state.members, message.quote.authorId)
                   : null;
@@ -511,8 +510,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             : undefined
                         }
                         className={cn(
-                          "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 shadow-sm",
-                          mine ? "bg-accent text-foreground" : "bg-white"
+                          "rounded-2xl rounded-ss-md bg-white px-3 py-2 text-sm leading-6 text-foreground shadow-sm ring-1 ring-black/[0.08]"
                         )}
                       >
                         {message.quote ? (
@@ -643,7 +641,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       <span className="text-sm font-medium">{me.displayName}</span>
                       <span className="text-[11px] text-muted-foreground">מעלה…</span>
                     </div>
-                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-accent shadow-sm">
+                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-white shadow-sm ring-1 ring-black/[0.08]">
                       <MediaProgressOverlay
                         src={item.previewUrl}
                         type={item.type}
