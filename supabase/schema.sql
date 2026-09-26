@@ -82,6 +82,7 @@ create table public.messages (
   attachments jsonb not null default '[]'::jsonb,
   voice_url text,
   mentions text[] not null default '{}',
+  poll jsonb,
   created_at timestamptz not null default now()
 );
 

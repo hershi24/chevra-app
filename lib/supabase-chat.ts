@@ -1,5 +1,6 @@
 import { messageFromRow, type MessageRow, type ReactionRow } from "./chat-message";
 import { getServiceSupabase, isSupabaseEnabled } from "./supabase";
+import { pollChanged } from "./poll";
 import type { AppState, Channel, Member, Message } from "./types";
 
 function reactionsMap(rows: ReactionRow[]): Record<string, Record<string, string[]>> {
@@ -47,6 +48,7 @@ function messageRow(message: Message) {
     voice_url: message.voiceUrl ?? null,
     mentions: message.mentions,
     created_at: message.createdAt,
+    poll: message.poll ?? null,
   };
 }
 
@@ -265,12 +267,43 @@ export async function syncChatDiff(before: AppState, after: AppState) {
   for (const message of after.messages) {
     const prev = before.messages.find((m) => m.id === message.id);
     if (!prev) {
-      const { error } = await db.from("messages").insert(messageRow(message));
-      if (error) throw error;
+      await insertMessage(message);
       continue;
+    }
+    if (pollChanged(prev, message) || prev.text !== message.text) {
+      await updateMessagePoll(message);
     }
     await syncReactions(prev, message);
   }
+}
+
+async function insertMessage(message: Message) {
+  const db = getServiceSupabase();
+  if (!db) return;
+  const row = messageRow(message);
+  let { error } = await db.from("messages").insert(row);
+  if (error && isMissingPollColumn(error)) {
+    const { poll: _poll, ...rest } = row;
+    error = (await db.from("messages").insert(rest)).error;
+  }
+  if (error) throw error;
+}
+
+async function updateMessagePoll(message: Message) {
+  const db = getServiceSupabase();
+  if (!db) return;
+  let { error } = await db
+    .from("messages")
+    .update({ text: message.text, poll: message.poll ?? null })
+    .eq("id", message.id);
+  if (error && isMissingPollColumn(error)) {
+    error = (await db.from("messages").update({ text: message.text }).eq("id", message.id)).error;
+  }
+  if (error) throw error;
+}
+
+function isMissingPollColumn(error: { message?: string }) {
+  return /poll/i.test(error.message ?? "") && /column|schema cache|Could not find/i.test(error.message ?? "");
 }
 
 async function syncReactions(before: Message, after: Message) {

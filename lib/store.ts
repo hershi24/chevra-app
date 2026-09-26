@@ -3,7 +3,7 @@ import path from "path";
 import { createSeed } from "./seed";
 import { emitUpdate } from "./realtime";
 import { isSupabaseEnabled } from "./supabase";
-import { canSeeChannel } from "./channels";
+import { canSeeChannel, isGeneralChannel, isRoshChevra } from "./channels";
 import {
   bootstrapChatIfEmpty,
   loadChatFromSupabase,
@@ -12,8 +12,9 @@ import {
   upsertMembers,
 } from "./supabase-chat";
 import { ensureMemberSecrets, publicMember } from "./password";
+import { isLeader } from "./permissions";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
-import type { AppState, Member, PublicState } from "./types";
+import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
   ? path.join("/tmp", "meine-chevra-store.json")
@@ -166,17 +167,41 @@ export async function updateState(
 export function toPublicState(state: AppState, me: Member): PublicState {
   const channels = state.channels.filter((channel) => canSeeChannel(me, channel));
   const visible = new Set(channels.map((channel) => channel.id));
+  const messages = state.messages.filter((message) => visible.has(message.channelId));
+  if (isRoshChevra(me)) {
+    for (const message of state.messages) {
+      if (!message.poll || visible.has(message.channelId)) continue;
+      const channel = state.channels.find((item) => item.id === message.channelId);
+      if (channel && isGeneralChannel(channel)) messages.push(message);
+    }
+  }
+  const visibleMessages = isLeader(me)
+    ? messages
+    : messages.map((message) =>
+        message.poll ? { ...message, poll: publicPoll(message.poll, me.id) } : message
+      );
   return {
     members: state.members.map(publicMember),
     gatherings: state.gatherings,
     gallery: state.gallery ?? [],
     channels,
-    messages: state.messages.filter((message) => visible.has(message.channelId)),
+    messages: visibleMessages,
     settings: state.settings,
     emailLog: state.emailLog,
     ivrLog: state.ivrLog,
     revision: state.revision,
     me: publicMember(me),
+  };
+}
+
+function publicPoll(poll: Poll, memberId: string): Poll {
+  return {
+    ...poll,
+    options: poll.options.map((option) => {
+      const others = option.voterIds.filter((id) => id !== memberId).length;
+      const mine = option.voterIds.includes(memberId) ? [memberId] : [];
+      return { ...option, voterIds: [...mine, ...Array.from({ length: others }, () => "")] };
+    }),
   };
 }
 

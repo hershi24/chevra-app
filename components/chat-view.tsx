@@ -23,6 +23,8 @@ import {
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { ChatBubble } from "@/components/chat-bubble";
+import { PollCard } from "@/components/poll-card";
+import { PollDialog } from "@/components/poll-dialog";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
@@ -34,7 +36,7 @@ import {
   isRoshChevra,
 } from "@/lib/channels";
 import { formatRelativeHe, memberById } from "@/lib/format";
-import { can, canDeleteMessage } from "@/lib/permissions";
+import { can, canDeleteMessage, isLeader } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
 import type { Attachment, Channel, Member, Message } from "@/lib/types";
 import {
@@ -71,6 +73,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [deleting, setDeleting] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [pollOpen, setPollOpen] = useState(false);
   const flashTimer = useRef<number | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
@@ -84,6 +87,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const messages = (state?.messages ?? [])
     .filter((m) => m.channelId === active?.id)
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  const leaderPolls =
+    me && isRoshChevra(me)
+      ? (state?.messages ?? [])
+          .filter((message) => message.poll && !channels.some((channel) => channel.id === message.channelId))
+          .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
+      : [];
 
   function scrollPendingIntoView() {
     pendingChatRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
@@ -160,9 +169,22 @@ export function ChatView({ channelId }: { channelId?: string }) {
     }
   }
 
+  async function voteInPoll(messageId: string, optionId: string) {
+    await act({ type: "votePoll", messageId, optionId });
+  }
+
   async function send(extra?: Partial<Message>) {
     if (!active || !me || !state) return;
     const text = draft.trim();
+    if (!extra?.voiceUrl && !extra?.attachments?.length && text.replace(/\s+/g, " ") === "התחל סקר") {
+      if (!isLeader(me)) {
+        toast.error("רק מנהל או ראש החברה יכולים לפתוח סקר");
+        return;
+      }
+      setDraft("");
+      setPollOpen(true);
+      return;
+    }
     if (!text && !extra?.voiceUrl && !extra?.attachments?.length) return;
     const mentions = state.members
       .filter((member) => text.includes(`@${member.displayName}`))
@@ -367,6 +389,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {leaderPolls.length ? (
+            <div className="px-3 pt-3 md:hidden">
+              <LeaderPolls messages={leaderPolls} me={me} members={state.members} onVote={voteInPoll} />
+            </div>
+          ) : null}
           <RoomGroup title="ערוצים">
             {groups.rooms.map((channel) => (
               <RoomRow
@@ -469,6 +496,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
               </div>
             </header>
 
+            {leaderPolls.length ? (
+              <div className="max-h-72 shrink-0 overflow-y-auto border-b border-black/5 px-3 py-3 md:px-6">
+                <LeaderPolls messages={leaderPolls} me={me} members={state.members} onVote={voteInPoll} />
+              </div>
+            ) : null}
+
             <div
               className={cn(
                 "min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6",
@@ -501,6 +534,17 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           {formatRelativeHe(message.createdAt)}
                         </span>
                       </div>
+                      {message.poll ? (
+                        <PollCard
+                          messageId={message.id}
+                          poll={message.poll}
+                          me={me}
+                          members={state.members}
+                          onVote={async (optionId) => {
+                            await act({ type: "votePoll", messageId: message.id, optionId });
+                          }}
+                        />
+                      ) : (
                       <ChatBubble
                         canDelete={canDeleteMessage(me, message)}
                         onLongPress={() => setDeleteTarget(message)}
@@ -560,6 +604,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           )
                         )}
                       </ChatBubble>
+                      )}
                       <div className="mt-1 flex flex-wrap items-center gap-1">
                         {Object.entries(message.reactions).map(([emoji, ids]) => (
                           <button
@@ -782,8 +827,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
             </div>
           </>
         ) : (
-          <div className="hidden flex-1 items-center justify-center text-muted-foreground md:flex">
-            בחרו שיחה מהרשימה
+          <div className="hidden flex-1 flex-col md:flex">
+            {leaderPolls.length ? (
+              <div className="overflow-y-auto px-6 py-4">
+                <LeaderPolls messages={leaderPolls} me={me} members={state.members} onVote={voteInPoll} />
+              </div>
+            ) : null}
+            <div className="flex flex-1 items-center justify-center text-muted-foreground">בחרו שיחה מהרשימה</div>
           </div>
         )}
       </section>
@@ -839,7 +889,40 @@ export function ChatView({ channelId }: { channelId?: string }) {
       document.body
     )
       : null}
+    {active ? (
+      <PollDialog channelId={active.id} open={pollOpen} onOpenChange={setPollOpen} />
+    ) : null}
     </>
+  );
+}
+
+function LeaderPolls({
+  messages,
+  me,
+  members,
+  onVote,
+}: {
+  messages: Message[];
+  me: Member;
+  members: Member[];
+  onVote: (messageId: string, optionId: string) => Promise<void>;
+}) {
+  return (
+    <div className="mb-4 space-y-3">
+      <div className="text-[11px] font-medium tracking-wide text-muted-foreground">סקרים</div>
+      {messages.map((message) =>
+        message.poll ? (
+          <PollCard
+            key={message.id}
+            messageId={message.id}
+            poll={message.poll}
+            me={me}
+            members={members}
+            onVote={(optionId) => onVote(message.id, optionId)}
+          />
+        ) : null
+      )}
+    </div>
   );
 }
 

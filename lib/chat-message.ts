@@ -10,6 +10,7 @@ export type MessageRow = {
   voice_url: string | null;
   mentions: string[] | null;
   created_at: string;
+  poll?: Message["poll"] | null;
 };
 
 export type ReactionRow = {
@@ -30,6 +31,7 @@ export function messageFromRow(row: MessageRow, reactions: Record<string, string
     attachments: row.attachments ?? [],
     voiceUrl: row.voice_url ?? undefined,
     mentions: row.mentions ?? [],
+    poll: row.poll ?? undefined,
   };
 }
 
@@ -41,7 +43,11 @@ export function upsertMessage(messages: Message[], incoming: Message): Message[]
   const index = messages.findIndex((item) => item.id === incoming.id);
   if (index === -1) return [...messages, incoming];
   const next = messages.slice();
-  next[index] = { ...incoming, reactions: messages[index].reactions };
+  next[index] = {
+    ...incoming,
+    reactions: messages[index].reactions,
+    poll: incoming.poll ?? messages[index].poll,
+  };
   return next;
 }
 
