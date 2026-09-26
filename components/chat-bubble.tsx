@@ -25,10 +25,8 @@ export function ChatBubble({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onLongPressRef = useRef(onLongPress);
-  const canDeleteRef = useRef(canDelete);
   const blockClickRef = useRef(false);
   onLongPressRef.current = onLongPress;
-  canDeleteRef.current = canDelete;
 
   useEffect(() => {
     const node = rootRef.current;
@@ -38,7 +36,7 @@ export function ChatBubble({
     let origin: { x: number; y: number } | null = null;
 
     function enabled() {
-      return canDeleteRef.current && isMobileView();
+      return isMobileView();
     }
 
     function clearTimer() {
@@ -106,6 +104,12 @@ export function ChatBubble({
       ref={rootRef}
       data-chat-bubble=""
       data-can-delete={canDelete ? "true" : "false"}
+      onClickCapture={(event) => {
+        if (!blockClickRef.current) return;
+        blockClickRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onClick={(event) => {
         if (blockClickRef.current) {
           blockClickRef.current = false;
@@ -119,7 +123,7 @@ export function ChatBubble({
       className={cn(
         className,
         onShortClick && "cursor-pointer",
-        canDelete && "touch-manipulation select-none [-webkit-touch-callout:none] md:select-text"
+        "touch-manipulation select-none [-webkit-touch-callout:none] md:select-text"
       )}
     >
       {children}

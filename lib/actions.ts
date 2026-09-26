@@ -34,6 +34,8 @@ export type ActionBody =
   | { type: "votePoll"; messageId: string; optionId: string }
   | { type: "closePoll"; messageId: string }
   | { type: "deleteMessage"; messageId: string }
+  | { type: "editMessage"; messageId: string; text: string }
+  | { type: "forwardMessage"; messageId: string; memberId: string }
   | { type: "createDm"; memberId: string }
   | {
       type: "addMember";

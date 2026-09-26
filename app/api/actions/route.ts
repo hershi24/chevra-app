@@ -30,6 +30,11 @@ export async function POST(request: Request) {
   }
 }
 
+function canReadMessage(me: Member, channel: Channel, message: Message) {
+  if (canSeeChannel(me, channel)) return true;
+  return Boolean(message.poll && canAccessPoll(me, channel));
+}
+
 function applyAction(s: AppState, me: Member, body: ActionBody) {
   switch (body.type) {
     case "rsvp": {
@@ -170,6 +175,65 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       if (!channel || !canSeeChannel(me, channel)) throw new Error("forbidden");
       if (!canDeleteMessage(me, message)) throw new Error("forbidden");
       s.messages = s.messages.filter((m) => m.id !== message.id);
+      return;
+    }
+    case "editMessage": {
+      if (!can(me, "chat")) throw new Error("forbidden");
+      const message = s.messages.find((item) => item.id === body.messageId);
+      if (!message) throw new Error("ההודעה לא נמצאה");
+      const channel = s.channels.find((item) => item.id === message.channelId);
+      if (!channel || !canReadMessage(me, channel, message)) throw new Error("forbidden");
+      if (message.authorId !== me.id) throw new Error("forbidden");
+      const text = body.text.trim();
+      if (message.poll && !text) throw new Error("חסרה שאלה");
+      if (!text && !message.attachments.length && !message.voiceUrl) {
+        throw new Error("אי אפשר לרוקן את ההודעה");
+      }
+      message.text = text;
+      if (message.poll) message.poll.question = text;
+      return;
+    }
+    case "forwardMessage": {
+      if (!can(me, "chat")) throw new Error("forbidden");
+      const message = s.messages.find((item) => item.id === body.messageId);
+      if (!message) throw new Error("ההודעה לא נמצאה");
+      const source = s.channels.find((item) => item.id === message.channelId);
+      if (!source || !canReadMessage(me, source, message)) throw new Error("forbidden");
+      const other = s.members.find((item) => item.id === body.memberId);
+      if (!other || other.id === me.id) throw new Error("החבר לא נמצא");
+      let channel = s.channels.find(
+        (item) =>
+          item.type === "dm" &&
+          item.memberIds.length === 2 &&
+          item.memberIds.includes(me.id) &&
+          item.memberIds.includes(other.id)
+      );
+      if (!channel) {
+        const withLeader = isRoshChevra(me) || isRoshChevra(other);
+        const person = isRoshChevra(me) ? other : me;
+        channel = {
+          id: crypto.randomUUID(),
+          name: withLeader ? `${person.displayName} וראש החברה` : `${me.displayName} ו${other.displayName}`,
+          type: "dm",
+          description: withLeader ? "ראש החברה" : undefined,
+          memberIds: [me.id, other.id],
+        };
+        s.channels.push(channel);
+      }
+      const text = (message.poll?.question || message.text).trim();
+      if (!text && !message.attachments.length && !message.voiceUrl) throw new Error("אין מה להעביר");
+      s.messages.push({
+        id: crypto.randomUUID(),
+        channelId: channel.id,
+        authorId: me.id,
+        text,
+        createdAt: new Date().toISOString(),
+        quote: message.quote,
+        reactions: {},
+        attachments: message.attachments.map((file) => ({ ...file, id: crypto.randomUUID() })),
+        voiceUrl: message.voiceUrl,
+        mentions: [],
+      });
       return;
     }
     case "createPoll": {

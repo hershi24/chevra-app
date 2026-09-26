@@ -8,10 +8,13 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Ellipsis,
+  Forward,
   Hash,
   Megaphone,
   Mic,
   Paperclip,
+  Pencil,
   Quote,
   Reply,
   Send,
@@ -29,6 +32,21 @@ import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   guideChatTitle,
@@ -71,6 +89,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [menuMessage, setMenuMessage] = useState<Message | null>(null);
+  const [menuView, setMenuView] = useState<"actions" | "forward">("actions");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
@@ -233,6 +257,50 @@ export function ChatView({ channelId }: { channelId?: string }) {
       await deleteMessageById(message.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "המחיקה נכשלה");
+    }
+  }
+
+  function openMobileMenu(message: Message) {
+    setMenuView("actions");
+    setMenuMessage(message);
+  }
+
+  function quoteMessage(message: Message) {
+    setQuote({
+      messageId: message.id,
+      authorId: message.authorId,
+      text: (message.poll?.question || message.text).slice(0, 140),
+    });
+    setMenuMessage(null);
+  }
+
+  function beginEdit(message: Message) {
+    setEditing(message);
+    setEditDraft(message.poll?.question || message.text);
+    setMenuMessage(null);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      await act({ type: "editMessage", messageId: editing.id, text: editDraft });
+      setEditing(null);
+      toast.success("ההודעה עודכנה");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "העריכה נכשלה");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function forwardMessageTo(message: Message, member: Member) {
+    try {
+      await act({ type: "forwardMessage", messageId: message.id, memberId: member.id });
+      toast.success(`ההודעה הועברה אל ${forwardLabel(member, state?.members ?? [])}`);
+      setMenuMessage(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ההעברה נכשלה");
     }
   }
 
@@ -535,19 +603,24 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         </span>
                       </div>
                       {message.poll ? (
-                        <PollCard
-                          messageId={message.id}
-                          poll={message.poll}
-                          me={me}
-                          members={state.members}
-                          onVote={async (optionId) => {
-                            await act({ type: "votePoll", messageId: message.id, optionId });
-                          }}
-                        />
+                        <ChatBubble
+                          canDelete={canDeleteMessage(me, message)}
+                          onLongPress={() => openMobileMenu(message)}
+                        >
+                          <PollCard
+                            messageId={message.id}
+                            poll={message.poll}
+                            me={me}
+                            members={state.members}
+                            onVote={async (optionId) => {
+                              await act({ type: "votePoll", messageId: message.id, optionId });
+                            }}
+                          />
+                        </ChatBubble>
                       ) : (
                       <ChatBubble
                         canDelete={canDeleteMessage(me, message)}
-                        onLongPress={() => setDeleteTarget(message)}
+                        onLongPress={() => openMobileMenu(message)}
                         onShortClick={
                           message.quote
                             ? () => jumpToMessage(message.quote!.messageId)
@@ -652,23 +725,18 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           <Reply data-icon="inline-start" />
                           השב
                         </Button>
-                        {canDeleteMessage(me, message) ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            aria-label="מחק"
-                            data-delete-msg=""
-                            className={cn(
-                              "text-destructive hover:bg-destructive/10 hover:text-destructive",
-                              hoveredMessageId === message.id ? "hidden md:inline-flex" : "hidden"
-                            )}
-                            onClick={() => void deleteFromHover(message)}
-                          >
-                            <Trash2 data-icon="inline-start" />
-                            מחק
-                          </Button>
-                        ) : null}
+                        <MessageMenu
+                          message={message}
+                          me={me}
+                          members={state.members}
+                          active={active}
+                          visible={hoveredMessageId === message.id || openMenuId === message.id}
+                          onOpenChange={(open) => setOpenMenuId(open ? message.id : null)}
+                          onEdit={() => beginEdit(message)}
+                          onDelete={() => void deleteFromHover(message)}
+                          onQuote={() => quoteMessage(message)}
+                          onForward={(member) => void forwardMessageTo(message, member)}
+                        />
                       </div>
                     </div>
                   </article>
@@ -839,6 +907,90 @@ export function ChatView({ channelId }: { channelId?: string }) {
       </section>
       </div>
     </div>
+    {menuMessage
+      ? createPortal(
+          <div className="fixed inset-0 z-[80] md:hidden">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              aria-label="ביטול"
+              onClick={() => setMenuMessage(null)}
+            />
+            <div
+              role="dialog"
+              aria-labelledby="message-menu-title"
+              className="absolute inset-x-0 bottom-16 max-h-[70dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pt-3 pb-4 shadow-2xl"
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
+              {menuView === "actions" ? (
+                <>
+                  <h2 id="message-menu-title" className="text-base font-medium">
+                    אפשרויות
+                  </h2>
+                  <p className="mt-3 truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {deletePreview(menuMessage)}
+                  </p>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {menuMessage.authorId === me.id ? (
+                      <Button className="h-12 w-full rounded-xl" variant="outline" onClick={() => beginEdit(menuMessage)}>
+                        <Pencil data-icon="inline-start" />
+                        עריכה
+                      </Button>
+                    ) : null}
+                    {canDeleteMessage(me, menuMessage) ? (
+                      <Button
+                        className="h-12 w-full rounded-xl"
+                        variant="destructive"
+                        onClick={() => {
+                          setDeleteTarget(menuMessage);
+                          setMenuMessage(null);
+                        }}
+                      >
+                        <Trash2 data-icon="inline-start" />
+                        מחיקה
+                      </Button>
+                    ) : null}
+                    <Button className="h-12 w-full rounded-xl" variant="outline" onClick={() => quoteMessage(menuMessage)}>
+                      <Quote data-icon="inline-start" />
+                      ציטוט בתשובה
+                    </Button>
+                    <Button
+                      className="h-12 w-full rounded-xl"
+                      variant="outline"
+                      onClick={() => setMenuView("forward")}
+                    >
+                      <Forward data-icon="inline-start" />
+                      העברה לצ׳אט אחר
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 id="message-menu-title" className="text-base font-medium">
+                    העברה לצ׳אט אחר
+                  </h2>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {forwardTargets(state.members, me, active).map((member) => (
+                      <Button
+                        key={member.id}
+                        className="h-12 w-full justify-start rounded-xl"
+                        variant="outline"
+                        onClick={() => void forwardMessageTo(menuMessage, member)}
+                      >
+                        {forwardLabel(member, state.members)}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button className="mt-3 h-12 w-full rounded-xl" variant="ghost" onClick={() => setMenuView("actions")}>
+                    חזרה
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
+      : null}
     {deleteTarget
       ? createPortal(
       <div className="fixed inset-0 z-[80] md:hidden">
@@ -892,8 +1044,128 @@ export function ChatView({ channelId }: { channelId?: string }) {
     {active ? (
       <PollDialog channelId={active.id} open={pollOpen} onOpenChange={setPollOpen} />
     ) : null}
+    <Dialog
+      open={editing !== null}
+      onOpenChange={(open) => {
+        if (!open) setEditing(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>עריכת הודעה</DialogTitle>
+        </DialogHeader>
+        <textarea
+          value={editDraft}
+          onChange={(event) => setEditDraft(event.target.value)}
+          rows={4}
+          className="w-full resize-none rounded-xl border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        />
+        <Button type="button" disabled={savingEdit} onClick={() => void saveEdit()}>
+          {savingEdit ? "שומר…" : "שמירה"}
+        </Button>
+      </DialogContent>
+    </Dialog>
     </>
   );
+}
+
+function MessageMenu({
+  message,
+  me,
+  members,
+  active,
+  visible,
+  onOpenChange,
+  onEdit,
+  onDelete,
+  onQuote,
+  onForward,
+}: {
+  message: Message;
+  me: Member;
+  members: Member[];
+  active: Channel | null;
+  visible: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onQuote: () => void;
+  onForward: (member: Member) => void;
+}) {
+  const targets = forwardTargets(members, me, active);
+  return (
+    <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="אפשרויות"
+          data-message-menu=""
+          className={cn(visible ? "hidden md:inline-flex" : "hidden")}
+        >
+          <Ellipsis />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        {message.authorId === me.id ? (
+          <DropdownMenuItem onSelect={onEdit}>
+            <Pencil />
+            עריכה
+          </DropdownMenuItem>
+        ) : null}
+        {canDeleteMessage(me, message) ? (
+          <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+            <Trash2 />
+            מחיקה
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={onQuote}>
+          <Quote />
+          ציטוט בתשובה
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Forward />
+            העברה לצ׳אט אחר
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
+            {targets.length ? (
+              targets.map((member) => (
+                <DropdownMenuItem key={member.id} onSelect={() => onForward(member)}>
+                  {forwardLabel(member, members)}
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <DropdownMenuItem disabled>אין שיחה להעביר אליה</DropdownMenuItem>
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function forwardTargets(members: Member[], me: Member, active: Channel | null) {
+  return members
+    .filter((member) => {
+      if (member.id === me.id) return false;
+      if (
+        active?.type === "dm" &&
+        active.memberIds.length === 2 &&
+        active.memberIds.includes(member.id)
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => Number(isRoshChevra(b)) - Number(isRoshChevra(a)) || a.displayName.localeCompare(b.displayName, "he"));
+}
+
+function forwardLabel(member: Member, members: Member[]) {
+  if (!isRoshChevra(member)) return member.displayName;
+  const leaders = members.filter((item) => isRoshChevra(item)).length;
+  return leaders > 1 ? `ראש החברה · ${member.displayName}` : "ראש החברה";
 }
 
 function LeaderPolls({
