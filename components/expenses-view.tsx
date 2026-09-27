@@ -17,6 +17,7 @@ import {
   settlement,
 } from "@/lib/expenses";
 import { gatheringLabel, memberById } from "@/lib/format";
+import { isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export function ExpensesView() {
   if (!state || !me || hidden) return null;
 
   const event = upcomingGathering(state);
+  const admin = isAdmin(me);
   const expenses = state.expenses ?? [];
   const report = settlement(
     expenses,
@@ -170,7 +172,7 @@ export function ExpensesView() {
                     ) : (
                       <span className="text-xs text-muted-foreground">מאוזן</span>
                     )}
-                    {pays && row.memberId !== me.id ? (
+                    {admin && pays && row.memberId !== me.id ? (
                       <Button
                         size="sm"
                         className="rounded-full"
@@ -190,18 +192,22 @@ export function ExpensesView() {
               );
             })}
           </div>
-          <Button
-            className="w-full rounded-full"
-            onClick={() =>
-              void act({ type: "sendExpenseNotice" })
-                .then(() => toast.success("נשלח לכל מי שצריך לשלם"))
-                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "השליחה נכשלה"))
-            }
-          >
-            שליחה אישית לכל מי שצריך לשלם
-          </Button>
+          {admin ? (
+            <Button
+              className="w-full rounded-full"
+              onClick={() =>
+                void act({ type: "sendExpenseNotice" })
+                  .then(() => toast.success("נשלח לכל מי שצריך לשלם"))
+                  .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "השליחה נכשלה"))
+              }
+            >
+              שליחה אישית לכל מי שצריך לשלם
+            </Button>
+          ) : null}
           <p className="text-xs font-light leading-5 text-muted-foreground">
-            לכל מי שחייב נשלחת הודעה אישית עם הסכום והפירוט. מי שכבר הוציא יותר מהחלק שלו לא מקבל בקשת תשלום.
+            {admin
+              ? "רק מנהל המערכת שולח. לכל מי שחייב נשלחת הודעה אישית עם הסכום והפירוט. מי שכבר הוציא יותר מהחלק שלו לא מקבל בקשת תשלום."
+              : "החלק שווה לכולם. מה שכל אחד קנה יורד מהחלק שלו, וזה מה שמופיע כאן."}
           </p>
         </section>
       </div>

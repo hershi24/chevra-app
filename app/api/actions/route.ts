@@ -504,7 +504,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
     }
     case "sendExpenseNotice": {
       assertExpensesOpen(s);
-      if (!can(me, "chat")) throw new Error("forbidden");
+      if (!isAdmin(me) || !can(me, "chat")) throw new Error("forbidden");
       if (body.memberId === me.id) throw new Error("אי אפשר לשלוח את החשבון לעצמך");
       const report = settlement(s.expenses ?? [], s.members.map((member) => member.id));
       const targets = body.memberId
