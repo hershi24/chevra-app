@@ -45,7 +45,7 @@ export function LoginView() {
 
   return (
     <div
-      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-center bg-fixed px-4 pt-[4vh] pb-36"
+      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-bottom bg-fixed px-4 pt-[5vh] pb-[18vh]"
       style={{
         backgroundImage:
           "linear-gradient(to bottom, rgba(20,12,8,0.12), rgba(20,12,8,0.28)), url(/login-bg.jpg)",
@@ -144,11 +144,6 @@ export function LoginView() {
           ) : null}
         </div>
       </div>
-      <img
-        src="/login-banner.png"
-        alt="אש קודש"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[520px]"
-      />
     </div>
   );
 }
