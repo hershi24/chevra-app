@@ -89,14 +89,6 @@ function headline(event: Gathering | null) {
   return "החברה הבאה";
 }
 
-function daysLeftText(event: Gathering | null) {
-  if (!event) return "אין חברה קרובה ביומן";
-  const diff = dayDiff(event.startsAt);
-  if (diff <= 0) return "החברה הבאה היום";
-  if (diff === 1) return "החברה הבאה מחר";
-  return `עוד ${diff} ימים לחברה הבאה`;
-}
-
 function messagePreview(msg: Message) {
   if (msg.text.trim()) return msg.text;
   if (msg.poll) return `סקר: ${msg.poll.question}`;
@@ -181,28 +173,56 @@ function Dashboard({
     }
   };
 
+  const canCreate = can(me, "createEvent");
+  const quick = [
+    {
+      href: "/chat",
+      icon: MessageCircle,
+      title: "צ׳אט",
+      sub: newMessages
+        ? `${newMessages} הודעות חדשות`
+        : latestMessages[0]
+          ? formatRelativeHe(latestMessages[0].createdAt)
+          : "עוד אין הודעות",
+      count: newMessages,
+    },
+    {
+      href: "/gallery",
+      icon: Images,
+      title: "גלריה",
+      sub: newPhotos ? `${newPhotos} חדשות` : gallery.length ? `${gallery.length} פריטים` : "עוד ריקה",
+      count: newPhotos,
+    },
+    {
+      href: "/journal",
+      icon: BookOpen,
+      title: "יומן",
+      sub: lastPast?.summary?.trim() ? "סיכום אחרון" : "החברות שהיו",
+    },
+    ...(showExpenses
+      ? [{ href: "/expenses", icon: Receipt, title: "באו חשבון", sub: expenseSub }]
+      : []),
+  ];
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 md:gap-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 md:gap-8">
+      <header className="flex items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-[13px] font-light text-muted-foreground">
-            {greeting()}, {me.displayName.split(" ")[0]} 👋
+            {greeting()}, {me.displayName.split(" ")[0]}
           </p>
-          <h1 className="mt-1 text-[1.6rem] font-normal tracking-tight text-foreground md:text-[1.9rem]">
+          <h1 className="mt-0.5 text-[1.55rem] font-normal tracking-tight text-foreground md:text-[1.85rem]">
             {headline(event)}
           </h1>
         </div>
-        <div className="flex items-end gap-3">
-          <div className="flex-1 rounded-2xl border border-[#d5dbe3] bg-[#fbfcfd] px-3.5 py-2 text-[12px] font-light text-muted-foreground sm:flex-none sm:border-0 sm:bg-transparent sm:p-0 sm:text-end">
-            <span className="block text-[14px] font-normal text-foreground">
-              {weekday(new Date())} · {formatHebrewDate(new Date().toISOString())}
-            </span>
-            {daysLeftText(event)}
-          </div>
-          {can(me, "createEvent") ? (
+        <div className="flex shrink-0 items-center gap-4">
+          <p className="hidden text-[13px] font-light text-muted-foreground md:block">
+            {weekday(new Date())} · {formatHebrewDate(new Date().toISOString())}
+          </p>
+          {canCreate ? (
             <EventDialog
               trigger={
-                <Button variant="outline" className="shrink-0 rounded-full bg-[#fbfcfd] px-4 font-normal">
+                <Button variant="ghost" size="sm" className="rounded-full font-normal text-muted-foreground">
                   <Plus data-icon="inline-start" />
                   חברה חדשה
                 </Button>
@@ -217,7 +237,7 @@ function Dashboard({
       ) : (
         <section className={cn(CARD, "px-6 py-12")}>
           <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
-          {can(me, "createEvent") ? (
+          {canCreate ? (
             <div className="mt-4">
               <EventDialog trigger={<Button variant="outline" className="rounded-full">קביעת חברה</Button>} />
             </div>
@@ -229,76 +249,48 @@ function Dashboard({
         </section>
       )}
 
-      <section
+      <nav
         className={cn(
-          "grid grid-cols-2 gap-2.5 md:gap-3.5",
-          showExpenses ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          "grid grid-cols-2 gap-px overflow-hidden rounded-[1.25rem] border border-[#dfe3e9] bg-[#e7eaee]",
+          quick.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
         )}
       >
-        <QuickTile
-          href="/chat"
-          icon={MessageCircle}
-          title="צ׳אט"
-          sub={
-            newMessages
-              ? `${newMessages} הודעות חדשות`
-              : latestMessages[0]
-                ? `הודעה אחרונה ${formatRelativeHe(latestMessages[0].createdAt)}`
-                : "עוד אין הודעות"
-          }
-          count={newMessages}
-        />
-        <QuickTile
-          href="/gallery"
-          icon={Images}
-          title="גלריה"
-          sub={
-            newPhotos
-              ? `${newPhotos} חדשות`
-              : gallery.length
-                ? `${gallery.length} תמונות וסרטונים`
-                : "עוד אין תמונות"
-          }
-          count={newPhotos}
-        />
-        <QuickTile
-          href="/journal"
-          icon={BookOpen}
-          title="יומן"
-          sub={lastPast?.summary?.trim() ? "סיכום החברה האחרונה" : "כל החברות שהיו"}
-        />
-        {showExpenses ? (
-          <QuickTile href="/expenses" icon={Receipt} title="באו חשבון" sub={expenseSub} />
-        ) : null}
-      </section>
+        {quick.map((item, index) => (
+          <QuickLink
+            key={item.href}
+            {...item}
+            className={cn(quick.length % 2 === 1 && index === quick.length - 1 && "col-span-2 md:col-span-1")}
+          />
+        ))}
+      </nav>
 
       <section
         className={cn(
-          "grid grid-cols-1 gap-4 md:gap-5",
-          lastWithPhotos && "lg:grid-cols-[1.15fr_1fr]"
+          "grid grid-cols-1 gap-6 md:gap-8",
+          lastWithPhotos && "lg:grid-cols-[1.2fr_1fr]"
         )}
       >
-        <div className={cn(CARD, "min-w-0 px-5 py-5 md:px-6")}>
-          <CardHead title="מה חדש בצ׳אט" href="/chat" link="לכל הצ׳אט" />
+        <div className="min-w-0">
+          <SectionHead title="מה חדש בצ׳אט" href="/chat" link="לצ׳אט" />
           {latestMessages.length ? (
-            <ul className="divide-y divide-[#eef0f3]">
-              {latestMessages.map((msg) => {
+            <ul className="divide-y divide-[#e7eaee]">
+              {latestMessages.slice(0, 3).map((msg) => {
                 const author = memberById(state.members, msg.authorId);
                 return (
                   <li key={msg.id}>
-                    <Link href="/chat" className="flex gap-3 py-2.5">
+                    <Link href="/chat" className="flex items-center gap-3 py-3">
                       <UserAvatar member={author} size="sm" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2 text-[13px]">
                           <span className="truncate font-normal">{author?.displayName}</span>
                           <span className="shrink-0 text-[11px] font-light text-muted-foreground">
-                            {formatRelativeHe(msg.createdAt)}
-                          </span>
-                          <span className="ms-auto shrink-0 truncate text-[11px] font-light text-muted-foreground/80">
                             {channelLabel(msg.channelId)}
                           </span>
+                          <span className="ms-auto shrink-0 text-[11px] font-light text-muted-foreground">
+                            {formatRelativeHe(msg.createdAt)}
+                          </span>
                         </div>
-                        <p className="font-chat truncate text-[13px] font-normal text-foreground/70">
+                        <p className="font-chat truncate text-[13px] font-normal text-foreground/65">
                           {messagePreview(msg)}
                         </p>
                       </div>
@@ -308,71 +300,72 @@ function Dashboard({
               })}
             </ul>
           ) : (
-            <p className="py-4 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
+            <p className="py-3 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
           )}
         </div>
 
-        {lastWithPhotos ? <LastGatheringCard event={lastWithPhotos} /> : null}
+        {lastWithPhotos ? <LastGathering event={lastWithPhotos} /> : null}
       </section>
     </div>
   );
 }
 
-function CardHead({ title, href, link }: { title: string; href: string; link: string }) {
+function SectionHead({ title, href, link }: { title: string; href: string; link: string }) {
   return (
-    <div className="mb-2 flex items-baseline justify-between gap-3">
-      <h2 className="text-[16px] font-normal">{title}</h2>
-      <Link href={href} className="text-[13px] font-light text-primary/85 hover:text-primary">
+    <div className="mb-1 flex items-baseline justify-between gap-3">
+      <h2 className="text-[15px] font-normal">{title}</h2>
+      <Link href={href} className="text-[12px] font-light text-primary/85 hover:text-primary">
         {link} ←
       </Link>
     </div>
   );
 }
 
-function QuickTile({
+function QuickLink({
   href,
   icon: Icon,
   title,
   sub,
   count,
+  className,
 }: {
   href: string;
   icon: LucideIcon;
   title: string;
   sub: string;
   count?: number;
+  className?: string;
 }) {
   return (
     <Link
       href={href}
-      className="flex min-w-0 items-center gap-3 rounded-[1.25rem] border border-[#d5dbe3] bg-[#fbfcfd] p-3 transition hover:border-[#c5ccd6] hover:bg-white md:gap-3.5 md:px-4 md:py-3.5"
+      className={cn(
+        "flex min-w-0 items-center gap-3 bg-[#fbfcfd] px-4 py-3.5 transition hover:bg-white",
+        className
+      )}
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#f1f3f5] text-primary/80 md:size-10">
-        <Icon className="size-[18px]" aria-hidden />
-      </span>
+      <Icon className="size-[18px] shrink-0 text-primary/75" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-normal md:text-[15px]">{title}</span>
+        <span className="flex items-center gap-1.5 text-[14px] font-normal">
+          {title}
+          {count ? <span className="size-1.5 rounded-full bg-primary" aria-hidden /> : null}
+        </span>
         <span className="block truncate text-[12px] font-light text-muted-foreground">{sub}</span>
       </span>
-      {count ? (
-        <span className="shrink-0 rounded-full bg-[#f3ede3] px-2 py-0.5 text-[11px] tabular-nums text-primary">
-          {count}
-        </span>
-      ) : null}
     </Link>
   );
 }
 
-function LastGatheringCard({ event }: { event: Gathering }) {
+function LastGathering({ event }: { event: Gathering }) {
   const media = event.media.filter((i) => i.type === "image" || i.type === "video");
-  const shown = media.slice(0, 6);
-  const extra = media.length - 6;
+  const shown = media.slice(0, 3);
+  const extra = media.length - 3;
   const summary = event.summary?.trim();
 
   return (
-    <div className={cn(CARD, "min-w-0 px-5 py-5 md:px-6")}>
-      <CardHead title="מהחברה האחרונה" href="/gallery" link="לגלריה" />
-      <div className="grid grid-cols-3 gap-1.5">
+    <div className="min-w-0">
+      <SectionHead title="מהחברה האחרונה" href="/gallery" link="לגלריה" />
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
         {shown.map((item, index) => (
           <Link
             key={item.id}
@@ -391,8 +384,8 @@ function LastGatheringCard({ event }: { event: Gathering }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.url} alt={item.caption ?? ""} loading="lazy" className="size-full object-cover" />
             )}
-            {index === 5 && extra > 0 ? (
-              <span className="absolute inset-0 grid place-items-center bg-black/40 text-lg text-white">
+            {index === 2 && extra > 0 ? (
+              <span className="absolute inset-0 grid place-items-center bg-black/35 text-base text-white">
                 +{extra}
               </span>
             ) : null}
@@ -400,9 +393,7 @@ function LastGatheringCard({ event }: { event: Gathering }) {
         ))}
       </div>
       {summary ? (
-        <p className="mt-3 line-clamp-3 text-[13px] font-light leading-6 text-foreground/70">
-          ״{summary}״
-        </p>
+        <p className="mt-3 line-clamp-2 text-[13px] font-light leading-6 text-foreground/65">{summary}</p>
       ) : null}
     </div>
   );
@@ -432,121 +423,110 @@ function HeroEvent({
   const topic = event.topic?.trim() || null;
   const heading = topic || title || "החברה הבאה";
   const sub = topic && title ? title : null;
-  const date = new Date(event.startsAt);
-  const dayNum = new Intl.DateTimeFormat("he-IL", { day: "numeric" }).format(date);
-  const month = new Intl.DateTimeFormat("he-IL", { month: "long" }).format(date);
-  const roles = [
-    { member: host, label: "מארח" },
-    { member: kibud, label: "כיבוד" },
-    { member: lecturer, label: "מעביר השיעור" },
-  ].filter((r): r is { member: Member; label: string } => Boolean(r.member));
+  const date = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long" }).format(
+    new Date(event.startsAt)
+  );
+  const details = [
+    event.location ? { icon: MapPin, text: event.location } : null,
+    host ? { icon: Home, text: `אצל ${host.displayName}` } : null,
+    kibud ? { icon: UtensilsCrossed, text: `כיבוד: ${kibud.displayName}` } : null,
+    lecturer ? { icon: BookOpen, text: `שיעור: ${lecturer.displayName}` } : null,
+  ].filter((d): d is { icon: LucideIcon; text: string } => Boolean(d));
 
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className={cn(CARD, "grid min-w-0 overflow-hidden lg:grid-cols-[1fr_18rem]")}
+      className={cn(CARD, "grid min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}
     >
-      <div className="relative min-w-0 space-y-5 px-5 py-6 md:space-y-6 md:px-8 md:py-8">
+      <div className="relative min-w-0 px-5 py-6 md:px-8 md:py-8">
         {can(me, "editEvent") ? (
-          <div className="absolute end-4 top-4 md:end-6 md:top-6">
+          <div className="absolute end-3 top-3 md:end-5 md:top-5">
             <EventDialog
               event={event}
               trigger={
-                <Button type="button" variant="ghost" size="xs" className="rounded-full text-muted-foreground">
-                  <Pencil data-icon="inline-start" />
-                  עריכה
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-full text-muted-foreground"
+                  aria-label="עריכה"
+                >
+                  <Pencil />
                 </Button>
               }
             />
           </div>
         ) : null}
 
-        <div className={cn("flex items-center gap-4", can(me, "editEvent") && "pe-16")}>
-          <div className="w-[3.9rem] shrink-0 rounded-2xl bg-[#f5f0e7] py-2.5 text-center text-primary/90 md:w-[4.4rem]">
-            <div className="text-[1.6rem] leading-none tabular-nums md:text-[1.8rem]">{dayNum}</div>
-            <div className="mt-1 text-[11px] font-light">{month}</div>
+        <p className="text-[12px] font-light text-primary/85">
+          {weekday(event.startsAt)} · {date} · {formatTimeHe(event.startsAt)}
+        </p>
+        <h2 className="mt-1.5 pe-8 text-[1.5rem] font-normal leading-tight tracking-tight md:text-[1.9rem]">
+          {heading}
+        </h2>
+        <p className="mt-1 text-[13px] font-light text-muted-foreground">
+          {formatHebrewDate(event.startsAt)}
+          {sub ? ` · ${sub}` : ""}
+        </p>
+
+        {details.length ? (
+          <ul className="mt-5 flex flex-col gap-1.5 text-[14px] font-light text-foreground/75 sm:flex-row sm:flex-wrap sm:gap-x-5">
+            {details.map((d) => (
+              <li key={d.text} className="flex min-w-0 items-center gap-2">
+                <d.icon className="size-4 shrink-0 text-primary/60" aria-hidden />
+                <span className="truncate">{d.text}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-5 border-t border-[#eceef1] pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <Countdown iso={event.startsAt} />
+          <div
+            role="group"
+            aria-label="אישור הגעה"
+            className="flex rounded-full bg-[#eef0f3] p-1"
+          >
+            <RsvpButton active={mine === "yes"} tone="yes" onClick={() => void onRsvp("yes")}>
+              {mine === "yes" ? <Check className="size-3.5" aria-hidden /> : null}
+              מגיע
+            </RsvpButton>
+            <RsvpButton active={mine === "maybe"} tone="maybe" onClick={() => void onRsvp("maybe")}>
+              אולי
+            </RsvpButton>
+            <RsvpButton active={mine === "no"} tone="no" onClick={() => void onRsvp("no")}>
+              לא אוכל
+            </RsvpButton>
           </div>
-          <div className="min-w-0">
-            <p className="text-[12px] font-light text-primary/85">
-              {weekday(event.startsAt)} · {formatTimeHe(event.startsAt)}
-            </p>
-            <h2 className="mt-0.5 text-[1.45rem] font-normal leading-tight tracking-tight md:text-[1.8rem]">
-              {heading}
-            </h2>
-            <p className="mt-0.5 text-[13px] font-light text-muted-foreground">
-              {formatHebrewDate(event.startsAt)}
-              {sub ? ` · ${sub}` : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {event.location ? <DetailChip icon={MapPin}>{event.location}</DetailChip> : null}
-          {host ? <DetailChip icon={Home}>אצל {host.displayName}</DetailChip> : null}
-          {kibud ? <DetailChip icon={UtensilsCrossed}>כיבוד: {kibud.displayName}</DetailChip> : null}
-          {lecturer ? <DetailChip icon={BookOpen}>שיעור: {lecturer.displayName}</DetailChip> : null}
-        </div>
-
-        <Countdown iso={event.startsAt} />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-full text-[13px] font-light text-muted-foreground sm:me-1 sm:w-auto">
-            {mine === "pending" ? "אתה מגיע?" : "התשובה שלך"}
-          </span>
-          <RsvpButton active={mine === "yes"} tone="yes" onClick={() => void onRsvp("yes")}>
-            {mine === "yes" ? <Check className="size-4" aria-hidden /> : null}
-            מאשר הגעה
-          </RsvpButton>
-          <RsvpButton active={mine === "maybe"} tone="maybe" onClick={() => void onRsvp("maybe")}>
-            אולי
-          </RsvpButton>
-          <RsvpButton active={mine === "no"} tone="no" onClick={() => void onRsvp("no")}>
-            לא אוכל
-          </RsvpButton>
         </div>
       </div>
 
-      <aside className="min-w-0 space-y-4 border-t border-[#eceae5] bg-[#f8f7f4] px-5 py-6 lg:border-s lg:border-t-0 lg:px-6 lg:py-7">
-        <div className="flex items-baseline justify-between text-[13px] font-light text-muted-foreground">
-          <span>מי מגיע</span>
-          <span>מתוך {members.length}</span>
-        </div>
-        <div className="flex items-center gap-3.5">
-          <Ring value={coming.length} total={members.length} />
-          <div>
-            <div className="text-[1.35rem] leading-none">{coming.length} מגיעים</div>
-            <div className="mt-1.5 text-[12px] font-light text-muted-foreground">
-              {maybe.length} אולי · {pending.length} עוד לא ענו
+      <aside className="flex min-w-0 flex-col justify-center border-t border-[#eceef1] px-5 py-5 md:border-s md:border-t-0 md:px-6 md:py-8">
+        <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-4">
+          <div className="flex items-center gap-3">
+            <Ring value={coming.length} total={members.length} />
+            <div>
+              <div className="text-[15px] leading-tight">
+                {coming.length} מגיעים
+                <span className="text-[12px] font-light text-muted-foreground"> מתוך {members.length}</span>
+              </div>
+              <div className="mt-0.5 text-[12px] font-light text-muted-foreground">
+                {maybe.length} אולי · {pending.length} לא ענו
+              </div>
             </div>
           </div>
+          {coming.length ? (
+            <div className="ms-auto flex -space-x-2 space-x-reverse md:ms-0">
+              {coming.slice(0, 6).map((member) => (
+                <UserAvatar key={member.id} member={member} size="sm" className="ring-2 ring-[#fbfcfd]" />
+              ))}
+            </div>
+          ) : null}
         </div>
-        {coming.length ? (
-          <div className="flex -space-x-2 space-x-reverse">
-            {coming.slice(0, 8).map((member) => (
-              <UserAvatar key={member.id} member={member} className="ring-2 ring-[#f8f7f4]" />
-            ))}
-          </div>
-        ) : null}
-        {roles.length ? (
-          <div className="space-y-2">
-            {roles.map((role) => (
-              <div
-                key={role.label}
-                className="flex items-center gap-2.5 rounded-xl border border-[#ebe8e1] bg-white px-3 py-2"
-              >
-                <UserAvatar member={role.member} size="sm" />
-                <div className="min-w-0 text-[13px] leading-tight">
-                  <div className="truncate">{role.member.displayName}</div>
-                  <div className="text-[11px] font-light text-muted-foreground">{role.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
         {showList ? (
-          <div>
+          <div className="mt-4">
             <button
               type="button"
               onClick={() => setListOpen((open) => !open)}
@@ -570,43 +550,30 @@ function HeroEvent({
               </ul>
             ) : null}
           </div>
-        ) : (
-          <p className="text-[12px] font-light text-muted-foreground">
-            פירוט מלא גלוי למנהל ולראש החברה.
-          </p>
-        )}
+        ) : null}
       </aside>
     </motion.section>
   );
 }
 
-function DetailChip({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e6e9ee] bg-white px-3 py-1.5 text-[13px] font-light text-foreground/85">
-      <Icon className="size-3.5 shrink-0 text-primary/70" aria-hidden />
-      <span className="truncate">{children}</span>
-    </span>
-  );
-}
-
 function Ring({ value, total }: { value: number; total: number }) {
-  const r = 23;
+  const r = 18;
   const c = 2 * Math.PI * r;
   const filled = total ? (value / total) * c : 0;
   return (
-    <svg width="56" height="56" viewBox="0 0 56 56" className="shrink-0" aria-hidden>
-      <circle cx="28" cy="28" r={r} fill="none" stroke="#e6e7ea" strokeWidth="5" />
+    <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0" aria-hidden>
+      <circle cx="22" cy="22" r={r} fill="none" stroke="#e8eaed" strokeWidth="4" />
       {filled ? (
         <circle
-          cx="28"
-          cy="28"
+          cx="22"
+          cy="22"
           r={r}
           fill="none"
           stroke="#3d8f62"
-          strokeWidth="5"
+          strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${c}`}
-          transform="rotate(-90 28 28)"
+          transform="rotate(-90 22 22)"
         />
       ) : null}
     </svg>
@@ -627,13 +594,14 @@ function RsvpButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-2.5 sm:px-5 text-[14px] font-normal transition sm:flex-none",
-        !active && "border-[#dfe3e8] bg-white text-foreground/75 hover:border-[#c9cfd7] hover:text-foreground",
-        active && tone === "yes" && "border-[#3d8f62] bg-[#3d8f62] text-white",
-        active && tone === "maybe" && "border-[#d9dde3] bg-[#eceff2] text-foreground",
-        active && tone === "no" && "border-destructive/25 bg-destructive/8 text-destructive"
+        "inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-normal transition sm:flex-none",
+        !active && "text-foreground/65 hover:text-foreground",
+        active && tone === "yes" && "bg-[#3d8f62] text-white",
+        active && tone === "maybe" && "bg-white text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
+        active && tone === "no" && "bg-white text-destructive shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
       )}
     >
       {children}

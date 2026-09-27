@@ -18,25 +18,27 @@ export function Countdown({ iso }: { iso: string }) {
   }
 
   const cells = [
-    { label: "ימים", value: parts.days },
+    ...(parts.days ? [{ label: "ימים", value: parts.days }] : []),
     { label: "שעות", value: parts.hours },
     { label: "דקות", value: parts.minutes },
     { label: "שניות", value: parts.seconds },
   ];
 
   return (
-    <div className="flex gap-1.5 sm:gap-2" role="timer" aria-label="ספירה לאחור לחברה">
-      {cells.map((cell) => (
-        <div
-          key={cell.label}
-          className="flex flex-1 flex-col items-center rounded-2xl border border-[#e6e9ee] bg-white px-2 pb-2 pt-2.5 sm:w-[4.4rem] sm:flex-none"
-        >
-          <span className="font-normal tabular-nums text-[1.45rem] leading-none tracking-tight text-foreground md:text-[1.6rem]">
-            {String(cell.value).padStart(2, "0")}
-          </span>
-          <span className="mt-1.5 text-[11px] font-normal leading-none text-muted-foreground">
-            {cell.label}
-          </span>
+    <div className="flex items-stretch" role="timer" aria-label="ספירה לאחור לחברה">
+      {cells.map((cell, index) => (
+        <div key={cell.label} className="flex items-stretch">
+          {index > 0 ? (
+            <span aria-hidden className="my-1 w-px shrink-0 self-stretch bg-[#dde1e7]" />
+          ) : null}
+          <div className="flex w-[3.6rem] flex-col items-center md:w-[4rem]">
+            <span className="font-normal tabular-nums text-[1.4rem] leading-none tracking-tight text-foreground md:text-[1.55rem]">
+              {String(cell.value).padStart(2, "0")}
+            </span>
+            <span className="mt-1.5 text-[11px] font-light leading-none text-muted-foreground">
+              {cell.label}
+            </span>
+          </div>
         </div>
       ))}
     </div>
