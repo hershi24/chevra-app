@@ -61,7 +61,7 @@ export function RsvpView({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-white px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4">
       <div className="paper-card w-full max-w-md rounded-3xl p-6">
         <img src="/brand-logo.png" alt="אש קודש" className="h-10 w-auto" />
         <h1 className="font-heading mt-1 text-2xl font-semibold">אישור הגעה</h1>

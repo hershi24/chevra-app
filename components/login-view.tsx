@@ -109,7 +109,7 @@ export function LoginView() {
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button
               type="submit"
-              className="h-12 w-full rounded-xl bg-[#3f4650] text-base text-white hover:bg-[#333940]"
+              className="h-12 w-full rounded-xl bg-[#a9782c] text-base text-white hover:bg-[#8d6424]"
               disabled={loading || !password}
             >
               {loading ? "נכנס…" : "כניסה לחבורה"}

@@ -43,7 +43,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-white text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center bg-background text-muted-foreground">
         טוען את החבורה…
       </div>
     );
@@ -51,7 +51,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
   if (error || !me) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background">
         <p>{error ?? "יש להתחבר מחדש"}</p>
         <Button onClick={() => router.replace("/login")}>למסך הכניסה</Button>
       </div>
@@ -69,7 +69,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
             <img src="/brand-logo.png" alt="אש קודש" className="h-[46px] w-auto" />
           </Link>
 
-          <nav className="flex items-center rounded-full bg-[var(--paper-card)] p-1">
+          <nav className="flex items-center rounded-full bg-[#f3eadc] p-1">
             {NAV.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -82,7 +82,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-light transition lg:px-3.5",
                     active
-                      ? "bg-white text-foreground shadow-sm"
+                      ? "bg-[#a9782c] text-[#fffdf8] shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
