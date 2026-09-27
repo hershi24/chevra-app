@@ -771,7 +771,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       )}
                       <div
                         className={cn(
-                          "absolute top-0 end-0 z-20 hidden -translate-y-1/2 items-center rounded-full bg-white p-0.5 shadow-[0_4px_14px_rgba(40,50,70,0.14)] ring-1 ring-[#e6ebf0]",
+                          "absolute top-0 end-0 z-20 hidden -translate-y-1/2 items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_4px_14px_rgba(40,50,70,0.14)] ring-1 ring-[#e6ebf0]",
                           toolsOpen && "md:flex"
                         )}
                       >
@@ -784,12 +784,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           onOpenChange={(open) => setOpenMenuId(open ? message.id : null)}
                           onEdit={() => beginEdit(message)}
                           onDelete={() => void deleteFromHover(message)}
-                          onQuote={() => quoteMessage(message)}
                           onForward={(member) => void forwardMessageTo(message, member)}
                         />
                         <Button
                           variant="ghost"
-                          size="icon-xs"
+                          size="icon"
+                          className="rounded-full"
                           aria-label="השב"
                           onClick={() =>
                             setQuote({
@@ -799,15 +799,20 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             })
                           }
                         >
-                          <Reply />
+                          <Reply className="size-5" />
                         </Button>
                         <Popover
                           open={emojiOpenId === message.id}
                           onOpenChange={(open) => setEmojiOpenId(open ? message.id : null)}
                         >
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon-xs" aria-label="תגובה">
-                              <Smile />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-full"
+                              aria-label="תגובה"
+                            >
+                              <Smile className="size-5" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="flex w-auto gap-1 p-2" align="start">
@@ -1216,6 +1221,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
   );
 }
 
+const menuItemClass = "gap-2.5 px-3 py-2.5 text-base";
+
 function MessageMenu({
   message,
   me,
@@ -1225,7 +1232,6 @@ function MessageMenu({
   onOpenChange,
   onEdit,
   onDelete,
-  onQuote,
   onForward,
 }: {
   message: Message;
@@ -1236,55 +1242,59 @@ function MessageMenu({
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
-  onQuote: () => void;
   onForward: (member: Member) => void;
 }) {
   const targets = forwardTargets(members, me, active);
   return (
-    <DropdownMenu onOpenChange={onOpenChange}>
+    <DropdownMenu dir="rtl" onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          size="icon-xs"
+          size="icon"
           aria-label="אפשרויות"
           data-message-menu=""
-          className={cn(visible ? "hidden md:inline-flex" : "hidden")}
+          className={cn(
+            "rounded-full",
+            visible ? "hidden md:inline-flex" : "hidden"
+          )}
         >
-          <Ellipsis />
+          <Ellipsis className="size-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-44">
+      <DropdownMenuContent align="end" className="min-w-52 p-1.5">
         {message.authorId === me.id ? (
-          <DropdownMenuItem onSelect={onEdit}>
-            <Pencil />
+          <DropdownMenuItem className={menuItemClass} onSelect={onEdit}>
+            <Pencil className="size-5" />
             עריכה
           </DropdownMenuItem>
         ) : null}
         {canDeleteMessage(me, message) ? (
-          <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-            <Trash2 />
+          <DropdownMenuItem className={menuItemClass} variant="destructive" onSelect={onDelete}>
+            <Trash2 className="size-5" />
             מחיקה
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem onSelect={onQuote}>
-          <Quote />
-          ציטוט בתשובה
-        </DropdownMenuItem>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Forward />
+          <DropdownMenuSubTrigger className={menuItemClass}>
+            <Forward className="size-5" />
             העברה לצ׳אט אחר
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
+          <DropdownMenuSubContent className="max-h-64 min-w-44 overflow-y-auto p-1.5">
             {targets.length ? (
               targets.map((member) => (
-                <DropdownMenuItem key={member.id} onSelect={() => onForward(member)}>
+                <DropdownMenuItem
+                  key={member.id}
+                  className={menuItemClass}
+                  onSelect={() => onForward(member)}
+                >
                   {forwardLabel(member, members)}
                 </DropdownMenuItem>
               ))
             ) : (
-              <DropdownMenuItem disabled>אין שיחה להעביר אליה</DropdownMenuItem>
+              <DropdownMenuItem className={menuItemClass} disabled>
+                אין שיחה להעביר אליה
+              </DropdownMenuItem>
             )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
