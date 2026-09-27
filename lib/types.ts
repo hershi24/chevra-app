@@ -105,10 +105,22 @@ export type BackgroundImage = {
   fromGatheringId?: string;
 };
 
+export type Expense = {
+  id: string;
+  memberId: string;
+  createdBy: string;
+  title: string;
+  detail: string;
+  amount: number;
+  excluded: boolean;
+  createdAt: string;
+};
+
 export type AppSettings = {
   groupName: string;
   backgroundImageId: string | null;
   backgrounds: BackgroundImage[];
+  showExpenses?: boolean;
 };
 
 export type EmailDelivery = {
@@ -145,6 +157,7 @@ export type AppState = {
   messages: Message[];
   tokens: RsvpToken[];
   settings: AppSettings;
+  expenses: Expense[];
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
   revision: number;

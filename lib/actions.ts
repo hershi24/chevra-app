@@ -61,4 +61,16 @@ export type ActionBody =
   | { type: "changePassword"; currentPassword: string; newPassword: string }
   | { type: "resetMemberPassword"; memberId: string }
   | { type: "setBackground"; backgroundImageId: string | null }
-  | { type: "addBackground"; url: string; label: string; fromGatheringId?: string };
+  | { type: "addBackground"; url: string; label: string; fromGatheringId?: string }
+  | {
+      type: "addExpense";
+      memberId: string;
+      title: string;
+      detail?: string;
+      amount: number;
+      excluded?: boolean;
+    }
+  | { type: "setExpenseExcluded"; expenseId: string; excluded: boolean }
+  | { type: "deleteExpense"; expenseId: string }
+  | { type: "setExpensesVisible"; visible: boolean }
+  | { type: "sendExpenseNotice"; memberId?: string };

@@ -4,9 +4,10 @@ import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
-import { can, canDeleteMedia, canDeleteMessage, isLeader } from "@/lib/permissions";
+import { canEditExpense, expenseNoticeText, expensesOpen, parseShekels, settlement } from "@/lib/expenses";
+import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
-import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
+import type { AppState, Channel, Expense, Gathering, Member, Message, Role } from "@/lib/types";
 import { notifyChatPush } from "@/lib/web-push";
 
 export const runtime = "nodejs";
@@ -18,12 +19,17 @@ export async function POST(request: Request) {
   const body = (await request.json()) as ActionBody;
 
   try {
+    const pushed: Message[] = [];
     const state = await updateState((s) => {
-      applyAction(s, me, body);
+      applyAction(s, me, body, pushed);
       ensureGuideChannels(s);
     });
     const alert = messageToAlert(state, me.id, body);
     if (alert) void notifyChatPush(state, alert);
+    for (const message of pushed) {
+      if (alert?.id === message.id) continue;
+      void notifyChatPush(state, message);
+    }
     const fresh = state.members.find((m) => m.id === me.id)!;
     return NextResponse.json(toPublicState(state, fresh));
   } catch (error) {
@@ -59,7 +65,7 @@ function canReadMessage(me: Member, channel: Channel, message: Message) {
   return Boolean(message.poll && canAccessPoll(me, channel));
 }
 
-function applyAction(s: AppState, me: Member, body: ActionBody) {
+function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[]) {
   switch (body.type) {
     case "rsvp": {
       if (!can(me, "rsvp")) throw new Error("forbidden");
@@ -410,6 +416,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       for (const event of s.gatherings) {
         delete event.rsvps[member.id];
       }
+      s.expenses = (s.expenses ?? []).filter((item) => item.memberId !== member.id);
       return;
     }
     case "changePassword": {
@@ -454,9 +461,109 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       });
       return;
     }
+    case "addExpense": {
+      assertExpensesOpen(s);
+      const member = s.members.find((item) => item.id === body.memberId);
+      if (!member) throw new Error("החבר לא נמצא");
+      const title = body.title.trim();
+      if (!title) throw new Error("נא לכתוב מה נקנה");
+      if (title.length > 80) throw new Error("התיאור ארוך מדי");
+      const detail = body.detail?.trim() ?? "";
+      if (detail.length > 400) throw new Error("הפירוט ארוך מדי");
+      const expense: Expense = {
+        id: crypto.randomUUID(),
+        memberId: member.id,
+        createdBy: me.id,
+        title,
+        detail,
+        amount: parseShekels(body.amount),
+        excluded: Boolean(body.excluded),
+        createdAt: new Date().toISOString(),
+      };
+      s.expenses = [...(s.expenses ?? []), expense];
+      return;
+    }
+    case "setExpenseExcluded": {
+      assertExpensesOpen(s);
+      const expense = findExpense(s, body.expenseId);
+      if (!canEditExpense(me, expense)) throw new Error("forbidden");
+      expense.excluded = body.excluded;
+      return;
+    }
+    case "deleteExpense": {
+      assertExpensesOpen(s);
+      const expense = findExpense(s, body.expenseId);
+      if (!canEditExpense(me, expense)) throw new Error("forbidden");
+      s.expenses = s.expenses.filter((item) => item.id !== expense.id);
+      return;
+    }
+    case "setExpensesVisible": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      s.settings.showExpenses = body.visible;
+      return;
+    }
+    case "sendExpenseNotice": {
+      assertExpensesOpen(s);
+      if (!can(me, "chat")) throw new Error("forbidden");
+      if (body.memberId === me.id) throw new Error("אי אפשר לשלוח את החשבון לעצמך");
+      const report = settlement(s.expenses ?? [], s.members.map((member) => member.id));
+      const targets = body.memberId
+        ? report.rows.filter((row) => row.memberId === body.memberId)
+        : report.rows.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
+      const payers = targets.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
+      if (!payers.length) throw new Error(body.memberId ? "אין לו חוב בחשבון" : "אין מי שצריך לשלם");
+      for (const row of payers) {
+        const channel = ensureDirectChannel(s, me.id, row.memberId);
+        const message: Message = {
+          id: crypto.randomUUID(),
+          channelId: channel.id,
+          authorId: me.id,
+          text: expenseNoticeText(s.members, s.expenses ?? [], row),
+          createdAt: new Date().toISOString(),
+          reactions: {},
+          attachments: [],
+          mentions: [],
+        };
+        s.messages.push(message);
+        pushed.push(message);
+      }
+      return;
+    }
     default:
       throw new Error("פעולה לא מוכרת");
   }
+}
+
+function assertExpensesOpen(state: AppState) {
+  if (!expensesOpen(state)) throw new Error("הדף מוסתר");
+}
+
+function findExpense(state: AppState, expenseId: string) {
+  const expense = (state.expenses ?? []).find((item) => item.id === expenseId);
+  if (!expense) throw new Error("ההוצאה לא נמצאה");
+  return expense;
+}
+
+function ensureDirectChannel(state: AppState, fromId: string, toId: string) {
+  const existing = state.channels.find(
+    (channel) =>
+      channel.type === "dm" &&
+      channel.memberIds.length === 2 &&
+      channel.memberIds.includes(fromId) &&
+      channel.memberIds.includes(toId)
+  );
+  if (existing) return existing;
+  const from = state.members.find((member) => member.id === fromId);
+  const to = state.members.find((member) => member.id === toId);
+  if (!to) throw new Error("החבר לא נמצא");
+  const channel: Channel = {
+    id: crypto.randomUUID(),
+    name: `${from?.displayName ?? ""} ו${to.displayName}`,
+    type: "dm",
+    memberIds: [fromId, toId],
+  };
+  state.channels.push(channel);
+  return channel;
 }
 
 function initialsFrom(name: string) {
