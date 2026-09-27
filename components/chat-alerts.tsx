@@ -19,24 +19,6 @@ export function ChatAlerts({ state }: { state: PublicState | null }) {
 
   useEffect(() => {
     void ensurePushSubscription();
-    if (
-      notificationsEnabled() &&
-      typeof Notification !== "undefined" &&
-      Notification.permission === "granted" &&
-      localStorage.getItem("chevra-notify-live") !== "1"
-    ) {
-      localStorage.setItem("chevra-notify-live", "1");
-      void showChatNotification({
-        title: "התראות דלוקות",
-        body: "מעכשיו תופיע התראה כשיש הודעה חדשה",
-        channelId: "",
-        messageId: "chevra-notify-ready",
-        openReply: false,
-      });
-      if (window.matchMedia("(max-width: 767px)").matches) {
-        toast.success("התראות דלוקות", { description: "מעכשיו תופיע התראה כשיש הודעה חדשה" });
-      }
-    }
     const retry = () => {
       void ensurePushSubscription();
     };
@@ -65,37 +47,48 @@ export function ChatAlerts({ state }: { state: PublicState | null }) {
       seen.current = new Set(state.messages.map((message) => message.id));
       return;
     }
+    const fresh: { title: string; body: string; channelId: string; id: string }[] = [];
     for (const message of state.messages) {
       if (seen.current.has(message.id)) continue;
       seen.current.add(message.id);
       if (message.authorId === state.me.id) continue;
+      const age = Date.now() - Date.parse(message.createdAt);
+      if (!Number.isFinite(age) || age > 60_000) continue;
       const author = state.members.find((member) => member.id === message.authorId);
-      const title = author?.displayName || "הודעה חדשה";
-      const body =
-        message.text.trim() ||
-        message.poll?.question ||
-        (message.voiceUrl ? "הודעה קולית" : message.attachments.length ? "קובץ מצורף" : "הודעה חדשה");
-      void showChatNotification({
-        title,
-        body,
+      fresh.push({
+        id: message.id,
         channelId: message.channelId,
-        messageId: message.id,
+        title: author?.displayName || "הודעה חדשה",
+        body:
+          message.text.trim() ||
+          message.poll?.question ||
+          (message.voiceUrl ? "הודעה קולית" : message.attachments.length ? "קובץ מצורף" : "הודעה חדשה"),
       });
-      if (document.visibilityState === "visible" && window.matchMedia("(max-width: 767px)").matches) {
-        toast(title, {
-          description: body,
-          duration: 7000,
-          action: {
-            label: "השב",
-            onClick: () => {
-              sessionStorage.setItem("chevra-reply", message.id);
-              window.dispatchEvent(new CustomEvent("chevra-open-reply", { detail: message.id }));
-              router.push(`/chat/${message.channelId}`);
-            },
-          },
-        });
-      }
     }
+    const latest = fresh.at(-1);
+    if (!latest) return;
+    if (document.visibilityState === "visible") {
+      toast(latest.title, {
+        id: "chevra-incoming",
+        description: latest.body,
+        duration: 2500,
+        action: {
+          label: "השב",
+          onClick: () => {
+            sessionStorage.setItem("chevra-reply", latest.id);
+            window.dispatchEvent(new CustomEvent("chevra-open-reply", { detail: latest.id }));
+            router.push(`/chat/${latest.channelId}`);
+          },
+        },
+      });
+      return;
+    }
+    void showChatNotification({
+      title: latest.title,
+      body: latest.body,
+      channelId: latest.channelId,
+      messageId: latest.id,
+    });
   }, [state, router]);
 
   return null;
@@ -123,7 +116,7 @@ export function NotificationToggle() {
         }
         void enableNotifications().then((ok) => {
           if (!ok) toast.error("הדפדפן לא אישר התראות");
-          else toast.success("התראות דלוקות");
+          else toast.success("התראות דלוקות", { id: "chevra-incoming", duration: 2000 });
         });
       }}
     >
