@@ -22,7 +22,7 @@ export function PasswordNotice() {
 
   return (
     <>
-      <div className="border-b border-[#d0d5dc] bg-[#e8ebf0] px-5 py-3 text-sm md:px-8">
+      <div className="shrink-0 border-b border-[#d0d5dc] bg-[#e8ebf0] px-5 py-3 text-sm md:px-8">
         <div className="mx-auto flex max-w-6xl flex-col items-start gap-1 md:flex-row md:items-center md:justify-between md:gap-6">
           <p>הסיסמה שלכם עדיין ברירת המחדל. מומלץ להחליף אותה.</p>
           <Link href="/settings#password" className="shrink-0 text-primary">

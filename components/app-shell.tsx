@@ -59,10 +59,10 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh">
+    <div className={cn("min-h-dvh", isChat && "flex h-dvh flex-col overflow-hidden")}>
       <BackgroundLayer />
 
-      <header className="sticky top-0 z-30 hidden h-16 border-b border-[#d0d5dc] bg-[#e4e8ee] md:block">
+      <header className="sticky top-0 z-30 hidden h-16 shrink-0 border-b border-[#d0d5dc] bg-[#e4e8ee] md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
           <Link href="/" className="min-w-0 shrink-0">
             <img src="/brand-logo.png" alt="אש קודש" className="h-[46px] w-auto" />
@@ -109,7 +109,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
       <header
         className={cn(
-          "sticky top-0 z-20 items-center justify-between border-b border-[#d0d5dc] bg-[#e4e8ee] px-4 py-3 md:hidden",
+          "sticky top-0 z-20 shrink-0 items-center justify-between border-b border-[#d0d5dc] bg-[#e4e8ee] px-4 py-3 md:hidden",
           isDashboard ? "flex" : "hidden"
         )}
       >
@@ -125,7 +125,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           isChat
-            ? "pb-0 md:h-[calc(100dvh-4rem)] md:overflow-hidden"
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0"
             : "px-5 py-6 pb-24 md:px-8 md:py-10 md:pb-16"
         )}
       >
