@@ -35,7 +35,7 @@ export function PasswordNotice() {
             aria-labelledby="password-alert-title"
             className="w-full max-w-md rounded-3xl border border-[#d5dbe3] bg-[#fbfcfd] p-6 shadow-[0_18px_50px_rgba(60,70,85,0.18)] md:max-w-[32rem] md:p-8"
           >
-            <img src="/brand-logo.png" alt="" className="mb-5 hidden h-9 w-auto md:block" />
+            <img src="/brand-logo.png" alt="" aria-hidden="true" className="mb-5 hidden h-9 w-auto md:block" />
             <h2 id="password-alert-title" className="text-xl leading-8 md:text-[1.7rem] md:leading-9">
               ברוכים הבאים לאתר{" "}
               <span className="whitespace-nowrap">
