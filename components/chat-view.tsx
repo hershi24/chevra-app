@@ -711,22 +711,24 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             ? audioOnly
                               ? "bg-transparent p-0"
                               : "overflow-hidden bg-transparent p-0"
-                            : cn("px-3.5 py-1.5", mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]")
+                            : cn(
+                                message.quote ? "p-1 pb-1.5" : "px-3.5 py-1.5",
+                                mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]"
+                              )
                         )}
                       >
                         {message.quote ? (
-                          <div className="mb-2 flex gap-2 rounded-xl bg-black/5 px-2 py-1.5">
-                            <Quote className="mt-0.5 size-3.5 text-primary" />
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-medium text-primary">
-                                {quoted?.displayName}
-                              </div>
-                              <div className="truncate text-xs text-muted-foreground">
+                          <div className="flex min-w-44 gap-2 rounded-[14px] bg-white px-3 py-2">
+                            <Quote className="mt-1 size-3.5 shrink-0 fill-current text-[#a8b1dc]" />
+                            <div className="min-w-0 leading-5">
+                              <div className="text-[13px] text-[#1f1f1f]">{quoted?.displayName}</div>
+                              <div className="truncate text-[13px] text-[#5f6368]">
                                 {message.quote.text}
                               </div>
                             </div>
                           </div>
                         ) : null}
+                        <div className={message.quote ? "px-2.5 pt-1" : undefined}>
                         {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(message.text)}</p> : null}
                         {message.voiceUrl ? (
                           <VoiceNotePlayer src={message.voiceUrl} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
@@ -770,6 +772,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             </a>
                           )
                         )}
+                        </div>
                       </ChatBubble>
                       )}
                       <div
@@ -1229,7 +1232,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   );
 }
 
-const menuItemClass = "gap-2.5 px-3 py-2.5 text-base";
+const menuItemClass = "gap-2 whitespace-nowrap px-2.5 py-1.5 text-sm";
 
 function MessageMenu({
   message,
@@ -1270,25 +1273,25 @@ function MessageMenu({
           <Ellipsis className="size-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52 p-1.5 font-chat">
+      <DropdownMenuContent align="end" className="w-auto min-w-40 p-1 font-chat">
         {message.authorId === me.id ? (
           <DropdownMenuItem className={menuItemClass} onSelect={onEdit}>
-            <Pencil className="size-5" />
+            <Pencil className="size-4" />
             עריכה
           </DropdownMenuItem>
         ) : null}
         {canDeleteMessage(me, message) ? (
           <DropdownMenuItem className={menuItemClass} variant="destructive" onSelect={onDelete}>
-            <Trash2 className="size-5" />
+            <Trash2 className="size-4" />
             מחיקה
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className={menuItemClass}>
-            <Forward className="size-5" />
+            <Forward className="size-4" />
             העברה לצ׳אט אחר
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-64 min-w-44 overflow-y-auto p-1.5 font-chat">
+          <DropdownMenuSubContent className="max-h-64 min-w-36 overflow-y-auto p-1 font-chat">
             {targets.length ? (
               targets.map((member) => (
                 <DropdownMenuItem
