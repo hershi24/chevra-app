@@ -45,7 +45,7 @@ export function LoginView() {
 
   return (
     <div
-      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-center bg-fixed px-4 pt-[4vh] pb-40"
+      className="flex min-h-dvh items-center justify-center bg-[#1a120c] bg-cover bg-center bg-fixed px-4 py-12"
       style={{
         backgroundImage:
           "linear-gradient(to bottom, rgba(20,12,8,0.12), rgba(20,12,8,0.28)), url(/login-bg.jpg)",
@@ -143,13 +143,6 @@ export function LoginView() {
             </div>
           ) : null}
         </div>
-      </div>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 bg-black">
-        <img
-          src="/login-banner.png"
-          alt="אש קודש"
-          className="mx-auto block h-auto w-full max-w-[40rem]"
-        />
       </div>
     </div>
   );
