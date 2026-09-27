@@ -21,19 +21,24 @@ self.addEventListener("push", (event) => {
     icon: "/icon.png",
     badge: "/icon.png",
     lang: "he",
-    tag: messageId || "chevra-chat",
+    tag: "chevra-chat",
     renotify: true,
-    requireInteraction: true,
     data: { url, messageId },
   };
   event.waitUntil(
-    self.registration
-      .showNotification(title, {
-        ...options,
-        dir: "rtl",
-        actions: [{ action: "reply", title: "השב" }],
-      })
-      .catch(() => self.registration.showNotification(title, options))
+    (async () => {
+      const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      if (open.some((client) => client.visibilityState === "visible")) return;
+      try {
+        await self.registration.showNotification(title, {
+          ...options,
+          dir: "rtl",
+          actions: [{ action: "reply", title: "השב" }],
+        });
+      } catch {
+        await self.registration.showNotification(title, options);
+      }
+    })()
   );
 });
 
