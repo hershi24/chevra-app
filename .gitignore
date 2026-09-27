@@ -37,6 +37,8 @@ yarn-error.log*
 
 # local demo store and uploads
 /data/store.json
+/data/vapid.json
+/data/push-subscriptions.json
 /public/uploads/*
 !/public/uploads/.gitkeep
 

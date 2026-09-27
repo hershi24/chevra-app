@@ -143,22 +143,30 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
   useEffect(() => {
     if (!state) return;
-    const fromQuery = new URLSearchParams(window.location.search).get("reply");
-    const id = sessionStorage.getItem("chevra-reply") || fromQuery;
-    if (!id) return;
-    const message = state.messages.find((item) => item.id === id);
-    if (!message || (channelId && message.channelId !== channelId)) return;
-    sessionStorage.removeItem("chevra-reply");
-    if (fromQuery) {
+    const openReply = (id: string | null) => {
+      if (!id) return false;
+      const message = state.messages.find((item) => item.id === id);
+      if (!message || (channelId && message.channelId !== channelId)) return false;
+      sessionStorage.removeItem("chevra-reply");
       const url = new URL(window.location.href);
-      url.searchParams.delete("reply");
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    }
-    setQuote({
-      messageId: message.id,
-      authorId: message.authorId,
-      text: (message.poll?.question || message.text).slice(0, 140),
-    });
+      if (url.searchParams.has("reply")) {
+        url.searchParams.delete("reply");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+      }
+      setQuote({
+        messageId: message.id,
+        authorId: message.authorId,
+        text: (message.poll?.question || message.text).slice(0, 140),
+      });
+      return true;
+    };
+    const fromQuery = new URLSearchParams(window.location.search).get("reply");
+    openReply(sessionStorage.getItem("chevra-reply") || fromQuery);
+    const onEvent = (event: Event) => {
+      openReply((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener("chevra-open-reply", onEvent);
+    return () => window.removeEventListener("chevra-open-reply", onEvent);
   }, [state, channelId]);
 
   useEffect(() => {

@@ -1,3 +1,42 @@
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+  const title = payload.title || "הודעה חדשה";
+  const messageId = payload.messageId || "";
+  const url = payload.url || "/chat";
+  const options = {
+    body: payload.body || "הודעה חדשה",
+    icon: "/icon.png",
+    badge: "/icon.png",
+    lang: "he",
+    tag: messageId || "chevra-chat",
+    renotify: true,
+    requireInteraction: true,
+    data: { url, messageId },
+  };
+  event.waitUntil(
+    self.registration
+      .showNotification(title, {
+        ...options,
+        dir: "rtl",
+        actions: [{ action: "reply", title: "השב" }],
+      })
+      .catch(() => self.registration.showNotification(title, options))
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   const path = data.url || "/chat";
