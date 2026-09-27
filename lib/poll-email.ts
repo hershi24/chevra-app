@@ -1,73 +1,97 @@
 import { sendEmail } from "./email";
+import {
+  A,
+  emailShell,
+  escapeHtml,
+  faint,
+  firstName,
+  gold,
+  goldSoft,
+  heading,
+  ink,
+  kicker,
+  line,
+  muted,
+  paragraph,
+} from "./email-shell";
 import { pollVoters } from "./poll";
 import { signPollVote } from "./poll-link";
 import type { Member, Message } from "./types";
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function shell(title: string, body: string) {
-  const align = "direction:rtl;text-align:right;";
-  return `<!doctype html>
-<html lang="he" dir="rtl">
-  <body dir="rtl" style="margin:0;background:#f4eee4;font-family:Arial,Helvetica,sans-serif;color:#2c2118;${align}">
-    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f4eee4;padding:24px 0;${align}">
-      <tr><td align="center">
-        <table role="presentation" dir="rtl" width="560" cellpadding="0" cellspacing="0" style="background:#fffaf4;border-radius:18px;overflow:hidden;border:1px solid #ead9c4;${align}">
-          <tr><td dir="rtl" align="right" style="background:#3f4650;color:#fff;padding:24px 28px;${align}">
-            <div style="font-size:13px;">מיין חברה</div>
-            <h1 style="margin:8px 0 0;font-size:24px;${align}">${title}</h1>
-          </td></tr>
-          <tr><td dir="rtl" align="right" style="padding:24px 28px;${align}">${body}</td></tr>
-        </table>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
-}
 
 export function pollInviteHtml(opts: {
   member: Member;
   message: Message;
   origin: string;
+  authorName?: string;
 }) {
   const poll = opts.message.poll!;
-  const buttons = poll.options
+  const voted = new Set(poll.options.flatMap((option) => option.voterIds)).size;
+  const author = opts.authorName ? escapeHtml(opts.authorName) : "";
+  const options = poll.options
     .map((option) => {
       const href = `${opts.origin}/poll/${signPollVote(opts.member.id, opts.message.id, option.id)}`;
-      return `<div style="margin-top:8px;"><a href="${href}" style="display:block;background:#fff;color:#1f2328;text-decoration:none;padding:12px 14px;border-radius:12px;font-weight:600;border:1px solid #e5e7eb;">${escapeHtml(option.label)}</a></div>`;
+      return `<tr><td style="padding-top:8px;"><a href="${href}" style="display:block;background:#ffffff;border:1px solid ${line};border-radius:14px;padding:13px 16px;text-decoration:none;color:${ink};font-size:15px;${A}"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #c5ccd6;border-radius:50%;vertical-align:-2px;margin-left:10px;"></span>${escapeHtml(option.label)}</a></td></tr>`;
     })
     .join("");
-  return shell(
-    "סקר חדש",
-    `<p style="margin:0 0 12px;">שלום ${escapeHtml(opts.member.displayName)},</p>
-     <p style="margin:0 0 16px;font-size:18px;font-weight:600;">${escapeHtml(poll.question)}</p>
-     ${buttons}`
-  );
+  const intro = author
+    ? `שלום ${escapeHtml(firstName(opts.member.displayName))}, ${escapeHtml(firstName(opts.authorName!))} פתח סקר בצ׳אט. לחיצה אחת על התשובה שלך — וזהו.`
+    : `שלום ${escapeHtml(firstName(opts.member.displayName))}, נפתח סקר בצ׳אט. לחיצה אחת על התשובה שלך — וזהו.`;
+  const inner = `
+    ${kicker(author ? `סקר חדש · מ${author}` : "סקר חדש")}
+    ${heading(escapeHtml(poll.question))}
+    ${paragraph(intro)}
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">${options}</table>
+    ${voted ? `<div style="margin-top:16px;font-size:12px;color:${faint};${A}">${voted === 1 ? "חבר אחד כבר הצביע" : `${voted} חברים כבר הצביעו`}</div>` : ""}
+  `;
+  return emailShell({
+    origin: opts.origin,
+    title: "סקר חדש",
+    preheader: "לחיצה על תשובה מצביעה מיד. אפשר לשנות עד שהסקר נסגר.",
+    inner,
+  });
 }
 
-export function pollResultsHtml(opts: { member: Member; message: Message; members: Member[] }) {
+export function pollResultsHtml(opts: {
+  member: Member;
+  message: Message;
+  members: Member[];
+  origin: string;
+}) {
   const poll = opts.message.poll!;
+  const total = poll.options.reduce((sum, option) => sum + option.voterIds.length, 0);
+  const top = Math.max(0, ...poll.options.map((option) => option.voterIds.length));
   const rows = poll.options
     .map((option) => {
+      const count = option.voterIds.length;
+      const pct = total ? Math.round((count / total) * 100) : 0;
+      const win = top > 0 && count === top;
       const names = pollVoters(opts.members, option.voterIds);
-      return `<div style="margin-top:10px;padding:10px 12px;background:#f3f4f6;border-radius:12px;">
-        <div><strong>${escapeHtml(option.label)}</strong> · ${option.voterIds.length}</div>
-        <div style="color:#6b7280;font-size:13px;margin-top:4px;">${names.length ? escapeHtml(names.join(", ")) : "אין מצביעים"}</div>
-      </div>`;
+      return `<tr><td style="padding-top:10px;">
+        <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:${win ? goldSoft : "#ffffff"};border:1px solid ${win ? "#ecdcc0" : line};border-radius:14px;${A}">
+          <tr><td style="padding:12px 16px;${A}">
+            <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="font-size:15px;color:${ink};${A}">${escapeHtml(option.label)}${win ? ` <span style="font-size:11px;color:${gold};">· נבחר</span>` : ""}</td>
+              <td style="font-size:13px;color:${muted};text-align:left;white-space:nowrap;">${count === 1 ? "קול אחד" : `${count} קולות`} · ${pct}%</td>
+            </tr></table>
+            <div style="margin-top:8px;height:6px;background:#eceff2;border-radius:99px;font-size:0;line-height:0;"><div style="width:${pct}%;height:6px;background:${win ? gold : "#c5ccd6"};border-radius:99px;font-size:0;line-height:0;">&nbsp;</div></div>
+            <div style="margin-top:7px;font-size:12px;color:${muted};${A}">${names.length ? escapeHtml(names.join(", ")) : "אין מצביעים"}</div>
+          </td></tr>
+        </table>
+      </td></tr>`;
     })
     .join("");
-  return shell(
-    "תוצאות הסקר",
-    `<p style="margin:0 0 12px;">שלום ${escapeHtml(opts.member.displayName)},</p>
-     <p style="margin:0 0 8px;font-size:18px;font-weight:600;">${escapeHtml(poll.question)}</p>
-     ${rows}`
-  );
+  const inner = `
+    ${kicker("תוצאות הסקר")}
+    ${heading(escapeHtml(poll.question))}
+    ${paragraph(`שלום ${escapeHtml(firstName(opts.member.displayName))}, הסקר נסגר — הנה מה שהחבורה בחרה.`)}
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">${rows}</table>
+  `;
+  return emailShell({
+    origin: opts.origin,
+    title: "תוצאות הסקר",
+    preheader: "הסקר נסגר. התוצאות מוצגות גם בצ׳אט.",
+    inner,
+  });
 }
 
 export async function deliverPollMail(opts: {

@@ -1,5 +1,48 @@
 import type { Gathering, Member } from "./types";
-import { formatDateTimeHe, formatHebrewDate, gatheringLabel, rsvpLabel } from "./format";
+import { formatHebrewDate, gatheringLabel, rsvpLabel } from "./format";
+import {
+  A,
+  emailShell,
+  escapeHtml,
+  faint,
+  firstName,
+  gold,
+  goldSoft,
+  green,
+  heading,
+  ink,
+  kicker,
+  line,
+  muted,
+  paragraph,
+} from "./email-shell";
+
+const TZ = "Asia/Jerusalem";
+
+function jerusalemParts(iso: string) {
+  const date = new Date(iso);
+  const pick = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("he-IL", { timeZone: TZ, ...options }).format(date);
+  return {
+    day: pick({ day: "numeric" }),
+    month: pick({ month: "long" }),
+    weekday: pick({ weekday: "long" }),
+    time: pick({ hour: "2-digit", minute: "2-digit", hour12: false }),
+    dayKey: new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(date),
+  };
+}
+
+function whenPhrase(iso: string) {
+  const event = jerusalemParts(iso);
+  const today = jerusalemParts(new Date().toISOString());
+  const days = Math.round(
+    (Date.parse(event.dayKey) - Date.parse(today.dayKey)) / 86_400_000
+  );
+  if (days === 0) return "היום";
+  if (days === 1) return "מחר";
+  if (days > 1 && days < 7) return `ב${event.weekday}`;
+  return `ב־${event.day} ב${event.month}`;
+}
 
 export function invitationHtml(opts: {
   member: Member;
@@ -7,84 +50,93 @@ export function invitationHtml(opts: {
   hostName: string;
   kibudName?: string;
   lecturerName?: string;
+  senderName?: string;
   yesUrl: string;
   maybeUrl: string;
   noUrl: string;
   note?: string;
+  origin: string;
 }) {
-  const { member, event, hostName, kibudName, lecturerName, yesUrl, maybeUrl, noUrl, note } = opts;
+  const { member, event, hostName, kibudName, lecturerName, senderName, yesUrl, maybeUrl, noUrl, note, origin } = opts;
+  const when = jerusalemParts(event.startsAt);
+  const title = gatheringLabel(event);
   const personal = note?.trim() ? escapeHtml(note.trim()).replaceAll("\n", "<br>") : "";
-  const align = "direction:rtl;text-align:right;";
-  return `<!doctype html>
-<html lang="he" dir="rtl">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>הזמנה לחברה</title>
-  </head>
-  <body dir="rtl" style="margin:0;background:#f4eee4;font-family:Arial,Helvetica,sans-serif;color:#2c2118;${align}">
-    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f4eee4;padding:24px 0;${align}">
+  const confirmed = Object.values(event.rsvps).filter((status) => status === "yes").length;
+  const topic = event.topic?.trim();
+  const lesson = lecturerName
+    ? topic && topic !== title
+      ? `${escapeHtml(topic)} · ${escapeHtml(lecturerName)}`
+      : escapeHtml(lecturerName)
+    : "";
+  const details: [string, string][] = [
+    ["מקום", event.location ? escapeHtml(event.location) : ""],
+    ["מארח", hostName ? escapeHtml(hostName) : ""],
+    ["כיבוד", kibudName ? escapeHtml(kibudName) : ""],
+    ["שיעור", lesson],
+  ];
+  const detailRows = details
+    .filter(([, value]) => value)
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:9px 0 0;width:70px;color:${muted};font-size:12px;vertical-align:top;${A}">${label}</td><td style="padding:9px 0 0;color:${ink};${A}">${value}</td></tr>`
+    )
+    .join("");
+
+  const inner = `
+    ${kicker("הזמנה לחברה")}
+    ${heading(`${escapeHtml(firstName(member.displayName))}, מחכים לך ${whenPhrase(event.startsAt)}`)}
+    ${paragraph("החברה הבאה כבר בפתח. נשמח לראות אותך — ספר לנו אם אתה מגיע.")}
+
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;background:#ffffff;border:1px solid ${line};border-radius:18px;${A}">
+      <tr><td style="padding:18px 20px;${A}">
+        <table role="presentation" dir="rtl" cellpadding="0" cellspacing="0" style="${A}"><tr>
+          <td valign="middle" style="width:64px;">
+            <div style="width:64px;border-radius:16px;background:${goldSoft};color:${gold};text-align:center;padding:9px 0 8px;">
+              <div style="font-size:26px;line-height:1;">${when.day}</div>
+              <div style="font-size:11px;margin-top:4px;">${when.month}</div>
+            </div>
+          </td>
+          <td valign="middle" style="padding-right:14px;${A}">
+            <div style="font-size:18px;line-height:1.3;color:${ink};">${escapeHtml(title)}</div>
+            <div style="font-size:13px;color:${muted};margin-top:3px;">${when.weekday} · ${when.time} · ${formatHebrewDate(event.startsAt)}</div>
+          </td>
+        </tr></table>
+        ${
+          detailRows
+            ? `<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border-top:1px solid #eef0f3;font-size:14px;line-height:1.6;${A}">${detailRows}</table>`
+            : ""
+        }
+      </td></tr>
+    </table>
+
+    ${
+      personal
+        ? `<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;${A}">
+      <tr><td style="border-right:3px solid ${gold};background:${goldSoft};border-radius:12px;padding:12px 16px;font-size:14px;line-height:1.7;color:#4b4033;${A}">
+        <div style="font-size:11px;color:${gold};margin-bottom:2px;">${senderName ? `מילה מ${escapeHtml(firstName(senderName))}` : "מילה מהמארגנים"}</div>
+        ${personal}
+      </td></tr>
+    </table>`
+        : ""
+    }
+
+    <div style="margin-top:26px;font-size:13px;color:${muted};${A}">אתה מגיע?</div>
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
       <tr>
-        <td align="center" dir="rtl">
-          <table role="presentation" dir="rtl" width="560" cellpadding="0" cellspacing="0" style="background:#fffaf4;border-radius:18px;overflow:hidden;border:1px solid #ead9c4;${align}">
-            <tr>
-              <td dir="rtl" align="right" style="background:#0f5f59;color:#f8f1e6;padding:28px 32px;${align}">
-                <div style="font-size:13px;letter-spacing:0.08em;${align}">מיין חברה</div>
-                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;${align}">הזמנה לחברה</h1>
-              </td>
-            </tr>
-            <tr>
-              <td dir="rtl" align="right" style="padding:28px 32px 8px;${align}">
-                <p style="margin:0 0 16px;font-size:16px;${align}">שלום ${member.displayName},</p>
-                <p style="margin:0 0 18px;line-height:1.7;${align}">
-                  מחכים לך ב<strong>${escapeHtml(gatheringLabel(event))}</strong>.
-                  לחיצה אחת על הכפתור מעדכנת את ההגעה — בלי צורך להתחבר.
-                </p>
-                ${personal ? `<p style="margin:0 0 18px;line-height:1.7;${align}">${personal}</p>` : ""}
-                <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f1e8;border-radius:14px;margin-bottom:22px;${align}">
-                  <tr>
-                    <td dir="rtl" align="right" style="padding:18px 20px;font-size:15px;line-height:1.8;${align}">
-                      <div style="${align}"><strong>מתי:</strong> ${formatHebrewDate(event.startsAt)}</div>
-                      <div style="${align}">${formatDateTimeHe(event.startsAt)}</div>
-                      ${event.location ? `<div style="${align}"><strong>איפה:</strong> ${event.location}</div>` : ""}
-                      <div style="${align}"><strong>מארח:</strong> ${hostName}</div>
-                      ${lecturerName ? `<div style="${align}"><strong>שיעור:</strong> ${event.topic ?? ""} · ${lecturerName}</div>` : ""}
-                      ${kibudName ? `<div style="${align}"><strong>כיבוד:</strong> ${kibudName}</div>` : ""}
-                    </td>
-                  </tr>
-                </table>
-                <table role="presentation" dir="rtl" align="right" cellpadding="0" cellspacing="0" style="${align}">
-                  <tr>
-                    <td dir="rtl" align="right" style="padding-left:10px;">
-                      <a href="${yesUrl}" style="display:inline-block;background:#0f5f59;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;">מאשר הגעה</a>
-                    </td>
-                    <td dir="rtl" align="right" style="padding-left:10px;">
-                      <a href="${maybeUrl}" style="display:inline-block;background:#fff;color:#2c2118;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #ead9c4;">אולי</a>
-                    </td>
-                    <td dir="rtl" align="right">
-                      <a href="${noUrl}" style="display:inline-block;background:#fff;color:#8a3b2b;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;border:1px solid #e4c7be;">לא אוכל להגיע</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td dir="rtl" align="right" style="padding:0 32px 24px;font-size:12px;color:#9a8876;${align}">הסטטוס הנוכחי שלך: ${rsvpLabel(event.rsvps[member.id] ?? "pending")}</td>
-            </tr>
-          </table>
-        </td>
+        <td width="40%" style="padding-left:6px;"><a href="${yesUrl}" style="display:block;text-align:center;background:${green};color:#ffffff;text-decoration:none;padding:13px 0;border-radius:999px;font-size:15px;">✓ מגיע</a></td>
+        <td width="30%" style="padding-left:6px;"><a href="${maybeUrl}" style="display:block;text-align:center;background:#ffffff;color:#3f4650;text-decoration:none;padding:12px 0;border-radius:999px;font-size:15px;border:1px solid #dfe3e8;">אולי</a></td>
+        <td width="30%"><a href="${noUrl}" style="display:block;text-align:center;background:#ffffff;color:#3f4650;text-decoration:none;padding:12px 0;border-radius:999px;font-size:15px;border:1px solid #dfe3e8;">לא אוכל</a></td>
       </tr>
     </table>
-  </body>
-</html>`;
-}
+    <div style="margin-top:14px;font-size:12px;color:${faint};${A}">התשובה הנוכחית שלך: ${rsvpLabel(event.rsvps[member.id] ?? "pending")}${confirmed ? ` · ${confirmed} כבר אישרו הגעה` : ""}</div>
+  `;
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+  return emailShell({
+    origin,
+    title: "הזמנה לחברה",
+    preheader: "לחיצה על כפתור מעדכנת את ההגעה — בלי להתחבר לאתר.",
+    inner,
+  });
 }
 
 export async function sendEmail(opts: {
