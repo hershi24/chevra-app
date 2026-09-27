@@ -33,22 +33,24 @@ export async function POST(request: Request) {
       target.poll.closed = true;
     });
     const fresh = await readState();
+    const origin = inviteOrigin(request);
     const closed = findPollMessage(fresh, message.id)!;
     const report = await deliverPollMail({
       members: fresh.members,
       message: closed,
       subject: `תוצאות הסקר: ${closed.poll!.question}`,
-      htmlFor: (member) => pollResultsHtml({ member, message: closed, members: fresh.members }),
+      htmlFor: (member) => pollResultsHtml({ member, message: closed, members: fresh.members, origin }),
     });
     return NextResponse.json({ ok: true, ...report });
   }
 
   const origin = inviteOrigin(request);
+  const authorName = state.members.find((item) => item.id === message.authorId)?.displayName;
   const report = await deliverPollMail({
     members: state.members,
     message,
     subject: `סקר: ${message.poll.question}`,
-    htmlFor: (member) => pollInviteHtml({ member, message, origin }),
+    htmlFor: (member) => pollInviteHtml({ member, message, origin, authorName }),
   });
   return NextResponse.json({ ok: true, ...report });
 }

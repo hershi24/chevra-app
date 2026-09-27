@@ -47,10 +47,12 @@ export async function POST(request: Request) {
       hostName: memberById(state.members, event.hostId)?.displayName ?? "",
       kibudName: memberById(state.members, event.kibudId)?.displayName,
       lecturerName: memberById(state.members, event.lecturerId)?.displayName,
+      senderName: me.displayName,
       yesUrl,
       maybeUrl,
       noUrl,
       note,
+      origin,
     });
     const result = await sendEmail({
       to: address,
