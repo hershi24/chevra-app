@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "חבורה של חברים — לימוד, חברות וצ׳אט",
     start_url: "/",
     display: "standalone",
-    background_color: "#f7f1e8",
-    theme_color: "#f7f1e8",
+    background_color: "#f3f4f6",
+    theme_color: "#f3f4f6",
     lang: "he",
     dir: "rtl",
     icons: [
