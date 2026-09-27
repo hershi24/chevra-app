@@ -7,6 +7,7 @@ import { canAccessPoll, castVote } from "@/lib/poll";
 import { can, canDeleteMedia, canDeleteMessage, isLeader } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
 import type { AppState, Channel, Gathering, Member, Message, Role } from "@/lib/types";
+import { notifyChatPush } from "@/lib/web-push";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
       applyAction(s, me, body);
       ensureGuideChannels(s);
     });
+    const alert = messageToAlert(state, me.id, body);
+    if (alert) void notifyChatPush(state, alert);
     const fresh = state.members.find((m) => m.id === me.id)!;
     return NextResponse.json(toPublicState(state, fresh));
   } catch (error) {
@@ -28,6 +31,27 @@ export async function POST(request: Request) {
     const status = message === "forbidden" ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }
+}
+
+function messageToAlert(state: AppState, authorId: string, body: ActionBody): Message | null {
+  if (body.type === "sendMessage") {
+    if (body.id) {
+      const byId = state.messages.find((item) => item.id === body.id);
+      if (byId) return byId;
+    }
+    return (
+      [...state.messages].reverse().find((item) => item.authorId === authorId && item.channelId === body.channelId) ??
+      null
+    );
+  }
+  if (body.type === "createPoll") {
+    const question = body.question.trim();
+    return (
+      [...state.messages].reverse().find((item) => item.authorId === authorId && item.poll?.question === question) ??
+      null
+    );
+  }
+  return null;
 }
 
 function canReadMessage(me: Member, channel: Channel, message: Message) {
