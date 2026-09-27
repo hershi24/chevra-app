@@ -14,12 +14,14 @@ export function PollCard({
   me,
   members,
   onVote,
+  sentByMe = false,
 }: {
   messageId: string;
   poll: Poll;
   me: Member;
   members: Member[];
   onVote: (optionId: string) => Promise<void>;
+  sentByMe?: boolean;
 }) {
   const [thanks, setThanks] = useState(false);
   const [busy, setBusy] = useState<"close" | "notify" | null>(null);
@@ -65,7 +67,12 @@ export function PollCard({
 
   return (
     <>
-      <div className="rounded-2xl rounded-ss-md bg-white px-3 py-3 text-sm leading-6 text-foreground shadow-sm ring-1 ring-black/[0.08]">
+      <div
+        className={cn(
+          "rounded-2xl rounded-ss-md px-3 py-3 text-sm leading-6 text-foreground shadow-sm ring-1",
+          sentByMe ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
+        )}
+      >
         <div className="mb-2 flex items-baseline justify-between gap-3">
           <div className="font-medium">{poll.question}</div>
           <div className="shrink-0 text-[11px] text-muted-foreground">{total} הצביעו</div>
