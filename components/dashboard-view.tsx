@@ -69,7 +69,7 @@ export function DashboardView() {
           }}
         />
       ) : (
-        <section className="rounded-[1.75rem] border border-[#e4c48a] bg-[#fff6ea] px-6 py-12 shadow-[0_12px_32px_rgba(169,120,44,0.12)]">
+        <section className="rounded-[1.75rem] border border-[#d5dbe3] bg-[#fbfcfd] px-6 py-12 shadow-[0_10px_28px_rgba(80,90,105,0.06)]">
           <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
           {can(me, "createEvent") ? (
             <div className="mt-4">
@@ -139,7 +139,7 @@ function HeroEvent({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="grid min-w-0 gap-8 rounded-[1.75rem] border border-[#e4c48a] bg-[#fff6ea] px-5 py-7 shadow-[0_12px_32px_rgba(169,120,44,0.12)] md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
+      className="grid min-w-0 gap-8 rounded-[1.75rem] border border-[#d5dbe3] bg-[#fbfcfd] px-5 py-7 shadow-[0_10px_28px_rgba(80,90,105,0.06)] md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
     >
       <div className="min-w-0 space-y-7">
         <div>

@@ -63,13 +63,13 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <BackgroundLayer />
       <PasswordNotice />
 
-      <header className="sticky top-0 z-30 hidden h-16 border-b border-black/5 bg-white md:block">
+      <header className="sticky top-0 z-30 hidden h-16 border-b border-[#d0d5dc] bg-[#e4e8ee] md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
           <Link href="/" className="min-w-0 shrink-0">
             <img src="/brand-logo.png" alt="אש קודש" className="h-[46px] w-auto" />
           </Link>
 
-          <nav className="flex items-center rounded-full bg-[#f3eadc] p-1">
+          <nav className="flex items-center rounded-full bg-[#f4f6f8] p-1">
             {NAV.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -110,7 +110,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
       <header
         className={cn(
-          "sticky top-0 z-20 items-center justify-between border-b border-black/5 bg-white px-4 py-3 md:hidden",
+          "sticky top-0 z-20 items-center justify-between border-b border-[#d0d5dc] bg-[#e4e8ee] px-4 py-3 md:hidden",
           isDashboard ? "flex" : "hidden"
         )}
       >
@@ -131,7 +131,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/5 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[#d0d5dc] bg-[#e4e8ee] pb-[env(safe-area-inset-bottom)] md:hidden">
         {NAV.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
