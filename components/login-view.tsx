@@ -45,7 +45,7 @@ export function LoginView() {
 
   return (
     <div
-      className="flex min-h-dvh items-center justify-center bg-[#1a120c] bg-cover bg-center bg-fixed px-4 py-12"
+      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-bottom bg-fixed px-4 pt-[5vh] pb-[18vh]"
       style={{
         backgroundImage:
           "linear-gradient(to bottom, rgba(20,12,8,0.12), rgba(20,12,8,0.28)), url(/login-bg.jpg)",
