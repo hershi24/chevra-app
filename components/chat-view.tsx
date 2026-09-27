@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
+import { ChatMediaGrid, isVisualAttachment } from "@/components/chat-media-grid";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PollCard } from "@/components/poll-card";
 import { PollDialog } from "@/components/poll-dialog";
@@ -103,19 +104,19 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [emojiOpenId, setEmojiOpenId] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
-  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+  const [zoomMedia, setZoomMedia] = useState<{ src: string; type: "image" | "video" } | null>(null);
   const flashTimer = useRef<number | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!zoomSrc) return;
+    if (!zoomMedia) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setZoomSrc(null);
+      if (event.key === "Escape") setZoomMedia(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [zoomSrc]);
+  }, [zoomMedia]);
 
   const channels = useMemo(() => {
     if (!state || !me) return [];
@@ -363,9 +364,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
     ]);
     if (fileRef.current) fileRef.current.value = "";
 
-    const attachments: Attachment[] = [];
+    const uploaded: (Attachment | null)[] = items.map(() => null);
     await Promise.all(
-      items.map(async (item) => {
+      items.map(async (item, index) => {
         try {
           const data = await uploadWithProgress(item.file, {}, ({ percent, remainingSeconds }) => {
             setPendingUploads((prev) =>
@@ -375,18 +376,19 @@ export function ChatView({ channelId }: { channelId?: string }) {
             );
           });
           await preloadMedia(data.url, item.type);
-          attachments.push({
+          uploaded[index] = {
             id: crypto.randomUUID(),
             type: item.type,
             url: data.url,
             name: item.name,
-          });
+          };
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "העלאה נכשלה");
         }
       })
     );
 
+    const attachments = uploaded.filter((file): file is Attachment => file !== null);
     if (attachments.length) await send({ attachments });
     items.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     setPendingUploads((prev) => prev.filter((p) => !items.some((item) => item.id === p.id)));
@@ -633,9 +635,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   !message.quote &&
                   (Boolean(message.voiceUrl) || message.attachments.length > 0) &&
                   message.attachments.every((file) => file.type !== "file");
-                const audioOnly =
-                  tightMedia &&
-                  !message.attachments.some((file) => file.type === "image" || file.type === "video");
                 const toolsOpen =
                   hoveredMessageId === message.id ||
                   openMenuId === message.id ||
@@ -708,9 +707,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         className={cn(
                           "w-fit max-w-full rounded-[18px] text-[15px] leading-6 text-[#1f1f1f] shadow-none ring-0",
                           tightMedia
-                            ? audioOnly
-                              ? "bg-transparent p-0"
-                              : "overflow-hidden bg-transparent p-0"
+                            ? "bg-transparent p-0"
                             : cn(
                                 message.quote ? "p-1 pb-1.5" : "px-3.5 py-1.5",
                                 mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]"
@@ -733,34 +730,15 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         {message.voiceUrl ? (
                           <VoiceNotePlayer src={message.voiceUrl} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                         ) : null}
+                        {message.attachments.some(isVisualAttachment) ? (
+                          <ChatMediaGrid
+                            items={message.attachments.filter(isVisualAttachment)}
+                            onOpen={(file) => setZoomMedia({ src: file.url, type: file.type })}
+                            className={tightMedia ? undefined : "my-1.5"}
+                          />
+                        ) : null}
                         {message.attachments.map((file) =>
-                          file.type === "image" ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={file.id}
-                              src={file.url}
-                              alt={file.name}
-                              className={cn(
-                                "block max-h-64 max-w-full cursor-zoom-in object-cover",
-                                !tightMedia && "mt-2 rounded-xl"
-                              )}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setZoomSrc(file.url);
-                              }}
-                            />
-                          ) : file.type === "video" ? (
-                            <video
-                              key={file.id}
-                              src={file.url}
-                              controls
-                              playsInline
-                              className={cn(
-                                "block max-h-64 max-w-full bg-black",
-                                tightMedia ? "w-full" : "mt-2 w-full rounded-xl"
-                              )}
-                            />
-                          ) : file.type === "audio" ? (
+                          isVisualAttachment(file) ? null : file.type === "audio" ? (
                             <VoiceNotePlayer key={file.id} src={file.url} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                           ) : (
                             <a
@@ -854,28 +832,40 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </article>
                 );
               })}
-              {pendingUploads.map((item, index) => (
-                <article
-                  key={item.id}
-                  ref={index === pendingUploads.length - 1 ? pendingChatRef : undefined}
-                  className="flex flex-row-reverse gap-2"
-                >
+              {pendingUploads.length ? (
+                <article ref={pendingChatRef} className="flex flex-row-reverse gap-2">
                   <div className="flex min-w-0 max-w-[min(85%,42rem)] flex-col items-end">
                     <div className="mb-0.5 px-1 text-[11px] text-[#5f6368]">מעלה…</div>
-                    <div className="overflow-hidden rounded-[18px] bg-[#d3e3fd]">
-                      <MediaProgressOverlay
-                        src={item.previewUrl}
-                        type={item.type}
-                        progress={item.progress}
-                        remainingSeconds={item.remainingSeconds}
-                        name={item.name}
-                        mediaClassName="max-h-64"
-                        onReady={scrollPendingIntoView}
-                      />
+                    <div
+                      className={cn(
+                        "w-[17rem] max-w-full",
+                        pendingUploads.length > 1 && "grid grid-cols-2 gap-1"
+                      )}
+                    >
+                      {pendingUploads.map((item, index) => (
+                        <MediaProgressOverlay
+                          key={item.id}
+                          src={item.previewUrl}
+                          type={item.type}
+                          progress={item.progress}
+                          remainingSeconds={item.remainingSeconds}
+                          name={item.name}
+                          className={cn(
+                            "min-h-0",
+                            pendingUploads.length === 1
+                              ? "aspect-square rounded-2xl"
+                              : pendingUploads.length % 2 === 1 && index === 0
+                                ? "col-span-2 aspect-[2/1] rounded-xl"
+                                : "aspect-square rounded-xl"
+                          )}
+                          mediaClassName="size-full max-h-none object-cover"
+                          onReady={scrollPendingIntoView}
+                        />
+                      ))}
                     </div>
                   </div>
                 </article>
-              ))}
+              ) : null}
               <div ref={endRef} />
             </div>
 
@@ -1008,27 +998,38 @@ export function ChatView({ channelId }: { channelId?: string }) {
         )}
       </section>
       </div>
-      {zoomSrc
+      {zoomMedia
         ? createPortal(
             <div
               className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 pt-16"
-              onClick={() => setZoomSrc(null)}
+              onClick={() => setZoomMedia(null)}
             >
               <button
                 type="button"
                 className="absolute top-4 left-4 z-10 flex size-9 items-center justify-center rounded-full bg-white text-xl leading-none text-[#1f2328]"
                 aria-label="סגירה"
-                onClick={() => setZoomSrc(null)}
+                onClick={() => setZoomMedia(null)}
               >
                 ×
               </button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={zoomSrc}
-                alt=""
-                className="h-[calc(100dvh-6rem)] max-h-[calc(100dvh-6rem)] w-auto max-w-[92vw] object-contain"
-                onClick={(event) => event.stopPropagation()}
-              />
+              {zoomMedia.type === "video" ? (
+                <video
+                  src={zoomMedia.src}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[calc(100dvh-6rem)] max-w-[92vw] bg-black"
+                  onClick={(event) => event.stopPropagation()}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={zoomMedia.src}
+                  alt=""
+                  className="h-[calc(100dvh-6rem)] max-h-[calc(100dvh-6rem)] w-auto max-w-[92vw] object-contain"
+                  onClick={(event) => event.stopPropagation()}
+                />
+              )}
             </div>,
             document.body
           )
