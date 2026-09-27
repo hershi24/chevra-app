@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Heebo } from "next/font/google";
+import { Secular_One } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const heebo = Heebo({
+const secularOne = Secular_One({
   subsets: ["latin", "hebrew"],
-  weight: ["300", "400", "500", "600"],
+  weight: "400",
   variable: "--font-sans",
 });
 
@@ -43,10 +43,10 @@ export default function RootLayout({
     <html
       lang="he"
       dir="rtl"
-      className={`${heebo.variable} h-full antialiased`}
+      className={`${secularOne.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full bg-background font-sans font-light text-foreground">
+      <body className="min-h-full bg-background font-sans font-normal text-foreground">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <TooltipProvider>
             {children}
