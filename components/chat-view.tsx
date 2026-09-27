@@ -420,7 +420,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   return (
     <>
     <div
-      className="flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] bg-white md:h-full md:bg-transparent md:px-6 md:pt-3 md:pb-5"
+      className="flex h-full min-h-0 w-full flex-1 bg-white md:bg-transparent md:px-6 md:pt-3 md:pb-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
@@ -530,7 +530,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
       <section
         className={cn(
-          "min-w-0 flex-1 flex-col",
+          "min-h-0 min-w-0 flex-1 flex-col",
           guideActive ? "bg-[#f4f2ee] md:bg-[#f4f2ee]" : "bg-muted md:bg-muted/80",
           active ? "flex" : "hidden md:flex"
         )}
