@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Color_Emoji, Secular_One } from "next/font/google";
+import { Noto_Color_Emoji, Noto_Sans_Hebrew, Secular_One } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -9,6 +9,12 @@ const secularOne = Secular_One({
   subsets: ["latin", "hebrew"],
   weight: "400",
   variable: "--font-secular",
+});
+
+const notoHebrew = Noto_Sans_Hebrew({
+  subsets: ["hebrew", "latin"],
+  weight: "400",
+  variable: "--font-noto-hebrew",
 });
 
 const notoEmoji = Noto_Color_Emoji({
@@ -51,7 +57,7 @@ export default function RootLayout({
     <html
       lang="he"
       dir="rtl"
-      className={`${secularOne.variable} ${notoEmoji.variable} h-full antialiased`}
+      className={`${secularOne.variable} ${notoHebrew.variable} ${notoEmoji.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background font-sans font-normal text-foreground">

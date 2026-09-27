@@ -15,6 +15,7 @@ import {
   Mic,
   Paperclip,
   Pencil,
+  Plus,
   Quote,
   Reply,
   Send,
@@ -27,6 +28,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { PollCard } from "@/components/poll-card";
 import { PollDialog } from "@/components/poll-dialog";
 import { MediaProgressOverlay } from "@/components/media-progress";
@@ -76,7 +78,6 @@ type PendingChatUpload = {
   name: string;
 };
 
-const EMOJIS = ["❤️", "👍", "😂", "🙏", "🔥", "✨", "🎉", "☕"];
 const MENU_EMOJIS = ["😊", "😂", "💥", "😐", "😌", "🚀"];
 
 export function ChatView({ channelId }: { channelId?: string }) {
@@ -93,7 +94,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [menuMessage, setMenuMessage] = useState<Message | null>(null);
-  const [menuView, setMenuView] = useState<"actions" | "forward">("actions");
+  const [menuView, setMenuView] = useState<"actions" | "forward" | "emoji">("actions");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -461,7 +462,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   return (
     <>
     <div
-      className="flex h-full min-h-0 w-full flex-1 bg-white md:bg-transparent md:px-6 md:pt-3 md:pb-5"
+      className="flex h-full min-h-0 w-full flex-1 bg-white font-chat md:bg-transparent md:px-6 md:pt-3 md:pb-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
       <aside
@@ -471,7 +472,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
         )}
       >
         <div className="border-b border-black/5 px-4 py-4">
-          <h1 className="text-xl font-medium tracking-tight">צ׳אט החבורה</h1>
+          <h1 className="font-chat text-xl tracking-tight">צ׳אט החבורה</h1>
           <p className="text-xs font-light text-muted-foreground">
             {onlineLabel(onlineIds.length)}
           </p>
@@ -572,7 +573,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       <section
         className={cn(
           "min-h-0 min-w-0 flex-1 flex-col",
-          guideActive ? "bg-[#f4f2ee] md:bg-[#f4f2ee]" : "bg-muted md:bg-muted/80",
+          guideActive ? "bg-[#f4f2ee] md:bg-[#f4f2ee]" : "bg-white",
           active ? "flex" : "hidden md:flex"
         )}
       >
@@ -649,6 +650,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     id={`message-${message.id}`}
                     className={cn(
                       "group flex scroll-my-4 gap-2 rounded-2xl transition-colors",
+                      mine && "flex-row-reverse",
                       continuation && "-mt-3",
                       flashId === message.id && "bg-[#ece8e0]"
                     )}
@@ -657,14 +659,21 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       setHoveredMessageId((current) => (current === message.id ? null : current))
                     }
                   >
-                    <UserAvatar member={author} size="sm" className={continuation ? "invisible" : undefined} />
-                    <div className="min-w-0 max-w-[min(100%,42rem)]">
+                    {mine ? null : (
+                      <UserAvatar member={author} size="sm" className={continuation ? "invisible" : undefined} />
+                    )}
+                    <div
+                      className={cn(
+                        "flex min-w-0 max-w-[min(85%,42rem)] flex-col",
+                        mine ? "items-end" : "items-start"
+                      )}
+                    >
                       {continuation ? null : (
-                        <div className="mb-0.5 flex items-baseline gap-2">
+                        <div className="mb-0.5 flex items-baseline gap-2 px-1">
                           {mine ? null : (
-                            <span className="text-[10px] font-medium">{author?.displayName}</span>
+                            <span className="text-xs text-[#1f1f1f]">{author?.displayName}</span>
                           )}
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[11px] text-[#5f6368]">
                             {formatTimeHe(message.createdAt)}
                           </span>
                         </div>
@@ -697,18 +706,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             : undefined
                         }
                         className={cn(
-                          "w-fit max-w-full rounded-2xl rounded-ss-md text-sm leading-6 text-foreground",
+                          "w-fit max-w-full rounded-[18px] text-[15px] leading-6 text-[#1f1f1f] shadow-none ring-0",
                           tightMedia
                             ? audioOnly
-                              ? "w-fit max-w-full bg-transparent p-0 shadow-none"
-                              : cn(
-                                  "w-fit max-w-full overflow-hidden bg-transparent p-0 shadow-sm ring-1",
-                                  mine ? "ring-[#a9c6e4]" : "ring-black/[0.08]"
-                                )
-                            : cn(
-                                "px-3 py-2 shadow-sm ring-1",
-                                mine ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
-                              )
+                              ? "bg-transparent p-0"
+                              : "overflow-hidden bg-transparent p-0"
+                            : cn("px-3.5 py-1.5", mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]")
                         )}
                       >
                         {message.quote ? (
@@ -726,7 +729,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         ) : null}
                         {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(message.text)}</p> : null}
                         {message.voiceUrl ? (
-                          <VoiceNotePlayer src={message.voiceUrl} className={tightMedia ? undefined : "mt-2"} />
+                          <VoiceNotePlayer src={message.voiceUrl} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                         ) : null}
                         {message.attachments.map((file) =>
                           file.type === "image" ? (
@@ -756,7 +759,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               )}
                             />
                           ) : file.type === "audio" ? (
-                            <VoiceNotePlayer key={file.id} src={file.url} className={tightMedia ? undefined : "mt-2"} />
+                            <VoiceNotePlayer key={file.id} src={file.url} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                           ) : (
                             <a
                               key={file.id}
@@ -771,7 +774,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       )}
                       <div
                         className={cn(
-                          "absolute top-0 end-0 z-20 hidden -translate-y-1/2 items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_4px_14px_rgba(40,50,70,0.14)] ring-1 ring-[#e6ebf0]",
+                          "absolute top-0 z-20 hidden -translate-y-1/2 items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_4px_14px_rgba(40,50,70,0.14)] ring-1 ring-[#e6ebf0]",
+                          mine ? "start-0" : "end-0",
                           toolsOpen && "md:flex"
                         )}
                       >
@@ -815,20 +819,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               <Smile className="size-5" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="flex w-auto gap-1 p-2" align="start">
-                            {EMOJIS.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                className="flex size-8 items-center justify-center rounded-lg text-base leading-none hover:bg-muted"
-                                onClick={() => {
-                                  void act({ type: "react", messageId: message.id, emoji });
-                                  setEmojiOpenId(null);
-                                }}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+                          <PopoverContent className="w-auto overflow-hidden rounded-2xl p-0" align="start">
+                            <EmojiPicker
+                              onPick={(emoji) => {
+                                void act({ type: "react", messageId: message.id, emoji });
+                                setEmojiOpenId(null);
+                              }}
+                            />
                           </PopoverContent>
                         </Popover>
                       </div>
@@ -840,12 +837,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               key={emoji}
                               onClick={() => void act({ type: "react", messageId: message.id, emoji })}
                               className={cn(
-                                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs leading-none ring-1 ring-black/5 md:text-base",
-                                ids.includes(me.id) ? "bg-primary/10" : "bg-white"
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm leading-5 ring-1",
+                                ids.includes(me.id) ? "bg-[#d3e3fd] ring-[#d3e3fd]" : "bg-white ring-[#dadce0]"
                               )}
                             >
                               {emoji}
-                              <span className="text-[11px] text-muted-foreground">{ids.length}</span>
+                              <span className="text-xs text-[#0b57d0]">{ids.length}</span>
                             </button>
                           ))}
                         </div>
@@ -858,15 +855,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 <article
                   key={item.id}
                   ref={index === pendingUploads.length - 1 ? pendingChatRef : undefined}
-                  className="flex gap-2"
+                  className="flex flex-row-reverse gap-2"
                 >
-                  <UserAvatar member={me} size="sm" />
-                  <div className="min-w-0 max-w-[min(100%,42rem)]">
-                    <div className="mb-0.5 flex items-baseline gap-2">
-                      <span className="text-[10px] font-medium">{me.displayName}</span>
-                      <span className="text-[11px] text-muted-foreground">מעלה…</span>
-                    </div>
-                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-[#d7e6f8] shadow-sm ring-1 ring-[#a9c6e4]">
+                  <div className="flex min-w-0 max-w-[min(85%,42rem)] flex-col items-end">
+                    <div className="mb-0.5 px-1 text-[11px] text-[#5f6368]">מעלה…</div>
+                    <div className="overflow-hidden rounded-[18px] bg-[#d3e3fd]">
                       <MediaProgressOverlay
                         src={item.previewUrl}
                         type={item.type}
@@ -970,19 +963,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         <Smile />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="grid w-56 grid-cols-8 gap-1 p-2">
-                      {["😀", "😂", "🙏", "❤️", "🔥", "✨", "👍", "🎉", "☕", "🍰", "📚", "🏡", "🚗", "🌙", "⭐", "💪"].map(
-                        (emoji) => (
-                          <button
-                            type="button"
-                            key={emoji}
-                            className="size-7 rounded hover:bg-muted"
-                            onClick={() => setDraft((d) => d + emoji)}
-                          >
-                            {emoji}
-                          </button>
-                        )
-                      )}
+                    <PopoverContent
+                      side="top"
+                      align="end"
+                      collisionPadding={8}
+                      className="w-auto overflow-hidden rounded-2xl p-0"
+                    >
+                      <EmojiPicker onPick={(emoji) => setDraft((d) => d + emoji)} />
                     </PopoverContent>
                   </Popover>
                   <Button
@@ -1056,10 +1043,23 @@ export function ChatView({ channelId }: { channelId?: string }) {
             <div
               role="dialog"
               aria-labelledby="message-menu-title"
-              className="absolute inset-x-0 bottom-16 max-h-[70dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pt-3 pb-4 shadow-2xl"
+              className="absolute inset-x-0 bottom-16 max-h-[70dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pt-3 pb-4 font-chat shadow-2xl"
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
-              {menuView === "actions" ? (
+              {menuView === "emoji" ? (
+                <>
+                  <h2 id="message-menu-title" className="sr-only">
+                    אימוג׳ים
+                  </h2>
+                  <EmojiPicker
+                    className="-mx-2 h-[min(26rem,55dvh)] w-auto"
+                    onPick={(emoji) => {
+                      void act({ type: "react", messageId: menuMessage.id, emoji });
+                      setMenuMessage(null);
+                    }}
+                  />
+                </>
+              ) : menuView === "actions" ? (
                 <>
                   <div className="mb-4 flex justify-between gap-2">
                     {MENU_EMOJIS.map((emoji) => (
@@ -1075,6 +1075,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         {emoji}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      aria-label="כל האימוג׳ים"
+                      className="flex size-11 items-center justify-center rounded-full bg-[#f3f4f6] text-[#444746]"
+                      onClick={() => setMenuView("emoji")}
+                    >
+                      <Plus className="size-5" />
+                    </button>
                   </div>
                   <h2 id="message-menu-title" className="sr-only">
                     אפשרויות
@@ -1262,7 +1270,7 @@ function MessageMenu({
           <Ellipsis className="size-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52 p-1.5">
+      <DropdownMenuContent align="end" className="min-w-52 p-1.5 font-chat">
         {message.authorId === me.id ? (
           <DropdownMenuItem className={menuItemClass} onSelect={onEdit}>
             <Pencil className="size-5" />
@@ -1280,7 +1288,7 @@ function MessageMenu({
             <Forward className="size-5" />
             העברה לצ׳אט אחר
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-64 min-w-44 overflow-y-auto p-1.5">
+          <DropdownMenuSubContent className="max-h-64 min-w-44 overflow-y-auto p-1.5 font-chat">
             {targets.length ? (
               targets.map((member) => (
                 <DropdownMenuItem
