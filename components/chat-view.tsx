@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
+import { ChatSidebar, useChatReads } from "@/components/chat-sidebar";
 import { ChatMediaGrid, isVisualAttachment } from "@/components/chat-media-grid";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PollCard } from "@/components/poll-card";
@@ -127,6 +128,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const messages = (state?.messages ?? [])
     .filter((m) => m.channelId === active?.id)
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  const reads = useChatReads(active?.id ?? null, messages[messages.length - 1]?.id);
   const leaderPolls =
     me && isRoshChevra(me)
       ? (state?.messages ?? [])
@@ -191,7 +193,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
   if (!state || !me) return null;
 
-  const groups = groupChannels(channels, state.members);
   const guideActive = Boolean(active && isGuideChannel(active, state.members));
   const canWrite =
     active &&
@@ -467,110 +468,27 @@ export function ChatView({ channelId }: { channelId?: string }) {
       className="flex h-full min-h-0 w-full flex-1 bg-white font-chat md:bg-transparent md:px-6 md:pt-3 md:pb-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden md:h-full md:rounded-[1.75rem] md:bg-[var(--paper-card)] md:ring-1 md:ring-black/5">
-      <aside
-        className={cn(
-          "w-full min-h-0 shrink-0 border-e border-black/5 bg-white/90 md:w-80 md:bg-transparent",
-          active ? "hidden md:flex md:flex-col" : "flex min-h-0 flex-col"
-        )}
-      >
-        <div className="border-b border-black/5 px-4 py-4">
-          <h1 className="font-chat text-xl tracking-tight">צ׳אט החבורה</h1>
-          <p className="text-xs font-light text-muted-foreground">
-            {onlineLabel(onlineIds.length)}
-          </p>
-        </div>
-        <div className="border-b border-black/5 px-4 py-3 md:hidden">
-          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
-            פתח שיחה אישית
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {state.members
-              .filter((member) => member.id !== me.id)
-              .map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="flex w-14 shrink-0 flex-col items-center gap-1"
-                  onClick={() => void openPersonalChat(member)}
-                >
-                  <UserAvatar member={member} size="sm" />
-                  <span className="w-full truncate text-center text-[11px] leading-4">
-                    {member.displayName.split(" ")[0]}
-                  </span>
-                </button>
-              ))}
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {leaderPolls.length ? (
-            <div className="px-3 pt-3 md:hidden">
+      <ChatSidebar
+        me={me}
+        members={state.members}
+        channels={channels}
+        messages={state.messages}
+        activeId={active?.id ?? null}
+        onlineIds={onlineIds}
+        reads={reads}
+        onOpenPerson={(member) => void openPersonalChat(member)}
+        top={
+          leaderPolls.length ? (
+            <div className="px-1 pt-3 md:hidden">
               <LeaderPolls messages={leaderPolls} me={me} members={state.members} onVote={voteInPoll} />
             </div>
-          ) : null}
-          <RoomGroup title="ערוצים">
-            {groups.rooms.map((channel) => (
-              <RoomRow
-                key={channel.id}
-                channel={channel}
-                active={channel.id === active?.id}
-                me={me}
-                members={state.members}
-                last={lastMessage(state.messages, channel.id)}
-              />
-            ))}
-          </RoomGroup>
-          {groups.guides.length ? (
-            <RoomGroup title={isRoshChevra(me) ? "שיחות עם חברים" : "ראש החברה"}>
-              {groups.guides.map((channel) => (
-                <RoomRow
-                  key={channel.id}
-                  channel={channel}
-                  active={channel.id === active?.id}
-                  me={me}
-                  members={state.members}
-                  last={lastMessage(state.messages, channel.id)}
-                />
-              ))}
-            </RoomGroup>
-          ) : null}
-          {groups.dms.length ? (
-            <RoomGroup title="שיחות אישיות">
-              {groups.dms.map((channel) => (
-                <RoomRow
-                  key={channel.id}
-                  channel={channel}
-                  active={channel.id === active?.id}
-                  me={me}
-                  members={state.members}
-                  last={lastMessage(state.messages, channel.id)}
-                />
-              ))}
-            </RoomGroup>
-          ) : null}
-          <div className="hidden md:block">
-            <RoomGroup title="פתח שיחה אישית">
-              {state.members
-                .filter((member) => member.id !== me.id)
-                .map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-start text-sm hover:bg-black/5"
-                    onClick={() => void openPersonalChat(member)}
-                  >
-                    <UserAvatar member={member} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{member.displayName}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {isRoshChevra(member) ? "ראש החברה" : "שיחה אישית"}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-            </RoomGroup>
-          </div>
-        </div>
-      </aside>
+          ) : null
+        }
+        className={cn(
+          "w-full shrink-0 border-e border-black/5 md:w-80",
+          active ? "hidden md:flex" : "flex"
+        )}
+      />
 
       <section
         className={cn(
@@ -1368,58 +1286,6 @@ function LeaderPolls({
   );
 }
 
-function RoomGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="px-2 py-3">
-      <div className="px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground">
-        {title}
-      </div>
-      <div className="space-y-0.5">{children}</div>
-    </div>
-  );
-}
-
-function RoomRow({
-  channel,
-  active,
-  me,
-  members,
-  last,
-}: {
-  channel: Channel;
-  active: boolean;
-  me: Member;
-  members: Member[];
-  last?: Message;
-}) {
-  const guide = isGuideChannel(channel, members);
-  const label = guide
-    ? guideChatTitle(channel, me, members)
-    : channel.type === "dm"
-      ? dmName(channel.name, channel.memberIds, me.id, (id) => members.find((m) => m.id === id)?.displayName ?? "")
-      : channel.name;
-  return (
-    <Link
-      href={`/chat/${channel.id}`}
-      className={cn(
-        "flex items-center gap-2 rounded-xl px-2 py-2 text-sm",
-        guide && !active && "bg-[#f3f1ec] hover:bg-[#ece8e0]",
-        guide && active && "bg-[#ece8e0] text-[#3f3a34]",
-        !guide && active && "bg-primary/10 text-primary",
-        !guide && !active && "hover:bg-black/5"
-      )}
-    >
-      <RoomIcon channel={channel} members={members} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">{label}</div>
-        <div className="truncate text-[11px] text-muted-foreground">
-          {guide ? last?.text || "שיחה פרטית" : last?.text || "אין הודעות עדיין"}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function RoomIcon({ channel, members = [] }: { channel: Channel; members?: Member[] }) {
   const guide = isGuideChannel(channel, members);
   const cls = cn(
@@ -1478,20 +1344,6 @@ function sameMinute(a: string, b: string) {
 function onlineLabel(count: number) {
   if (count === 1) return "מחובר אחד כעת";
   return `${count} מחוברים כעת`;
-}
-
-function lastMessage(messages: Message[], channelId: string) {
-  return messages
-    .filter((m) => m.channelId === channelId)
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
-}
-
-function groupChannels(channels: Channel[], members: Member[]) {
-  return {
-    rooms: channels.filter((c) => c.type !== "dm"),
-    guides: channels.filter((c) => isGuideChannel(c, members)),
-    dms: channels.filter((c) => c.type === "dm" && !isGuideChannel(c, members)),
-  };
 }
 
 function deletePreview(message: Message) {

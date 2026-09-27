@@ -72,6 +72,8 @@ R2_PUBLIC_URL
 
 בסופרבייס הריצו גם את `supabase/migrations/20260923150000_media_files.sql`.
 
+לספירת הודעות שלא נקראו בצ׳אט הריצו גם את `supabase/migrations/20260927230000_chat_reads.sql`.
+
 ### מייל אמיתי
 
 הגדירו `RESEND_API_KEY` ו־`RESEND_FROM`. בלי המפתח, המנהל מקבל קישורים לבדיקה במסך ההגדרות.
