@@ -160,9 +160,10 @@ export type AppState = {
   expenses: Expense[];
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
+  chatReads?: Record<string, Record<string, string>>;
   revision: number;
 };
 
-export type PublicState = Omit<AppState, "tokens"> & {
+export type PublicState = Omit<AppState, "tokens" | "chatReads"> & {
   me: Member;
 };
