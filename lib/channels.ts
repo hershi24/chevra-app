@@ -1,7 +1,7 @@
 import type { AppState, Channel, Member } from "./types";
 
 export function isGeneralChannel(channel: Channel) {
-  return channel.id === "c-general" || (channel.type === "group" && channel.name === "כללי");
+  return channel.id === "c-general" || channel.name === "כללי";
 }
 
 export function isRoshChevra(user?: Member | null) {
@@ -36,8 +36,15 @@ export function ensureGuideChannels(state: AppState): boolean {
 
   for (const channel of state.channels) {
     if (!isGeneralChannel(channel)) continue;
-    const next = channel.memberIds.filter((id) => !leaders.some((leader) => leader.id === id));
-    if (next.length !== channel.memberIds.length) {
+    if (channel.type !== "group") {
+      channel.type = "group";
+      changed = true;
+    }
+    const allowed = new Set(others.map((member) => member.id));
+    const kept = channel.memberIds.filter((id) => allowed.has(id));
+    const missing = others.map((member) => member.id).filter((id) => !kept.includes(id));
+    const next = [...kept, ...missing];
+    if (next.length !== channel.memberIds.length || next.some((id, index) => channel.memberIds[index] !== id)) {
       channel.memberIds = next;
       changed = true;
     }

@@ -143,7 +143,11 @@ function applyAction(s: AppState, me: Member, body: ActionBody) {
       const channel = s.channels.find((c) => c.id === body.channelId);
       if (!channel) throw new Error("הערוץ לא נמצא");
       if (!canSeeChannel(me, channel)) throw new Error("forbidden");
-      if (channel.type === "announcements" && !can(me, "postAnnouncement")) {
+      if (
+        channel.type === "announcements" &&
+        !isGeneralChannel(channel) &&
+        !can(me, "postAnnouncement")
+      ) {
         throw new Error("רק מנהל או ראש החברה יכולים לכתוב בהודעות רשמיות");
       }
       const clientId = body.id?.trim();

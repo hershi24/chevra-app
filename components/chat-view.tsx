@@ -50,6 +50,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   guideChatTitle,
+  isGeneralChannel,
   isGuideChannel,
   isRoshChevra,
 } from "@/lib/channels";
@@ -151,7 +152,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const guideActive = Boolean(active && isGuideChannel(active, state.members));
   const canWrite =
     active &&
-    (active.type !== "announcements" || can(me, "postAnnouncement"));
+    (isGeneralChannel(active) || active.type !== "announcements" || can(me, "postAnnouncement"));
 
   function jumpToMessage(messageId: string) {
     const el = document.getElementById(`message-${messageId}`);
