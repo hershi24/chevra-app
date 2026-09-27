@@ -597,7 +597,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     <UserAvatar member={author} size="sm" />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
                       <div className="mb-0.5 flex items-baseline gap-2">
-                        <span className="text-sm font-medium">{author?.displayName}</span>
+                        <span className="text-[10px] font-medium">{author?.displayName}</span>
                         <span className="text-[11px] text-muted-foreground">
                           {formatRelativeHe(message.createdAt)}
                         </span>
@@ -751,7 +751,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   <UserAvatar member={me} size="sm" />
                   <div className="min-w-0 max-w-[min(100%,42rem)]">
                     <div className="mb-0.5 flex items-baseline gap-2">
-                      <span className="text-sm font-medium">{me.displayName}</span>
+                      <span className="text-[10px] font-medium">{me.displayName}</span>
                       <span className="text-[11px] text-muted-foreground">מעלה…</span>
                     </div>
                     <div className="overflow-hidden rounded-2xl rounded-ss-md bg-white shadow-sm ring-1 ring-black/[0.08]">
