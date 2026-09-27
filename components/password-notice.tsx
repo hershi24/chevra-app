@@ -37,10 +37,12 @@ export function PasswordNotice() {
             aria-labelledby="password-alert-title"
             className="w-full max-w-md rounded-3xl border border-[#d5dbe3] bg-[#fbfcfd] p-6 shadow-[0_18px_50px_rgba(60,70,85,0.18)] md:max-w-[32rem] md:p-8"
           >
-            <img src="/brand-logo.png" alt="" aria-hidden="true" className="mb-5 hidden h-9 w-auto md:block" />
-            <h2 id="password-alert-title" className="text-xl leading-8 md:text-[1.7rem] md:leading-9">
-              שלום ל{firstName}
-            </h2>
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 id="password-alert-title" className="text-xl leading-8 md:text-[1.7rem] md:leading-9">
+                שלום ל{firstName}
+              </h2>
+              <img src="/brand-logo.png" alt="" aria-hidden="true" className="h-8 w-auto shrink-0 md:h-9" />
+            </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground md:text-[15px] md:leading-7">
               הסיסמה עדיין 1234. זו הכניסה הראשונה עם סיסמת ברירת המחדל שנפתחה לחשבון. מומלץ להחליף אותה עכשיו לסיסמה שרק אתם מכירים.
             </p>
