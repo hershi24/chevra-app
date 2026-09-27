@@ -92,13 +92,6 @@ export async function enableNotifications() {
   setNotificationsEnabled(true);
   localStorage.setItem(LIVE_KEY, "1");
   await ensurePushSubscription();
-  await showChatNotification({
-    title: "התראות דלוקות",
-    body: "מעכשיו תופיע התראה כשיש הודעה חדשה",
-    channelId: "",
-    messageId: "chevra-notify-ready",
-    openReply: false,
-  });
   return true;
 }
 
@@ -109,7 +102,6 @@ type WorkerOptions = {
   lang: string;
   tag: string;
   renotify: boolean;
-  requireInteraction: boolean;
   data: { url: string; messageId: string };
   dir?: NotificationDirection;
   actions?: { action: string; title: string }[];
@@ -142,11 +134,15 @@ function showViaPage(title: string, body: string, tag: string, onClick: () => vo
     };
   };
   try {
-    open(new Notification(title, { body, icon: "/icon.png", lang: "he", tag }));
+    const note = new Notification(title, { body, icon: "/icon.png", lang: "he", tag });
+    open(note);
+    window.setTimeout(() => note.close(), 2500);
     return true;
   } catch {
     try {
-      open(new Notification(title, { body, tag }));
+      const note = new Notification(title, { body, tag });
+      open(note);
+      window.setTimeout(() => note.close(), 2500);
       return true;
     } catch {
       return false;
@@ -180,14 +176,12 @@ export async function showChatNotification(options: {
     icon: "/icon.png",
     badge: "/icon.png",
     lang: "he",
-    tag: options.messageId,
+    tag: "chevra-chat",
     renotify: true,
-    requireInteraction: true,
     data,
   };
-  const hidden = document.visibilityState === "hidden";
-  if (!hidden && showViaPage(options.title, options.body, options.messageId, open)) return true;
+  if (document.visibilityState === "visible") return false;
   const shown = await showViaWorker(options.title, workerOptions);
   if (shown) return true;
-  return showViaPage(options.title, options.body, options.messageId, open);
+  return showViaPage(options.title, options.body, "chevra-chat", open);
 }
