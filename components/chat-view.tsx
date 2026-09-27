@@ -656,6 +656,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             poll={message.poll}
                             me={me}
                             members={state.members}
+                            sentByMe={mine}
                             onVote={async (optionId) => {
                               await act({ type: "votePoll", messageId: message.id, optionId });
                             }}
@@ -671,7 +672,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             : undefined
                         }
                         className={cn(
-                          "rounded-2xl rounded-ss-md bg-white px-3 py-2 text-sm leading-6 text-foreground shadow-sm ring-1 ring-black/[0.08]"
+                          "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 text-foreground shadow-sm ring-1",
+                          mine ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
                         )}
                       >
                         {message.quote ? (
@@ -804,7 +806,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       <span className="text-[10px] font-medium">{me.displayName}</span>
                       <span className="text-[11px] text-muted-foreground">מעלה…</span>
                     </div>
-                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-white shadow-sm ring-1 ring-black/[0.08]">
+                    <div className="overflow-hidden rounded-2xl rounded-ss-md bg-[#d7e6f8] shadow-sm ring-1 ring-[#a9c6e4]">
                       <MediaProgressOverlay
                         src={item.previewUrl}
                         type={item.type}
@@ -1255,6 +1257,7 @@ function LeaderPolls({
             poll={message.poll}
             me={me}
             members={members}
+            sentByMe={message.authorId === me.id}
             onVote={(optionId) => onVote(message.id, optionId)}
           />
         ) : null
