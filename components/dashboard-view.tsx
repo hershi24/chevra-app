@@ -69,7 +69,7 @@ export function DashboardView() {
           }}
         />
       ) : (
-        <section className="paper-card rounded-[1.75rem] border border-black/15 px-6 py-12">
+        <section className="rounded-[1.75rem] border border-[#e4c48a] bg-[#fff6ea] px-6 py-12 shadow-[0_12px_32px_rgba(169,120,44,0.12)]">
           <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
           {can(me, "createEvent") ? (
             <div className="mt-4">
@@ -139,7 +139,7 @@ function HeroEvent({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="paper-card grid min-w-0 gap-8 rounded-[1.75rem] border border-black/15 px-5 py-7 md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
+      className="grid min-w-0 gap-8 rounded-[1.75rem] border border-[#e4c48a] bg-[#fff6ea] px-5 py-7 shadow-[0_12px_32px_rgba(169,120,44,0.12)] md:px-10 md:py-10 lg:grid-cols-[1fr_15.5rem] lg:gap-12"
     >
       <div className="min-w-0 space-y-7">
         <div>
@@ -267,7 +267,7 @@ function RsvpPill({
       onClick={onClick}
       className={cn(
         "rounded-full px-4 py-2 text-[13px] font-normal transition",
-        active && tone === "primary" && "bg-primary text-primary-foreground",
+        active && tone === "primary" && "bg-[#3d8f62] text-white",
         active && tone === "soft" && "bg-foreground/8 text-foreground",
         active && tone === "quiet" && "bg-destructive/10 text-destructive",
         !active && "text-muted-foreground hover:bg-black/4 hover:text-foreground"
@@ -284,7 +284,7 @@ function StatusDot({ status }: { status: RsvpStatus }) {
       title={rsvpLabel(status)}
       className={cn(
         "size-1.5 shrink-0 rounded-full",
-        status === "yes" && "bg-primary",
+        status === "yes" && "bg-[#3d8f62]",
         status === "maybe" && "bg-amber-500/80",
         status === "no" && "bg-destructive/70",
         status === "pending" && "bg-black/15"
