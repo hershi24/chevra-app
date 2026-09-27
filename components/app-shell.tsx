@@ -61,7 +61,6 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <BackgroundLayer />
-      <PasswordNotice />
 
       <header className="sticky top-0 z-30 hidden h-16 border-b border-[#d0d5dc] bg-[#e4e8ee] md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
@@ -120,6 +119,8 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         </div>
         <UserAvatar member={me} size="sm" />
       </header>
+
+      <PasswordNotice />
 
       <main
         className={cn(
