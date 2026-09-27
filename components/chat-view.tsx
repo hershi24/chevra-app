@@ -101,9 +101,19 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [flashId, setFlashId] = useState<string | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const flashTimer = useRef<number | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!zoomSrc) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setZoomSrc(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomSrc]);
 
   const channels = useMemo(() => {
     if (!state || !me) return [];
@@ -616,6 +626,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     sameMinute(previous.createdAt, message.createdAt)
                 );
                 const mine = message.authorId === me.id;
+                const tightMedia =
+                  !message.text.trim() &&
+                  !message.quote &&
+                  (Boolean(message.voiceUrl) || message.attachments.length > 0) &&
+                  message.attachments.every((file) => file.type !== "file");
+                const audioOnly =
+                  tightMedia &&
+                  !message.attachments.some((file) => file.type === "image" || file.type === "video");
                 const author = memberById(state.members, message.authorId);
                 const quoted = message.quote
                   ? memberById(state.members, message.quote.authorId)
@@ -672,8 +690,18 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             : undefined
                         }
                         className={cn(
-                          "rounded-2xl rounded-ss-md px-3 py-2 text-sm leading-6 text-foreground shadow-sm ring-1",
-                          mine ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
+                          "rounded-2xl rounded-ss-md text-sm leading-6 text-foreground",
+                          tightMedia
+                            ? audioOnly
+                              ? "w-fit max-w-full bg-transparent p-0 shadow-none"
+                              : cn(
+                                  "w-fit max-w-full overflow-hidden bg-transparent p-0 shadow-sm ring-1",
+                                  mine ? "ring-[#a9c6e4]" : "ring-black/[0.08]"
+                                )
+                            : cn(
+                                "px-3 py-2 shadow-sm ring-1",
+                                mine ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
+                              )
                         )}
                       >
                         {message.quote ? (
@@ -691,7 +719,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         ) : null}
                         {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(message.text)}</p> : null}
                         {message.voiceUrl ? (
-                          <VoiceNotePlayer src={message.voiceUrl} className="mt-2" />
+                          <VoiceNotePlayer src={message.voiceUrl} className={tightMedia ? undefined : "mt-2"} />
                         ) : null}
                         {message.attachments.map((file) =>
                           file.type === "image" ? (
@@ -700,7 +728,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               key={file.id}
                               src={file.url}
                               alt={file.name}
-                              className="mt-2 max-h-64 rounded-xl object-cover"
+                              className={cn(
+                                "block max-h-64 max-w-full cursor-zoom-in object-cover",
+                                !tightMedia && "mt-2 rounded-xl"
+                              )}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setZoomSrc(file.url);
+                              }}
                             />
                           ) : file.type === "video" ? (
                             <video
@@ -708,10 +743,13 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               src={file.url}
                               controls
                               playsInline
-                              className="mt-2 max-h-64 w-full rounded-xl bg-black"
+                              className={cn(
+                                "block max-h-64 max-w-full bg-black",
+                                tightMedia ? "w-full" : "mt-2 w-full rounded-xl"
+                              )}
                             />
                           ) : file.type === "audio" ? (
-                            <VoiceNotePlayer key={file.id} src={file.url} className="mt-2" />
+                            <VoiceNotePlayer key={file.id} src={file.url} className={tightMedia ? undefined : "mt-2"} />
                           ) : (
                             <a
                               key={file.id}
@@ -958,6 +996,31 @@ export function ChatView({ channelId }: { channelId?: string }) {
         )}
       </section>
       </div>
+      {zoomSrc
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 pt-16"
+              onClick={() => setZoomSrc(null)}
+            >
+              <button
+                type="button"
+                className="absolute top-4 left-4 z-10 flex size-9 items-center justify-center rounded-full bg-white text-xl leading-none text-[#1f2328]"
+                aria-label="סגירה"
+                onClick={() => setZoomSrc(null)}
+              >
+                ×
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={zoomSrc}
+                alt=""
+                className="h-[calc(100dvh-6rem)] max-h-[calc(100dvh-6rem)] w-auto max-w-[92vw] object-contain"
+                onClick={(event) => event.stopPropagation()}
+              />
+            </div>,
+            document.body
+          )
+        : null}
     </div>
     {menuMessage
       ? createPortal(
