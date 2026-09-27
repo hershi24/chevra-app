@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
 import { PollCard } from "@/components/poll-card";
 import { PollDialog } from "@/components/poll-dialog";
@@ -54,7 +55,7 @@ import {
   isGuideChannel,
   isRoshChevra,
 } from "@/lib/channels";
-import { formatRelativeHe, memberById } from "@/lib/format";
+import { formatTimeHe, memberById } from "@/lib/format";
 import { can, canDeleteMessage, isLeader } from "@/lib/permissions";
 import { dmName } from "@/lib/selectors";
 import type { Attachment, Channel, Member, Message } from "@/lib/types";
@@ -76,6 +77,7 @@ type PendingChatUpload = {
 };
 
 const EMOJIS = ["❤️", "👍", "😂", "🙏", "🔥", "✨", "🎉", "☕"];
+const MENU_EMOJIS = ["😊", "😂", "💥", "😐", "😌", "🚀"];
 
 export function ChatView({ channelId }: { channelId?: string }) {
   const { state, me, act, onlineIds } = useApp();
@@ -138,6 +140,26 @@ export function ChatView({ channelId }: { channelId?: string }) {
     el.style.height = `${min}px`;
     if (draft) el.style.height = `${Math.min(Math.max(el.scrollHeight, min), 112)}px`;
   }, [draft]);
+
+  useEffect(() => {
+    if (!state) return;
+    const fromQuery = new URLSearchParams(window.location.search).get("reply");
+    const id = sessionStorage.getItem("chevra-reply") || fromQuery;
+    if (!id) return;
+    const message = state.messages.find((item) => item.id === id);
+    if (!message || (channelId && message.channelId !== channelId)) return;
+    sessionStorage.removeItem("chevra-reply");
+    if (fromQuery) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("reply");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    }
+    setQuote({
+      messageId: message.id,
+      authorId: message.authorId,
+      text: (message.poll?.question || message.text).slice(0, 140),
+    });
+  }, [state, channelId]);
 
   useEffect(() => {
     if (channelId || channels.length === 0) return;
@@ -563,6 +585,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   )}
                 </div>
               </div>
+              <NotificationToggle />
             </header>
 
             {leaderPolls.length ? (
@@ -577,7 +600,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 pendingUploads.length && "pb-28"
               )}
             >
-              {messages.map((message) => {
+              {messages.map((message, index) => {
+                const previous = messages[index - 1];
+                const continuation = Boolean(
+                  previous &&
+                    previous.authorId === message.authorId &&
+                    sameMinute(previous.createdAt, message.createdAt)
+                );
+                const mine = message.authorId === me.id;
                 const author = memberById(state.members, message.authorId);
                 const quoted = message.quote
                   ? memberById(state.members, message.quote.authorId)
@@ -588,6 +618,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     id={`message-${message.id}`}
                     className={cn(
                       "group flex scroll-my-4 gap-2 rounded-2xl transition-colors",
+                      continuation && "-mt-3",
                       flashId === message.id && "bg-[#ece8e0]"
                     )}
                     onMouseEnter={() => setHoveredMessageId(message.id)}
@@ -595,14 +626,18 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       setHoveredMessageId((current) => (current === message.id ? null : current))
                     }
                   >
-                    <UserAvatar member={author} size="sm" />
+                    <UserAvatar member={author} size="sm" className={continuation ? "invisible" : undefined} />
                     <div className="min-w-0 max-w-[min(100%,42rem)]">
-                      <div className="mb-0.5 flex items-baseline gap-2">
-                        <span className="text-[10px] font-medium">{author?.displayName}</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {formatRelativeHe(message.createdAt)}
-                        </span>
-                      </div>
+                      {continuation ? null : (
+                        <div className="mb-0.5 flex items-baseline gap-2">
+                          {mine ? null : (
+                            <span className="text-[10px] font-medium">{author?.displayName}</span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTimeHe(message.createdAt)}
+                          </span>
+                        </div>
+                      )}
                       {message.poll ? (
                         <ChatBubble
                           canDelete={canDeleteMessage(me, message)}
@@ -679,7 +714,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         )}
                       </ChatBubble>
                       )}
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <div
+                        className={cn(
+                          "mt-1 flex flex-wrap items-center gap-1",
+                          Object.keys(message.reactions).length === 0 && "max-md:hidden"
+                        )}
+                      >
                         {Object.entries(message.reactions).map(([emoji, ids]) => (
                           <button
                             key={emoji}
@@ -694,7 +734,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         ))}
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" size="xs" aria-label="תגובה">
+                            <Button variant="ghost" size="xs" aria-label="תגובה" className="hidden md:inline-flex">
                               <Smile data-icon="inline-start" />
                               הגב
                             </Button>
@@ -715,6 +755,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           variant="ghost"
                           size="xs"
                           aria-label="השב"
+                          className="hidden md:inline-flex"
                           onClick={() =>
                             setQuote({
                               messageId: message.id,
@@ -925,7 +966,22 @@ export function ChatView({ channelId }: { channelId?: string }) {
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/15" />
               {menuView === "actions" ? (
                 <>
-                  <h2 id="message-menu-title" className="text-base font-medium">
+                  <div className="mb-4 flex justify-between gap-2">
+                    {MENU_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="flex size-11 items-center justify-center rounded-full bg-[#f3f4f6] text-[22px]"
+                        onClick={() => {
+                          void act({ type: "react", messageId: menuMessage.id, emoji });
+                          setMenuMessage(null);
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <h2 id="message-menu-title" className="sr-only">
                     אפשרויות
                   </h2>
                   <p className="mt-3 truncate rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
@@ -1291,6 +1347,18 @@ function RoomIcon({ channel, members = [] }: { channel: Channel; members?: Membe
     <span className={cls}>
       <Hash className="size-4" />
     </span>
+  );
+}
+
+function sameMinute(a: string, b: string) {
+  const left = new Date(a);
+  const right = new Date(b);
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate() &&
+    left.getHours() === right.getHours() &&
+    left.getMinutes() === right.getMinutes()
   );
 }
 

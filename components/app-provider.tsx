@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { ChatAlerts } from "@/components/chat-alerts";
 import type { ActionBody } from "@/lib/actions";
 import {
   applyReaction,
@@ -245,7 +246,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [state, loading, error, onlineIds, refresh, act, logout]
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <ChatAlerts state={state} />
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {
