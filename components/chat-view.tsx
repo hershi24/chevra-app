@@ -615,7 +615,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
 
             <div
               className={cn(
-                "min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6 md:pt-12",
+                "min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 md:px-6",
                 pendingUploads.length && "pb-28"
               )}
             >
@@ -658,7 +658,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     }
                   >
                     <UserAvatar member={author} size="sm" className={continuation ? "invisible" : undefined} />
-                    <div className="relative min-w-0 max-w-[min(100%,42rem)]">
+                    <div className="min-w-0 max-w-[min(100%,42rem)]">
                       {continuation ? null : (
                         <div className="mb-0.5 flex items-baseline gap-2">
                           {mine ? null : (
@@ -669,10 +669,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           </span>
                         </div>
                       )}
+                      <div className="relative w-fit max-w-full">
                       {message.poll ? (
                         <ChatBubble
                           canDelete={canDeleteMessage(me, message)}
                           onLongPress={() => openMobileMenu(message)}
+                          className="w-fit max-w-full"
                         >
                           <PollCard
                             messageId={message.id}
@@ -695,7 +697,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             : undefined
                         }
                         className={cn(
-                          "rounded-2xl rounded-ss-md text-sm leading-6 text-foreground",
+                          "w-fit max-w-full rounded-2xl rounded-ss-md text-sm leading-6 text-foreground",
                           tightMedia
                             ? audioOnly
                               ? "w-fit max-w-full bg-transparent p-0 shadow-none"
@@ -767,26 +769,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         )}
                       </ChatBubble>
                       )}
-                      {Object.keys(message.reactions).length > 0 ? (
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          {Object.entries(message.reactions).map(([emoji, ids]) => (
-                            <button
-                              key={emoji}
-                              onClick={() => void act({ type: "react", messageId: message.id, emoji })}
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs leading-none ring-1 ring-black/5 md:px-2 md:text-[20px]",
-                                ids.includes(me.id) ? "bg-primary/10" : "bg-white"
-                              )}
-                            >
-                              {emoji}
-                              <span className="text-[11px] text-muted-foreground">{ids.length}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
                       <div
                         className={cn(
-                          "absolute bottom-full start-0 z-20 mb-1 hidden items-center gap-0.5 rounded-full bg-white px-1 py-0.5 shadow-[0_8px_22px_rgba(40,50,70,0.16)] ring-1 ring-[#e6ebf0]",
+                          "absolute top-0 end-0 z-20 hidden -translate-y-1/2 items-center rounded-full bg-white p-0.5 shadow-[0_4px_14px_rgba(40,50,70,0.14)] ring-1 ring-[#e6ebf0]",
                           toolsOpen && "md:flex"
                         )}
                       >
@@ -816,16 +801,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
                         >
                           <Reply />
                         </Button>
-                        {EMOJIS.slice(0, 3).map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            className="flex size-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-muted"
-                            onClick={() => void act({ type: "react", messageId: message.id, emoji })}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
                         <Popover
                           open={emojiOpenId === message.id}
                           onOpenChange={(open) => setEmojiOpenId(open ? message.id : null)}
@@ -840,7 +815,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                               <button
                                 key={emoji}
                                 type="button"
-                                className="flex size-9 items-center justify-center rounded-lg text-[20px] leading-none hover:bg-muted"
+                                className="flex size-8 items-center justify-center rounded-lg text-base leading-none hover:bg-muted"
                                 onClick={() => {
                                   void act({ type: "react", messageId: message.id, emoji });
                                   setEmojiOpenId(null);
@@ -852,6 +827,24 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           </PopoverContent>
                         </Popover>
                       </div>
+                      </div>
+                      {Object.keys(message.reactions).length > 0 ? (
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {Object.entries(message.reactions).map(([emoji, ids]) => (
+                            <button
+                              key={emoji}
+                              onClick={() => void act({ type: "react", messageId: message.id, emoji })}
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs leading-none ring-1 ring-black/5 md:text-base",
+                                ids.includes(me.id) ? "bg-primary/10" : "bg-white"
+                              )}
+                            >
+                              {emoji}
+                              <span className="text-[11px] text-muted-foreground">{ids.length}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </article>
                 );
