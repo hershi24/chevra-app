@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Secular_One } from "next/font/google";
+import { Noto_Color_Emoji, Noto_Sans_Hebrew, Secular_One } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,7 +8,21 @@ import "./globals.css";
 const secularOne = Secular_One({
   subsets: ["latin", "hebrew"],
   weight: "400",
-  variable: "--font-sans",
+  variable: "--font-secular",
+});
+
+const notoHebrew = Noto_Sans_Hebrew({
+  subsets: ["hebrew", "latin"],
+  weight: "400",
+  variable: "--font-noto-hebrew",
+});
+
+const notoEmoji = Noto_Color_Emoji({
+  subsets: ["emoji"],
+  weight: "400",
+  variable: "--font-emoji",
+  adjustFontFallback: false,
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -43,7 +57,7 @@ export default function RootLayout({
     <html
       lang="he"
       dir="rtl"
-      className={`${secularOne.variable} h-full antialiased`}
+      className={`${secularOne.variable} ${notoHebrew.variable} ${notoEmoji.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background font-sans font-normal text-foreground">

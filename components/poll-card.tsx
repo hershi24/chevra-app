@@ -69,8 +69,8 @@ export function PollCard({
     <>
       <div
         className={cn(
-          "rounded-2xl rounded-ss-md px-3 py-3 text-sm leading-6 text-foreground shadow-sm ring-1",
-          sentByMe ? "bg-[#d7e6f8] ring-[#a9c6e4]" : "bg-white ring-black/[0.08]"
+          "rounded-[18px] px-3.5 py-3 text-[15px] leading-6 text-[#1f1f1f]",
+          sentByMe ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]"
         )}
       >
         <div className="mb-2 flex items-baseline justify-between gap-3">
