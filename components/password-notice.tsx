@@ -18,6 +18,8 @@ export function PasswordNotice() {
 
   if (!me?.mustChangePassword) return null;
 
+  const firstName = me.displayName.split(" ")[0];
+
   return (
     <>
       <div className="border-b border-[#d0d5dc] bg-[#e8ebf0] px-5 py-3 text-sm md:px-8">
@@ -37,10 +39,7 @@ export function PasswordNotice() {
           >
             <img src="/brand-logo.png" alt="" aria-hidden="true" className="mb-5 hidden h-9 w-auto md:block" />
             <h2 id="password-alert-title" className="text-xl leading-8 md:text-[1.7rem] md:leading-9">
-              ברוכים הבאים לאתר{" "}
-              <span className="whitespace-nowrap">
-                מיין חברה<span dir="ltr">.com</span>
-              </span>
+              שלום ל{firstName}
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground md:text-[15px] md:leading-7">
               הסיסמה עדיין 1234. זו הכניסה הראשונה עם סיסמת ברירת המחדל שנפתחה לחשבון. מומלץ להחליף אותה עכשיו לסיסמה שרק אתם מכירים.
