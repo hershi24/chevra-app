@@ -445,8 +445,10 @@ export function createSeed(): AppState {
     channels,
     messages,
     tokens,
+    expenses: [],
     settings: {
       groupName: "מיין חברה",
+      showExpenses: true,
       backgroundImageId: "bg-1",
       backgrounds: [
         {

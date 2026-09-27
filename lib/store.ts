@@ -14,6 +14,8 @@ import {
 import { ensureMemberSecrets, publicMember } from "./password";
 import { isLeader } from "./permissions";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
+import { ensureExpenses } from "./expenses";
+import { loadExpenseLedger, syncExpenseLedger } from "./supabase-expenses";
 import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -35,7 +37,7 @@ async function loadJson(): Promise<AppState> {
   try {
     const raw = await readFile(FILE, "utf8");
     const parsed = JSON.parse(raw) as AppState;
-    if (ensureMemberSecrets(parsed.members)) await persist(parsed);
+    if (ensureMemberSecrets(parsed.members) || ensureExpenses(parsed)) await persist(parsed);
     g.__chevraCache = parsed;
     return g.__chevraCache;
   } catch {
@@ -49,7 +51,7 @@ async function loadJson(): Promise<AppState> {
 export async function readState(): Promise<AppState> {
   const json = await loadJson();
   if (!json.gallery) json.gallery = [];
-  if (ensureMemberSecrets(json.members)) await persist(json);
+  if (ensureMemberSecrets(json.members) || ensureExpenses(json)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
   const state = structuredClone(json);
@@ -104,6 +106,11 @@ export async function readState(): Promise<AppState> {
         }
       }
     }
+    const ledger = await loadExpenseLedger();
+    if (ledger) {
+      state.expenses = ledger.items;
+      state.settings.showExpenses = ledger.visible;
+    }
   } catch (error) {
     console.error("Supabase chat read failed", error);
   }
@@ -123,6 +130,7 @@ export async function persistQuietly(
       try {
         await syncChatDiff(before, current);
         await syncGatheringsDiff(before, current);
+        await syncExpenseLedger(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -149,6 +157,7 @@ export async function updateState(
       try {
         await syncChatDiff(before, current);
         await syncGatheringsDiff(before, current);
+        await syncExpenseLedger(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -187,6 +196,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     channels,
     messages: visibleMessages,
     settings: state.settings,
+    expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
     emailLog: state.emailLog,
     ivrLog: state.ivrLog,
     revision: state.revision,

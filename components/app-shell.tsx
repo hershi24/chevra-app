@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
+  Receipt,
   Settings,
 } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-provider";
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/journal", label: "יומן החבורה", short: "יומן", icon: BookOpen },
   { href: "/gallery", label: "גלריה", short: "גלריה", icon: Images },
   { href: "/chat", label: "צ׳אט", short: "צ׳אט", icon: MessageCircle },
+  { href: "/expenses", label: "באו חשבון", short: "באו חשבון", icon: Receipt },
   { href: "/settings", label: "הגדרות", short: "הגדרות", icon: Settings },
 ];
 
@@ -35,11 +37,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function ShellFrame({ children }: { children: React.ReactNode }) {
-  const { me, loading, error, logout } = useApp();
+  const { me, state, loading, error, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
   const isChat = pathname.startsWith("/chat");
   const isDashboard = pathname === "/";
+  const nav =
+    state?.settings.showExpenses === false ? NAV.filter((item) => item.href !== "/expenses") : NAV;
 
   if (loading) {
     return (
@@ -69,7 +73,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className="flex items-center rounded-full bg-[#f4f6f8] p-1">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
@@ -125,15 +129,25 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           isChat
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0"
-            : "px-5 py-6 pb-24 md:px-8 md:py-10 md:pb-16"
+            ? cn(
+                "flex min-h-0 flex-1 flex-col overflow-hidden md:pb-0",
+                nav.some((item) => item.href === "/expenses")
+                  ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))]"
+                  : "pb-[calc(4rem+env(safe-area-inset-bottom))]"
+              )
+            : "px-5 py-6 pb-28 md:px-8 md:py-10 md:pb-16"
         )}
       >
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[#d0d5dc] bg-[#e4e8ee] pb-[env(safe-area-inset-bottom)] md:hidden">
-        {NAV.map((item) => {
+      <nav
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-30 grid border-t border-[#d0d5dc] bg-[#e4e8ee] pb-[env(safe-area-inset-bottom)] md:hidden",
+          nav.length > 5 ? "grid-cols-6" : "grid-cols-5"
+        )}
+      >
+        {nav.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
@@ -146,7 +160,15 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
               )}
             >
               <item.icon className="size-5" />
-              {item.short}
+              {item.href === "/expenses" ? (
+                <span className="text-center leading-[1.15]">
+                  באו
+                  <br />
+                  חשבון
+                </span>
+              ) : (
+                item.short
+              )}
             </Link>
           );
         })}

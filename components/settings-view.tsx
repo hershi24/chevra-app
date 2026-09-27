@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeHe, memberById, roleLabel } from "@/lib/format";
+import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
 import type { EmailDelivery, Member } from "@/lib/types";
@@ -106,6 +108,8 @@ export function SettingsView() {
       </Card>
 
       <PasswordCard />
+
+      {isAdmin(me) ? <ExpensesVisibility /> : null}
 
       {isAdmin(me) ? <OnlineNow members={state.members} onlineIds={onlineIds} /> : null}
 
@@ -252,6 +256,32 @@ export function SettingsView() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+function ExpensesVisibility() {
+  const { state, act } = useApp();
+  const visible = state ? expensesOpen(state) : true;
+  return (
+    <Card className="paper-card rounded-[1.75rem]">
+      <CardContent className="flex items-start justify-between gap-4">
+        <div>
+          <div className="font-medium">הצגת באו חשבון</div>
+          <p className="mt-1 text-sm font-light text-muted-foreground">
+            רק מנהל המערכת. כיבוי מסתיר את הדף ואת הטאב מכולם.
+          </p>
+        </div>
+        <Switch
+          checked={visible}
+          onCheckedChange={(checked) =>
+            void act({ type: "setExpensesVisible", visible: checked })
+              .then(() => toast.success(checked ? "באו חשבון מוצג" : "באו חשבון מוסתר"))
+              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "העדכון נכשל"))
+          }
+          aria-label="הצגת באו חשבון"
+        />
+      </CardContent>
+    </Card>
   );
 }
 
