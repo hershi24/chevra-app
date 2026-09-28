@@ -1,4 +1,5 @@
-import type { AppState, BankAccount, Expense, ExpensePayment, Member } from "./types";
+import type { AppState, BankAccount, Expense, ExpensePayment, Member, PaymentMethod } from "./types";
+import { formatDateShortHe, gatheringLabel } from "./format";
 import { isAdmin } from "./permissions";
 
 export function agorot(amount: number) {
@@ -92,6 +93,7 @@ export function normalizePayments(value: unknown): ExpensePayment[] {
       fromId: item.fromId,
       toId: item.toId,
       amount,
+      ...(isPaymentMethod(item.method) ? { method: item.method } : {}),
       ...(typeof item.eventId === "string" && item.eventId ? { eventId: item.eventId } : {}),
       note: String(item.note ?? "").slice(0, 200),
       createdBy: typeof item.createdBy === "string" ? item.createdBy : item.fromId,
@@ -99,6 +101,19 @@ export function normalizePayments(value: unknown): ExpensePayment[] {
     });
   }
   return items;
+}
+
+export const PAYMENT_METHODS: { id: PaymentMethod; label: string }[] = [
+  { id: "transfer", label: "העברה" },
+  { id: "cash", label: "מזומן" },
+];
+
+export function isPaymentMethod(value: unknown): value is PaymentMethod {
+  return value === "cash" || value === "transfer";
+}
+
+export function paymentMethodLabel(method?: PaymentMethod) {
+  return PAYMENT_METHODS.find((item) => item.id === method)?.label ?? "";
 }
 
 const BANK_LIMITS: Record<Exclude<keyof BankAccount, "updatedAt">, number> = {
@@ -145,6 +160,13 @@ export function inScope(item: { eventId?: string }, scope: ExpenseScope) {
   if (scope === SCOPE_ALL) return true;
   if (scope === SCOPE_NONE) return !item.eventId;
   return item.eventId === scope;
+}
+
+export function expenseScopeLabel(state: Pick<AppState, "gatherings">, scope: ExpenseScope) {
+  if (scope === SCOPE_ALL) return "כל ההוצאות";
+  if (scope === SCOPE_NONE) return "ללא שיוך לחברה";
+  const event = state.gatherings.find((item) => item.id === scope);
+  return event ? `${gatheringLabel(event)} · ${formatDateShortHe(event.startsAt)}` : "חברה שנמחקה";
 }
 
 export type SettlementRow = {

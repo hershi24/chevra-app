@@ -9,15 +9,26 @@ import {
   canEditExpense,
   canEditPayment,
   expenseNoticeText,
+  expenseScopeLabel,
+  isPaymentMethod,
   expensesOpen,
   parseBankAccount,
   parseShekels,
   scopedSettlement,
 } from "@/lib/expenses";
-import { gatheringLabel } from "@/lib/format";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
-import type { AppState, Channel, Expense, ExpensePayment, Gathering, Member, Message, Role } from "@/lib/types";
+import type {
+  AppState,
+  Channel,
+  Expense,
+  ExpensePayment,
+  Gathering,
+  Member,
+  Message,
+  PaymentMethod,
+  Role,
+} from "@/lib/types";
 import { notifyChatPush } from "@/lib/web-push";
 
 export const runtime = "nodejs";
@@ -545,7 +556,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         : report.rows.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
       const payers = targets.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
       if (!payers.length) throw new Error(body.memberId ? "אין לו חוב בחשבון" : "אין מי שצריך לשלם");
-      const scopeLabel = noticeScopeLabel(s, scope);
+      const scopeLabel = scope === SCOPE_ALL ? undefined : expenseScopeLabel(s, scope);
       for (const row of payers) {
         const channel = ensureDirectChannel(s, me.id, row.memberId);
         const message: Message = {
@@ -569,6 +580,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         id: crypto.randomUUID(),
         ...paymentParties(s, body.fromId, body.toId),
         amount: parseShekels(body.amount),
+        ...paymentMethod(body.method),
         ...scopeEvent(s, body.eventId),
         note: paymentNote(body.note),
         createdBy: me.id,
@@ -592,6 +604,10 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       Object.assign(payment, parties);
       if (patch.amount !== undefined) payment.amount = parseShekels(patch.amount);
       if (patch.note !== undefined) payment.note = paymentNote(patch.note);
+      if (patch.method !== undefined) {
+        delete payment.method;
+        Object.assign(payment, paymentMethod(patch.method));
+      }
       if (patch.eventId !== undefined) {
         delete payment.eventId;
         Object.assign(payment, scopeEvent(s, patch.eventId));
@@ -643,6 +659,12 @@ function paymentNote(value?: string) {
   return note;
 }
 
+function paymentMethod(value?: string | null): { method?: PaymentMethod } {
+  if (!value) return {};
+  if (!isPaymentMethod(value)) throw new Error("אמצעי תשלום לא מוכר");
+  return { method: value };
+}
+
 function scopeEvent(state: AppState, eventId?: string | null): { eventId?: string } {
   if (!eventId) return {};
   if (!state.gatherings.some((event) => event.id === eventId)) throw new Error("החברה לא נמצאה");
@@ -656,12 +678,6 @@ function paymentParties(state: AppState, fromId: string, toId: string) {
   return { fromId, toId };
 }
 
-function noticeScopeLabel(state: AppState, scope: string) {
-  if (scope === SCOPE_ALL) return undefined;
-  if (scope === "none") return "ללא שיוך לחברה";
-  const event = state.gatherings.find((item) => item.id === scope);
-  return event ? gatheringLabel(event) : undefined;
-}
 
 function findPayment(state: AppState, paymentId: string) {
   const payment = (state.payments ?? []).find((item) => item.id === paymentId);
