@@ -2,16 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, MessageCircle, Pencil, Search, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, MessageCircle, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { roleLabel } from "@/lib/format";
 import type { Member, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
+const COLLAPSED_COUNT = 6;
+const ROLES: Role[] = ["admin", "leader", "member"];
 
 const ROLE_HELP: { role: Role; title: string; lines: string[] }[] = [
   {
@@ -31,36 +34,12 @@ const ROLE_HELP: { role: Role; title: string; lines: string[] }[] = [
   },
 ];
 
-export function MemberAdmin() {
-  const { state, me, act } = useApp();
+type Filter = "all" | "online" | Role;
+
+function useOpenChat() {
+  const { me, act } = useApp();
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-
-  const members = state?.members ?? [];
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    if (!q) return members;
-    return members.filter(
-      (member) =>
-        member.displayName.includes(q) ||
-        member.username.includes(q) ||
-        member.phone.includes(q) ||
-        member.email.includes(q)
-    );
-  }, [members, query]);
-
-  const counts = {
-    all: members.length,
-    admin: members.filter((member) => member.role === "admin").length,
-    leader: members.filter((member) => member.role === "leader").length,
-    member: members.filter((member) => member.role === "member").length,
-  };
-
-  if (!state || !me) return null;
-
-  async function openChat(member: Member) {
+  return async (member: Member) => {
     if (!me || member.id === me.id) return;
     const myId = me.id;
     try {
@@ -75,100 +54,189 @@ export function MemberAdmin() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "לא הצלחנו לפתוח שיחה");
     }
-  }
+  };
+}
+
+function sortMembers(members: Member[], onlineIds: string[], meId?: string) {
+  const rank = (member: Member) => (member.id === meId ? 0 : onlineIds.includes(member.id) ? 1 : 2);
+  return [...members].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      ROLES.indexOf(a.role) - ROLES.indexOf(b.role) ||
+      a.displayName.localeCompare(b.displayName, "he")
+  );
+}
+
+export function MemberAdmin() {
+  const { state, me, onlineIds } = useApp();
+  const openChat = useOpenChat();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const members = useMemo(() => state?.members ?? [], [state?.members]);
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    const list = members.filter((member) => {
+      if (filter === "online" && !onlineIds.includes(member.id)) return false;
+      if (filter !== "all" && filter !== "online" && member.role !== filter) return false;
+      if (!q) return true;
+      return (
+        member.displayName.includes(q) ||
+        member.username.includes(q) ||
+        member.phone.includes(q) ||
+        member.email.includes(q)
+      );
+    });
+    return sortMembers(list, onlineIds, me?.id);
+  }, [members, query, filter, onlineIds, me?.id]);
+
+  if (!state || !me) return null;
+
+  const filters: { id: Filter; label: string; count: number }[] = [
+    { id: "all", label: "כולם", count: members.length },
+    { id: "online", label: "מחוברים", count: members.filter((m) => onlineIds.includes(m.id)).length },
+    { id: "admin", label: "מנהלים", count: members.filter((m) => m.role === "admin").length },
+    { id: "leader", label: "ראשי חברה", count: members.filter((m) => m.role === "leader").length },
+    { id: "member", label: "חברי חבורה", count: members.filter((m) => m.role === "member").length },
+  ];
+  const narrowed = Boolean(query.trim()) || filter !== "all";
+  const collapsible = !narrowed && filtered.length > COLLAPSED_COUNT + 1;
+  const shown =
+    collapsible && !expanded
+      ? filtered.filter((member, index) => index < COLLAPSED_COUNT || member.id === openId)
+      : filtered;
+  const hidden = filtered.length - shown.length;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="חברים" value={counts.all} />
-        <Stat label="מנהלים" value={counts.admin} />
-        <Stat label="ראשי חברה" value={counts.leader} />
-        <Stat label="חברי חבורה" value={counts.member} />
-      </div>
+    <div className="space-y-3">
+      <div className={PANEL}>
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-[#e9ecef] p-3 md:p-3.5">
+          <div className="relative min-w-0 basis-full md:flex-1 md:basis-auto">
+            <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-[#9aa1ab]" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="חיפוש לפי שם, משתמש או טלפון"
+              className="h-10 rounded-xl bg-white ps-9"
+            />
+          </div>
+          <Button
+            type="button"
+            className="h-10 flex-1 rounded-full px-4 md:flex-none"
+            variant={adding ? "outline" : "default"}
+            onClick={() => setAdding((value) => !value)}
+          >
+            {adding ? <X data-icon="inline-start" /> : <Plus data-icon="inline-start" />}
+            {adding ? "סגירה" : "חבר חדש"}
+          </Button>
+        </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 end-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="חיפוש לפי שם, משתמש או טלפון"
-          className="pe-9"
-        />
-      </div>
-
-      <ul className="space-y-2">
-        {filtered.map((member) => (
-          <MemberRow
-            key={member.id}
-            member={member}
-            meId={me.id}
-            open={openId === member.id}
-            onToggle={() => setOpenId((id) => (id === member.id ? null : member.id))}
-            onChat={() => void openChat(member)}
-          />
-        ))}
-        {filtered.length === 0 ? (
-          <li className="rounded-xl bg-secondary px-3 py-6 text-center text-sm text-muted-foreground">
-            לא נמצאו חברים בהתאמה.
-          </li>
-        ) : null}
-      </ul>
-
-      <div className="rounded-2xl border border-dashed border-black/15 p-4">
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 text-start text-sm font-medium"
-          onClick={() => setAdding((value) => !value)}
-        >
-          <UserPlus className="size-4" />
-          {adding ? "סגירת טופס" : "הוספת חבר חדש"}
-        </button>
         {adding ? <AddMemberForm onDone={() => setAdding(false)} /> : null}
-      </div>
 
-      <div>
-        <h3 className="text-sm font-medium">מה כל תפקיד יכול</h3>
-        <p className="mt-1 text-[13px] font-light text-muted-foreground">
-          כך מחליטים למי לתת מפתח, אם רק ניהול יומיומי או אחריות על החבורה כולה.
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {ROLE_HELP.map((item) => (
-            <div key={item.role} className="rounded-2xl bg-secondary px-4 py-3">
-              <div className="text-sm font-medium">{item.title}</div>
-              <ul className="mt-2 space-y-1.5 text-[13px] font-light text-muted-foreground">
-                {item.lines.map((line) => (
-                  <li key={line} className="flex gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <div className="flex gap-1.5 overflow-x-auto px-3 pt-3 [scrollbar-width:none] md:flex-wrap md:px-3.5">
+          {filters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFilter(item.id)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-[12px]",
+                filter === item.id
+                  ? "border-foreground bg-foreground text-white"
+                  : "border-[#e3e7ec] bg-white text-[#4b5563]"
+              )}
+            >
+              {item.label}
+              <span className={cn("ms-1 tabular-nums", filter === item.id ? "text-white/60" : "text-[#9aa1ab]")}>
+                {item.count}
+              </span>
+            </button>
           ))}
         </div>
+
+        <ul className="mt-2.5">
+          {shown.map((member) => (
+            <MemberRow
+              key={member.id}
+              member={member}
+              meId={me.id}
+              online={onlineIds.includes(member.id)}
+              open={openId === member.id}
+              onToggle={() => setOpenId((id) => (id === member.id ? null : member.id))}
+              onChat={() => void openChat(member)}
+            />
+          ))}
+          {filtered.length === 0 ? (
+            <li className="border-t border-[#e9ecef] px-4 py-8 text-center text-sm font-light text-muted-foreground">
+              לא נמצאו חברים בהתאמה.
+            </li>
+          ) : null}
+        </ul>
+
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="flex w-full items-center gap-2 border-t border-[#e9ecef] px-4 py-3.5 text-start text-sm text-primary hover:bg-black/[0.02] md:px-5"
+          >
+            <Plus className={cn("size-4 transition-transform", expanded && "rotate-45")} />
+            {expanded ? "הצגת פחות" : `עוד ${hidden} חברים · הצגת כולם`}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="grid gap-2.5 px-1 text-[12.5px] font-light text-muted-foreground md:grid-cols-3 md:gap-0">
+        {ROLE_HELP.map((item, index) => (
+          <div key={item.role} className={cn("leading-relaxed md:px-4", index === 0 ? "md:ps-1" : "md:border-s md:border-[#e3e7ec]")}>
+            <div className="mb-0.5 text-[13px] font-normal text-foreground">{item.title}</div>
+            {item.lines.join(" · ")}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function RolePill({ role }: { role: Role }) {
   return (
-    <div className="rounded-2xl bg-secondary px-3 py-3">
-      <div className="text-[1.35rem] font-medium leading-none tabular-nums">{value}</div>
-      <div className="mt-1.5 text-[11px] text-muted-foreground">{label}</div>
-    </div>
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] whitespace-nowrap",
+        role === "admin" && "bg-[#f5f0e7] text-primary",
+        role === "leader" && "bg-[#eaf0fb] text-[#3b5ea8]",
+        role === "member" && "bg-[#eef1f4] text-[#4b5563]"
+      )}
+    >
+      {roleLabel(role)}
+    </span>
+  );
+}
+
+function MemberFace({ member, online }: { member: Member; online: boolean }) {
+  return (
+    <span className="relative shrink-0">
+      <UserAvatar member={member} />
+      {online ? (
+        <span className="absolute bottom-0 start-0 size-2.5 rounded-full bg-[#3ba55d] ring-2 ring-[#fbfcfd]" />
+      ) : null}
+    </span>
   );
 }
 
 function MemberRow({
   member,
   meId,
+  online,
   open,
   onToggle,
   onChat,
 }: {
   member: Member;
   meId: string;
+  online: boolean;
   open: boolean;
   onToggle: () => void;
   onChat: () => void;
@@ -183,6 +251,7 @@ function MemberRow({
   });
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const isMe = member.id === meId;
 
   function syncDraft() {
     setDraft({
@@ -198,11 +267,7 @@ function MemberRow({
   async function save() {
     setSaving(true);
     try {
-      await act({
-        type: "updateMember",
-        memberId: member.id,
-        patch: draft,
-      });
+      await act({ type: "updateMember", memberId: member.id, patch: draft });
       toast.success("פרטי החבר עודכנו");
       onToggle();
     } catch (error) {
@@ -223,141 +288,144 @@ function MemberRow({
     }
   }
 
+  async function resetPassword() {
+    setSaving(true);
+    try {
+      await act({ type: "resetMemberPassword", memberId: member.id });
+      toast.success("הסיסמה אופסה ל-1234. בכניסה הבאה תופיע בקשה להחליף.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "האיפוס נכשל");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <li className="rounded-2xl bg-secondary">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-        <UserAvatar member={member} size="sm" />
+    <li className={cn("border-t border-[#e9ecef] first:border-t-0", open && "bg-white")}>
+      <div className="flex items-center gap-3 px-3.5 py-2.5 md:px-4.5">
+        <MemberFace member={member} online={online} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">
+          <div className="truncate text-sm">
             {member.displayName}
-            {member.id === meId ? (
-              <span className="ms-1 text-[11px] font-light text-muted-foreground">אתם</span>
-            ) : null}
+            {isMe ? <span className="ms-1 text-[11px] font-light text-[#9aa1ab]">· אתה</span> : null}
           </div>
-          <div className="truncate text-[11px] text-muted-foreground">
+          <div className="truncate text-[12px] font-light text-muted-foreground">
             {member.username}
             {member.phone ? ` · ${member.phone}` : ""}
           </div>
         </div>
-        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-muted-foreground">
-          {roleLabel(member.role)}
+        <span className="hidden sm:inline">
+          <RolePill role={member.role} />
         </span>
-        {member.id !== meId ? (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="צ׳אט" onClick={onChat}>
-            <MessageCircle className="size-4" />
+        <div className="flex shrink-0 items-center text-[#9aa1ab]">
+          {!isMe ? (
+            <Button type="button" variant="ghost" size="icon" className="hidden rounded-xl sm:inline-flex" aria-label="צ׳אט" onClick={onChat}>
+              <MessageCircle />
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="hidden rounded-xl sm:inline-flex"
+            aria-label="העתקת שם משתמש"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(member.username);
+                toast.success("השם הועתק");
+              } catch {
+                toast.error("ההעתקה נכשלה");
+              }
+            }}
+          >
+            <Copy />
           </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="העתקת שם משתמש"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(member.username);
-              toast.success("השם הועתק");
-            } catch {
-              toast.error("ההעתקה נכשלה");
-            }
-          }}
-        >
-          <Copy className="size-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          onClick={() => {
-            if (!open) syncDraft();
-            onToggle();
-          }}
-        >
-          <Pencil data-icon="inline-start" />
-          {open ? "סגור" : "עריכה"}
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={open ? "סגירת עריכה" : "עריכה"}
+            aria-expanded={open}
+            className={cn("rounded-xl", open && "bg-[#f5f0e7] text-primary hover:bg-[#f5f0e7]")}
+            onClick={() => {
+              if (!open) syncDraft();
+              onToggle();
+            }}
+          >
+            {open ? <X /> : <Pencil />}
+          </Button>
+        </div>
       </div>
+
       {open ? (
-        <div className="space-y-3 border-t border-black/6 px-3 py-3">
-          <div className="grid gap-2 md:grid-cols-2">
-            <Field
-              label="שם מלא"
-              value={draft.displayName}
-              onChange={(value) => setDraft((prev) => ({ ...prev, displayName: value }))}
-            />
-            <Field
-              label="שם בחבורה"
-              value={draft.username}
-              onChange={(value) => setDraft((prev) => ({ ...prev, username: value }))}
-            />
-            <Field
-              label="טלפון"
-              value={draft.phone}
-              onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))}
-            />
-            <Field
-              label="אימייל"
-              value={draft.email}
-              onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))}
-            />
-            <label className="grid gap-1.5 md:col-span-2">
-              <span className="text-sm font-medium">תפקיד</span>
-              <select
-                className="h-8 rounded-lg border border-input bg-white px-2.5 text-sm"
-                value={draft.role}
-                onChange={(e) => setDraft((prev) => ({ ...prev, role: e.target.value as Role }))}
+        <div className="grid gap-2.5 px-3.5 pb-4 md:grid-cols-2 md:px-4.5">
+          <Field
+            label="שם מלא"
+            value={draft.displayName}
+            onChange={(value) => setDraft((prev) => ({ ...prev, displayName: value }))}
+          />
+          <Field
+            label="שם בחבורה"
+            value={draft.username}
+            onChange={(value) => setDraft((prev) => ({ ...prev, username: value }))}
+          />
+          <Field
+            label="טלפון"
+            dir="ltr"
+            value={draft.phone}
+            onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))}
+          />
+          <Field
+            label="אימייל"
+            dir="ltr"
+            value={draft.email}
+            onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))}
+          />
+          <RolePicker
+            value={draft.role}
+            onChange={(role) => setDraft((prev) => ({ ...prev, role }))}
+          />
+          <div className="flex flex-wrap items-center gap-1.5 md:col-span-2">
+            <Button type="button" className="h-9 rounded-full px-5" disabled={saving} onClick={() => void save()}>
+              {saving ? "שומר…" : "שמירה"}
+            </Button>
+            <Button type="button" variant="ghost" className="h-9 rounded-full text-muted-foreground" onClick={onToggle}>
+              ביטול
+            </Button>
+            <div className="ms-auto flex flex-wrap items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 rounded-full text-muted-foreground"
+                disabled={saving}
+                onClick={() => void resetPassword()}
               >
-                <option value="member">חבר חבורה</option>
-                <option value="leader">ראש החברה</option>
-                <option value="admin">מנהל מערכת</option>
-              </select>
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" disabled={saving} onClick={() => void save()}>
-              {saving ? "שומר…" : "שמירת שינויים"}
-            </Button>
-            {member.id !== meId ? (
-              confirmRemove ? (
-                <>
-                  <Button type="button" variant="destructive" disabled={saving} onClick={() => void remove()}>
-                    כן, להסיר
+                <KeyRound data-icon="inline-start" />
+                איפוס סיסמה ל-1234
+              </Button>
+              {!isMe ? (
+                confirmRemove ? (
+                  <>
+                    <Button type="button" variant="destructive" className="h-9 rounded-full" disabled={saving} onClick={() => void remove()}>
+                      כן, להסיר
+                    </Button>
+                    <Button type="button" variant="ghost" className="h-9 rounded-full" onClick={() => setConfirmRemove(false)}>
+                      לא
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 rounded-full text-[#a4453a] hover:bg-[#a4453a]/5 hover:text-[#a4453a]"
+                    onClick={() => setConfirmRemove(true)}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    הסרה מהחבורה
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setConfirmRemove(false)}>
-                    ביטול
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => setConfirmRemove(true)}
-                >
-                  <Trash2 data-icon="inline-start" />
-                  הסרה מהחבורה
-                </Button>
-              )
-            ) : (
-              <p className="text-[12px] text-muted-foreground">לא ניתן להסיר את עצמכם.</p>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await act({ type: "resetMemberPassword", memberId: member.id });
-                  toast.success("הסיסמה אופסה ל-1234. בכניסה הבאה תופיע בקשה להחליף.");
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "האיפוס נכשל");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              איפוס סיסמה ל-1234
-            </Button>
+                )
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -365,19 +433,74 @@ function MemberRow({
   );
 }
 
+function RolePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: Role;
+  onChange: (role: Role) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="grid gap-1.5 md:col-span-2">
+      <span className="text-[12px] text-muted-foreground">תפקיד</span>
+      <div role="radiogroup" aria-label="תפקיד" className="grid grid-cols-3 gap-1.5">
+        {ROLES.map((role) => (
+          <button
+            key={role}
+            type="button"
+            role="radio"
+            aria-checked={value === role}
+            disabled={disabled}
+            onClick={() => onChange(role)}
+            className={cn(
+              "rounded-xl border py-2 text-[13px] disabled:opacity-60",
+              value === role
+                ? "border-primary bg-[#f5f0e7] text-primary"
+                : "border-[#e3e7ec] bg-white text-[#4b5563] hover:border-[#cfd5dd]"
+            )}
+          >
+            {roleLabel(role)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Field({
   label,
   value,
   onChange,
+  dir,
+  name,
+  required,
+  type,
+  placeholder,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
+  dir?: "ltr" | "rtl";
+  name?: string;
+  required?: boolean;
+  type?: string;
+  placeholder?: string;
 }) {
   return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+    <label className="grid gap-1.5 text-[12px] text-muted-foreground">
+      {label}
+      <Input
+        name={name}
+        type={type}
+        dir={dir}
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        className="h-10 rounded-xl bg-white text-sm text-foreground"
+      />
     </label>
   );
 }
@@ -388,7 +511,7 @@ function AddMemberForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form
-      className="mt-4 grid gap-2 md:grid-cols-2"
+      className="grid gap-2.5 border-b border-[#e9ecef] bg-white p-3.5 md:grid-cols-2 md:p-4"
       onSubmit={async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -411,51 +534,60 @@ function AddMemberForm({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <div className="grid gap-1.5">
-        <Label htmlFor="new-username">שם בחבורה</Label>
-        <Input id="new-username" name="username" required placeholder="למשל: יוסי" />
+      <div className="text-[15px] md:col-span-2">חבר חדש</div>
+      <Field label="שם מלא" name="displayName" required placeholder="יוסף גולדשטיין" />
+      <Field label="שם בחבורה" name="username" required placeholder="למשל: יוסי" />
+      <Field label="טלפון" name="phone" dir="ltr" placeholder="050..." />
+      <Field label="אימייל" name="email" type="email" dir="ltr" />
+      <RolePicker value={role} onChange={setRole} />
+      <div className="md:col-span-2">
+        <Button className="h-10 w-full rounded-full px-6 md:w-auto">הוספת החבר</Button>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="new-displayName">שם מלא</Label>
-        <Input id="new-displayName" name="displayName" required placeholder="יוסף גולדשטיין" />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="new-phone">טלפון</Label>
-        <Input id="new-phone" name="phone" placeholder="050..." />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="new-email">אימייל</Label>
-        <Input id="new-email" name="email" type="email" />
-      </div>
-      <label className="grid gap-1.5 md:col-span-2">
-        <span className="text-sm font-medium">תפקיד</span>
-        <select
-          className="h-8 rounded-lg border border-input bg-white px-2.5 text-sm"
-          value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
-        >
-          <option value="member">חבר חבורה</option>
-          <option value="leader">ראש החברה</option>
-          <option value="admin">מנהל מערכת</option>
-        </select>
-      </label>
-      <Button className="md:col-span-2">הוספת החבר</Button>
     </form>
   );
 }
 
 export function MemberDirectory({ members }: { members: Member[] }) {
+  const { me, onlineIds } = useApp();
+  const openChat = useOpenChat();
+  const sorted = sortMembers(members, onlineIds, me?.id);
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {members.map((member) => (
-        <div key={member.id} className={cn("flex items-center gap-2")}>
-          <UserAvatar member={member} />
-          <div>
-            <div className="text-sm font-medium">{member.displayName}</div>
-            <div className="text-xs text-muted-foreground">{roleLabel(member.role)}</div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <ul className={PANEL}>
+      {sorted.map((member) => {
+        const isMe = member.id === me?.id;
+        return (
+          <li
+            key={member.id}
+            className="flex items-center gap-3 border-t border-[#e9ecef] px-3.5 py-2.5 first:border-t-0 md:px-4.5"
+          >
+            <MemberFace member={member} online={onlineIds.includes(member.id)} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm">
+                {member.displayName}
+                {isMe ? <span className="ms-1 text-[11px] font-light text-[#9aa1ab]">· אתה</span> : null}
+              </div>
+              <div className="truncate text-[12px] font-light text-muted-foreground">
+                {onlineIds.includes(member.id) ? "מחובר עכשיו" : roleLabel(member.role)}
+              </div>
+            </div>
+            <RolePill role={member.role} />
+            {!isMe ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-xl text-[#9aa1ab]"
+                aria-label={`צ׳אט עם ${member.displayName}`}
+                onClick={() => void openChat(member)}
+              >
+                <MessageCircle />
+              </Button>
+            ) : (
+              <span className="size-8 shrink-0" />
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
