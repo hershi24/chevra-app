@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
+import { deliverExpenseMail, expenseNoticeHtml } from "@/lib/expense-email";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
 import {
@@ -17,6 +18,7 @@ import {
   scopedSettlement,
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
+import { inviteOrigin } from "@/lib/request-origin";
 import { updateState, toPublicState } from "@/lib/store";
 import type {
   AppState,
@@ -32,6 +34,46 @@ import type {
 import { notifyChatPush } from "@/lib/web-push";
 
 export const runtime = "nodejs";
+
+const NOTICE_REPEAT_MS = 10 * 60 * 1000;
+
+async function mailExpenseNotice(
+  state: AppState,
+  me: Member,
+  pushed: Message[],
+  scope: string,
+  origin: string
+) {
+  const { expenses, report, transfers } = scopedSettlement(state, scope);
+  const scopeLabel = scope === SCOPE_ALL ? undefined : expenseScopeLabel(state, scope);
+  const recipients = pushed.flatMap((message) => {
+    const channel = state.channels.find((item) => item.id === message.channelId);
+    const memberId = channel?.memberIds.find((id) => id !== me.id);
+    const member = state.members.find((item) => item.id === memberId);
+    const row = report.rows.find((item) => item.memberId === memberId);
+    if (!member || !row) return [];
+    const html = expenseNoticeHtml({
+      member,
+      members: state.members,
+      expenses,
+      row,
+      transfers,
+      bankAccounts: state.bankAccounts ?? {},
+      origin,
+      scopeLabel,
+    });
+    return [{ member, html }];
+  });
+  try {
+    return await deliverExpenseMail(
+      recipients,
+      scopeLabel ? `באו חשבון · ${scopeLabel}` : "באו חשבון"
+    );
+  } catch (error) {
+    console.error("expense notice mail failed", error);
+    return { sent: 0, failed: recipients.length, skipped: 0 };
+  }
+}
 
 export async function POST(request: Request) {
   const me = await getSessionUser();
@@ -51,8 +93,12 @@ export async function POST(request: Request) {
       if (alert?.id === message.id) continue;
       void notifyChatPush(state, message);
     }
+    const mail =
+      body.type === "sendExpenseNotice" && pushed.length
+        ? await mailExpenseNotice(state, me, pushed, body.scope || SCOPE_ALL, inviteOrigin(request))
+        : undefined;
     const fresh = state.members.find((m) => m.id === me.id)!;
-    return NextResponse.json(toPublicState(state, fresh));
+    return NextResponse.json({ ...toPublicState(state, fresh), ...(mail ? { mail } : {}) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה";
     const status = message === "forbidden" ? 403 : 400;
@@ -557,13 +603,27 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       const payers = targets.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
       if (!payers.length) throw new Error(body.memberId ? "אין לו חוב בחשבון" : "אין מי שצריך לשלם");
       const scopeLabel = scope === SCOPE_ALL ? undefined : expenseScopeLabel(s, scope);
+      const since = Date.now() - NOTICE_REPEAT_MS;
+      let repeats = 0;
       for (const row of payers) {
         const channel = ensureDirectChannel(s, me.id, row.memberId);
+        const text = expenseNoticeText(s.members, expenses, row, { scopeLabel, transfers });
+        const repeat = s.messages.some(
+          (item) =>
+            item.channelId === channel.id &&
+            item.authorId === me.id &&
+            item.text === text &&
+            Date.parse(item.createdAt) > since
+        );
+        if (repeat) {
+          repeats += 1;
+          continue;
+        }
         const message: Message = {
           id: crypto.randomUUID(),
           channelId: channel.id,
           authorId: me.id,
-          text: expenseNoticeText(s.members, expenses, row, { scopeLabel, transfers }),
+          text,
           createdAt: new Date().toISOString(),
           reactions: {},
           attachments: [],
@@ -572,6 +632,7 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         s.messages.push(message);
         pushed.push(message);
       }
+      if (repeats === payers.length) throw new Error("החשבון הזה כבר נשלח לפני רגע");
       return;
     }
     case "addPayment": {
