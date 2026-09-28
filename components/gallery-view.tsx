@@ -213,12 +213,14 @@ export function GalleryView() {
         <div className="flex flex-col gap-8">
           {groups.map((group) => (
             <section key={group.id} className="flex flex-col gap-3">
-              <div className="flex items-baseline gap-2.5">
-                <h2 className="min-w-0 truncate text-[16px] font-normal">{group.title}</h2>
-                <span className="shrink-0 text-[12px] font-light text-muted-foreground">
-                  {group.date ? `${group.date} · ` : ""}
-                  {group.items.length} פריטים
-                </span>
+              <div className="flex items-center gap-2.5">
+                <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2.5">
+                  <h2 className="min-w-0 truncate text-[16px] font-normal">{group.title}</h2>
+                  <span className="shrink-0 text-[12px] font-light text-muted-foreground">
+                    {group.date ? `${group.date} · ` : ""}
+                    {group.items.length} פריטים
+                  </span>
+                </div>
                 <span className="ms-auto hidden shrink-0 -space-x-1.5 space-x-reverse sm:flex">
                   {[...new Set(group.items.map((item) => item.uploadedBy))].slice(0, 4).map((id) => (
                     <UserAvatar
@@ -230,7 +232,7 @@ export function GalleryView() {
                   ))}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-1 sm:grid-cols-4 sm:gap-1.5 md:grid-cols-5">
+              <div className="-mx-5 grid grid-cols-3 gap-[2px] sm:mx-0 sm:grid-cols-4 sm:gap-1.5 md:grid-cols-5">
                 {group.items.map((item) => (
                   <MediaTile
                     key={item.id}
@@ -355,7 +357,7 @@ function AlbumStrip({
   ];
 
   return (
-    <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:gap-3.5 md:px-0">
+    <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:mx-0 md:gap-3.5 md:px-0">
       <AlbumCard
         active={value === "all"}
         title="כל הגלריה"
@@ -402,16 +404,16 @@ function AlbumCard({
   children: React.ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className="w-32 shrink-0 text-start md:w-40">
+    <button type="button" onClick={onClick} aria-pressed={active} className="w-[6.75rem] shrink-0 text-start md:w-40">
       <div
         className={cn(
-          "h-[5.5rem] overflow-hidden rounded-2xl bg-[#e7eaee] outline-2 outline-offset-2 transition md:h-[6.75rem]",
+          "h-[4.75rem] overflow-hidden rounded-[12px] bg-[#e7eaee] outline-2 outline-offset-2 transition md:h-[6.75rem] md:rounded-[16px]",
           active ? "outline outline-primary" : "outline-transparent hover:opacity-90"
         )}
       >
         {children}
       </div>
-      <div className="mt-2 truncate text-[13px] font-normal">{title}</div>
+      <div className="mt-1.5 truncate text-[12.5px] font-normal md:mt-2 md:text-[13px]">{title}</div>
       <div className="truncate text-[11px] font-light text-muted-foreground">{sub}</div>
     </button>
   );
@@ -475,7 +477,7 @@ function MediaTile({
       type="button"
       onClick={onOpen}
       aria-label={item.caption || item.eventLabel}
-      className="group relative block aspect-square overflow-hidden rounded-lg bg-[#e7eaee] sm:rounded-xl"
+      className="group relative block aspect-square overflow-hidden bg-[#e7eaee] sm:rounded-[10px]"
     >
       {item.type === "image" ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -631,7 +633,7 @@ function Lightbox({
               <img
                 src={item.url}
                 alt={item.caption || item.eventLabel}
-                className="max-h-[calc(100dvh-16rem)] max-w-full rounded-lg object-contain md:max-h-[calc(100dvh-8.5rem)]"
+                className="max-h-[calc(100dvh-16rem)] max-w-full rounded-[6px] object-contain md:max-h-[calc(100dvh-8.5rem)]"
               />
             ) : item.type === "video" ? (
               <video
@@ -639,7 +641,7 @@ function Lightbox({
                 controls
                 autoPlay
                 playsInline
-                className="max-h-[calc(100dvh-16rem)] max-w-full rounded-lg md:max-h-[calc(100dvh-8.5rem)]"
+                className="max-h-[calc(100dvh-16rem)] max-w-full rounded-[6px] md:max-h-[calc(100dvh-8.5rem)]"
               />
             ) : (
               <div className="rounded-2xl bg-[#fbfcfd] px-6 py-8">
@@ -662,7 +664,7 @@ function Lightbox({
                 type="button"
                 onClick={() => onSelect(thumb.id)}
                 className={cn(
-                  "size-11 shrink-0 overflow-hidden rounded-md transition md:size-12",
+                  "size-11 shrink-0 overflow-hidden rounded-[6px] transition md:size-12",
                   thumb.id === item.id ? "opacity-100 outline-2 outline-offset-1 outline-white" : "opacity-40 hover:opacity-70"
                 )}
               >
@@ -673,7 +675,7 @@ function Lightbox({
         ) : null}
       </div>
 
-      <aside className="max-h-[42dvh] shrink-0 space-y-4 overflow-y-auto rounded-t-2xl bg-[#fbfcfd] px-5 py-5 md:max-h-none md:rounded-none md:px-6 md:py-7">
+      <aside className="max-h-[42dvh] shrink-0 space-y-4 overflow-y-auto rounded-t-[20px] bg-[#fbfcfd] px-5 py-5 md:max-h-none md:rounded-none md:px-6 md:py-7">
         <div>
           <p className="truncate text-[12px] font-light text-primary/85">
             {index + 1} מתוך {list.length} · {item.eventLabel}
