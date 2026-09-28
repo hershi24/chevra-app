@@ -3,6 +3,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { fileExtension, isActiveContent, mediaKind } from "@/lib/media-kind";
 import { isR2Enabled, uploadToR2 } from "@/lib/r2";
 import { saveMediaMeta } from "@/lib/supabase-media";
 
@@ -21,10 +22,11 @@ export async function POST(request: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const ext = path.extname(file.name) || mimeExt(file.type);
+  const active = isActiveContent(file.type, file.name);
+  const ext = active ? ".download" : safeExt(file.name) || mimeExt(file.type);
   const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
   const gatheringId = String(form.get("gatheringId") || "").trim() || undefined;
-  const kind = mediaKind(file.type);
+  const kind = mediaKind(file.type, file.name);
 
   let url: string;
   try {
@@ -32,7 +34,8 @@ export async function POST(request: Request) {
       url = await uploadToR2({
         key,
         body: bytes,
-        contentType: file.type,
+        contentType: active ? "application/octet-stream" : file.type,
+        downloadName: kind === "file" ? file.name : undefined,
       });
     } else {
       const dir = path.join(process.cwd(), "public", "uploads");
@@ -69,11 +72,9 @@ export async function POST(request: Request) {
   });
 }
 
-function mediaKind(type: string): "image" | "video" | "audio" | "file" {
-  if (type.startsWith("video")) return "video";
-  if (type.startsWith("audio")) return "audio";
-  if (type.startsWith("image")) return "image";
-  return "file";
+function safeExt(name: string) {
+  const ext = fileExtension(name);
+  return ext ? `.${ext}` : "";
 }
 
 function mimeExt(type: string) {

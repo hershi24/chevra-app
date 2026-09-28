@@ -18,7 +18,7 @@ export function MediaProgressOverlay({
   remainingSeconds,
   className,
   mediaClassName,
-  name: _name,
+  name,
   onReady,
 }: {
   src: string;
@@ -57,7 +57,11 @@ export function MediaProgressOverlay({
           <VoiceNotePlayer src={src} onReady={onReady} />
         </div>
       ) : (
-        <div className="flex h-32 items-center justify-center text-sm text-white/80">מעלה קובץ…</div>
+        <div className="flex h-24 items-start px-4 pt-3 text-sm text-white/85">
+          <span className="truncate" dir="auto">
+            {name || "קובץ"}
+          </span>
+        </div>
       )}
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white">
         <div className="text-2xl font-medium tabular-nums">{progress}%</div>

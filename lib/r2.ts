@@ -25,6 +25,7 @@ export async function uploadToR2(opts: {
   key: string;
   body: Buffer;
   contentType: string;
+  downloadName?: string;
 }) {
   const bucket = process.env.R2_BUCKET!;
   await client().send(
@@ -33,8 +34,17 @@ export async function uploadToR2(opts: {
       Key: opts.key,
       Body: opts.body,
       ContentType: opts.contentType || "application/octet-stream",
+      ...(opts.downloadName
+        ? {
+            ContentDisposition: `attachment; filename="${asciiName(opts.downloadName)}"; filename*=UTF-8''${encodeURIComponent(opts.downloadName)}`,
+          }
+        : {}),
     })
   );
   const base = process.env.R2_PUBLIC_URL!.replace(/\/$/, "");
   return `${base}/${opts.key}`;
+}
+
+function asciiName(name: string) {
+  return name.replace(/[^\x20-\x7e]+/g, "_").replace(/["\\]/g, "_") || "file";
 }

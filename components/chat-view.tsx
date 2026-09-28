@@ -30,6 +30,7 @@ import { useApp } from "@/components/app-provider";
 import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
 import { ChatSidebar, useChatReads } from "@/components/chat-sidebar";
+import { ChatFileCard } from "@/components/chat-file-card";
 import { ChatMediaGrid, isVisualAttachment } from "@/components/chat-media-grid";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PollCard } from "@/components/poll-card";
@@ -383,6 +384,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
             type: item.type,
             url: data.url,
             name: item.name,
+            size: item.file.size,
           };
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "העלאה נכשלה");
@@ -660,13 +662,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           isVisualAttachment(file) ? null : file.type === "audio" ? (
                             <VoiceNotePlayer key={file.id} src={file.url} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                           ) : (
-                            <a
-                              key={file.id}
-                              href={file.url}
-                              className="mt-2 inline-block text-xs underline"
-                            >
-                              {file.name}
-                            </a>
+                            <ChatFileCard key={file.id} file={file} className="mt-1.5 first:mt-0" />
                           )
                         )}
                         </div>
@@ -771,7 +767,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           name={item.name}
                           className={cn(
                             "min-h-0",
-                            pendingUploads.length === 1
+                            item.type === "file"
+                              ? "col-span-2 h-24 rounded-2xl"
+                              : pendingUploads.length === 1
                               ? "aspect-square rounded-2xl"
                               : pendingUploads.length % 2 === 1 && index === 0
                                 ? "col-span-2 aspect-[2/1] rounded-xl"
@@ -808,7 +806,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   <input
                     ref={fileRef}
                     type="file"
-                    accept="image/*,video/*,audio/*"
                     className="hidden"
                     multiple
                     onChange={(e) => void attach(e.target.files)}
