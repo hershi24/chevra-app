@@ -161,8 +161,11 @@ insert into public.settings (id) values (1) on conflict do nothing;
 create table if not exists public.expense_ledger (
   id int primary key default 1 check (id = 1),
   visible boolean not null default true,
-  items jsonb not null default '[]'::jsonb
+  items jsonb not null default '[]'::jsonb,
+  payments jsonb not null default '[]'::jsonb
 );
+
+alter table public.expense_ledger add column if not exists payments jsonb not null default '[]'::jsonb;
 
 alter table public.expense_ledger enable row level security;
 
@@ -193,3 +196,12 @@ create table if not exists public.chat_reads (
 );
 
 alter table public.chat_reads enable row level security;
+
+create table if not exists public.member_bank_accounts (
+  member_id text primary key references public.members(id) on delete cascade,
+  details jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+-- No policies: only the server (service role) reads or writes bank details.
+alter table public.member_bank_accounts enable row level security;

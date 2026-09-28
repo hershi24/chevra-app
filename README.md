@@ -74,6 +74,8 @@ R2_PUBLIC_URL
 
 לספירת הודעות שלא נקראו בצ׳אט הריצו גם את `supabase/migrations/20260927230000_chat_reads.sql`.
 
+לסימון תשלומים ולפרטי חשבון בנק בבאו חשבון הריצו גם את `supabase/migrations/20260928090000_expense_payments_bank.sql`.
+
 ### מייל אמיתי
 
 הגדירו `RESEND_API_KEY` ו־`RESEND_FROM`. בלי המפתח, המנהל מקבל קישורים לבדיקה במסך ההגדרות.

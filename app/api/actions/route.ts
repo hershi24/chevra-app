@@ -4,10 +4,20 @@ import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
-import { canEditExpense, expenseNoticeText, expensesOpen, parseShekels, settlement } from "@/lib/expenses";
+import {
+  SCOPE_ALL,
+  canEditExpense,
+  canEditPayment,
+  expenseNoticeText,
+  expensesOpen,
+  parseBankAccount,
+  parseShekels,
+  scopedSettlement,
+} from "@/lib/expenses";
+import { gatheringLabel } from "@/lib/format";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { updateState, toPublicState } from "@/lib/store";
-import type { AppState, Channel, Expense, Gathering, Member, Message, Role } from "@/lib/types";
+import type { AppState, Channel, Expense, ExpensePayment, Gathering, Member, Message, Role } from "@/lib/types";
 import { notifyChatPush } from "@/lib/web-push";
 
 export const runtime = "nodejs";
@@ -128,6 +138,9 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       s.tokens = s.tokens.filter((token) => token.eventId !== event.id);
       s.emailLog = s.emailLog.filter((entry) => entry.eventId !== event.id);
       s.ivrLog = s.ivrLog.filter((entry) => entry.eventId !== event.id);
+      for (const item of [...(s.expenses ?? []), ...(s.payments ?? [])]) {
+        if (item.eventId === event.id) delete item.eventId;
+      }
       return;
     }
     case "uploadMedia": {
@@ -417,6 +430,10 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         delete event.rsvps[member.id];
       }
       s.expenses = (s.expenses ?? []).filter((item) => item.memberId !== member.id);
+      s.payments = (s.payments ?? []).filter(
+        (item) => item.fromId !== member.id && item.toId !== member.id
+      );
+      if (s.bankAccounts) delete s.bankAccounts[member.id];
       return;
     }
     case "changePassword": {
@@ -465,22 +482,37 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       assertExpensesOpen(s);
       const member = s.members.find((item) => item.id === body.memberId);
       if (!member) throw new Error("החבר לא נמצא");
-      const title = body.title.trim();
-      if (!title) throw new Error("נא לכתוב מה נקנה");
-      if (title.length > 80) throw new Error("התיאור ארוך מדי");
-      const detail = body.detail?.trim() ?? "";
-      if (detail.length > 400) throw new Error("הפירוט ארוך מדי");
       const expense: Expense = {
         id: crypto.randomUUID(),
         memberId: member.id,
         createdBy: me.id,
-        title,
-        detail,
+        title: expenseTitle(body.title),
+        detail: expenseDetail(body.detail),
         amount: parseShekels(body.amount),
         excluded: Boolean(body.excluded),
+        ...scopeEvent(s, body.eventId),
         createdAt: new Date().toISOString(),
       };
       s.expenses = [...(s.expenses ?? []), expense];
+      return;
+    }
+    case "updateExpense": {
+      assertExpensesOpen(s);
+      const expense = findExpense(s, body.expenseId);
+      if (!canEditExpense(me, expense)) throw new Error("forbidden");
+      const patch = body.patch;
+      if (patch.memberId !== undefined) {
+        if (!s.members.some((item) => item.id === patch.memberId)) throw new Error("החבר לא נמצא");
+        expense.memberId = patch.memberId;
+      }
+      if (patch.title !== undefined) expense.title = expenseTitle(patch.title);
+      if (patch.detail !== undefined) expense.detail = expenseDetail(patch.detail);
+      if (patch.amount !== undefined) expense.amount = parseShekels(patch.amount);
+      if (patch.excluded !== undefined) expense.excluded = Boolean(patch.excluded);
+      if (patch.eventId !== undefined) {
+        delete expense.eventId;
+        Object.assign(expense, scopeEvent(s, patch.eventId));
+      }
       return;
     }
     case "setExpenseExcluded": {
@@ -506,19 +538,21 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       assertExpensesOpen(s);
       if (!isAdmin(me) || !can(me, "chat")) throw new Error("forbidden");
       if (body.memberId === me.id) throw new Error("אי אפשר לשלוח את החשבון לעצמך");
-      const report = settlement(s.expenses ?? [], s.members.map((member) => member.id));
+      const scope = body.scope || SCOPE_ALL;
+      const { expenses, report, transfers } = scopedSettlement(s, scope);
       const targets = body.memberId
         ? report.rows.filter((row) => row.memberId === body.memberId)
         : report.rows.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
       const payers = targets.filter((row) => row.owesAgorot > 0 && row.memberId !== me.id);
       if (!payers.length) throw new Error(body.memberId ? "אין לו חוב בחשבון" : "אין מי שצריך לשלם");
+      const scopeLabel = noticeScopeLabel(s, scope);
       for (const row of payers) {
         const channel = ensureDirectChannel(s, me.id, row.memberId);
         const message: Message = {
           id: crypto.randomUUID(),
           channelId: channel.id,
           authorId: me.id,
-          text: expenseNoticeText(s.members, s.expenses ?? [], row),
+          text: expenseNoticeText(s.members, expenses, row, { scopeLabel, transfers }),
           createdAt: new Date().toISOString(),
           reactions: {},
           attachments: [],
@@ -529,6 +563,58 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       }
       return;
     }
+    case "addPayment": {
+      assertExpensesOpen(s);
+      const payment: ExpensePayment = {
+        id: crypto.randomUUID(),
+        ...paymentParties(s, body.fromId, body.toId),
+        amount: parseShekels(body.amount),
+        ...scopeEvent(s, body.eventId),
+        note: paymentNote(body.note),
+        createdBy: me.id,
+        createdAt: new Date().toISOString(),
+      };
+      if (!isAdmin(me) && payment.fromId !== me.id && payment.toId !== me.id) {
+        throw new Error("אפשר לסמן רק תשלום שלך");
+      }
+      s.payments = [...(s.payments ?? []), payment];
+      return;
+    }
+    case "updatePayment": {
+      assertExpensesOpen(s);
+      const payment = findPayment(s, body.paymentId);
+      if (!canEditPayment(me, payment)) throw new Error("forbidden");
+      const patch = body.patch;
+      const parties = paymentParties(s, patch.fromId ?? payment.fromId, patch.toId ?? payment.toId);
+      if (!isAdmin(me) && parties.fromId !== me.id && parties.toId !== me.id) {
+        throw new Error("אפשר לסמן רק תשלום שלך");
+      }
+      Object.assign(payment, parties);
+      if (patch.amount !== undefined) payment.amount = parseShekels(patch.amount);
+      if (patch.note !== undefined) payment.note = paymentNote(patch.note);
+      if (patch.eventId !== undefined) {
+        delete payment.eventId;
+        Object.assign(payment, scopeEvent(s, patch.eventId));
+      }
+      return;
+    }
+    case "deletePayment": {
+      assertExpensesOpen(s);
+      const payment = findPayment(s, body.paymentId);
+      if (!canEditPayment(me, payment)) throw new Error("forbidden");
+      s.payments = (s.payments ?? []).filter((item) => item.id !== payment.id);
+      return;
+    }
+    case "setBankAccount": {
+      if (body.memberId !== me.id && !isAdmin(me)) throw new Error("forbidden");
+      if (!s.members.some((item) => item.id === body.memberId)) throw new Error("החבר לא נמצא");
+      const account = body.account ? parseBankAccount(body.account) : null;
+      const accounts = { ...(s.bankAccounts ?? {}) };
+      if (account) accounts[body.memberId] = account;
+      else delete accounts[body.memberId];
+      s.bankAccounts = accounts;
+      return;
+    }
     default:
       throw new Error("פעולה לא מוכרת");
   }
@@ -536,6 +622,51 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
 
 function assertExpensesOpen(state: AppState) {
   if (!expensesOpen(state)) throw new Error("הדף מוסתר");
+}
+
+function expenseTitle(value: string) {
+  const title = String(value ?? "").trim();
+  if (!title) throw new Error("נא לכתוב מה נקנה");
+  if (title.length > 80) throw new Error("התיאור ארוך מדי");
+  return title;
+}
+
+function expenseDetail(value?: string) {
+  const detail = String(value ?? "").trim();
+  if (detail.length > 400) throw new Error("הפירוט ארוך מדי");
+  return detail;
+}
+
+function paymentNote(value?: string) {
+  const note = String(value ?? "").trim();
+  if (note.length > 200) throw new Error("ההערה ארוכה מדי");
+  return note;
+}
+
+function scopeEvent(state: AppState, eventId?: string | null): { eventId?: string } {
+  if (!eventId) return {};
+  if (!state.gatherings.some((event) => event.id === eventId)) throw new Error("החברה לא נמצאה");
+  return { eventId };
+}
+
+function paymentParties(state: AppState, fromId: string, toId: string) {
+  if (!state.members.some((item) => item.id === fromId)) throw new Error("החבר לא נמצא");
+  if (!state.members.some((item) => item.id === toId)) throw new Error("החבר לא נמצא");
+  if (fromId === toId) throw new Error("המשלם והמקבל אותו אדם");
+  return { fromId, toId };
+}
+
+function noticeScopeLabel(state: AppState, scope: string) {
+  if (scope === SCOPE_ALL) return undefined;
+  if (scope === "none") return "ללא שיוך לחברה";
+  const event = state.gatherings.find((item) => item.id === scope);
+  return event ? gatheringLabel(event) : undefined;
+}
+
+function findPayment(state: AppState, paymentId: string) {
+  const payment = (state.payments ?? []).find((item) => item.id === paymentId);
+  if (!payment) throw new Error("התשלום לא נמצא");
+  return payment;
 }
 
 function findExpense(state: AppState, expenseId: string) {

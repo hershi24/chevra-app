@@ -113,7 +113,29 @@ export type Expense = {
   detail: string;
   amount: number;
   excluded: boolean;
+  eventId?: string;
   createdAt: string;
+};
+
+export type ExpensePayment = {
+  id: string;
+  fromId: string;
+  toId: string;
+  amount: number;
+  eventId?: string;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type BankAccount = {
+  holder: string;
+  bank: string;
+  branch: string;
+  account: string;
+  phone: string;
+  note: string;
+  updatedAt: string;
 };
 
 export type AppSettings = {
@@ -158,6 +180,8 @@ export type AppState = {
   tokens: RsvpToken[];
   settings: AppSettings;
   expenses: Expense[];
+  payments?: ExpensePayment[];
+  bankAccounts?: Record<string, BankAccount>;
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
   chatReads?: Record<string, Record<string, string>>;
