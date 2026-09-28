@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Copy, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,14 @@ const selectClass =
 
 function fail(fallback: string) {
   return (error: unknown) => toast.error(error instanceof Error ? error.message : fallback);
+}
+
+function noticeSent(base: string) {
+  return (data: unknown) => {
+    const sent = (data as { mail?: { sent: number } } | undefined)?.mail?.sent ?? 0;
+    if (!sent) return void toast.success(base);
+    toast.success(`${base} · ${sent === 1 ? "נשלח גם מייל" : `נשלחו גם ${sent} מיילים`}`);
+  };
 }
 
 function eventName(gatherings: Gathering[], id?: string) {
@@ -261,6 +269,8 @@ function StatusCard({
   const { act } = useApp();
   const admin = isAdmin(me);
   const [open, setOpen] = useState<{ key: string; method: PaymentMethod } | null>(null);
+  const [sending, setSending] = useState(false);
+  const busy = useRef(false);
   const row = report.rows.find((item) => item.memberId === me.id);
   const name = (id: string) => memberById(members, id)?.displayName ?? "חבר";
   const toPay = transfers.filter((item) => item.fromId === me.id);
@@ -431,14 +441,22 @@ function StatusCard({
           {debtors ? (
             <button
               type="button"
-              onClick={() =>
+              disabled={sending}
+              onClick={() => {
+                if (busy.current) return;
+                busy.current = true;
+                setSending(true);
                 void act({ type: "sendExpenseNotice", scope })
-                  .then(() => toast.success("נשלח לכל מי שצריך לשלם"))
+                  .then(noticeSent("נשלח לכל מי שצריך לשלם"))
                   .catch(fail("השליחה נכשלה"))
-              }
-              className="rounded-full border border-white/25 px-4 py-1.5 text-[13px] hover:bg-white/10"
+                  .finally(() => {
+                    busy.current = false;
+                    setSending(false);
+                  });
+              }}
+              className="rounded-full border border-white/25 px-4 py-1.5 text-[13px] hover:bg-white/10 disabled:opacity-60"
             >
-              שליחה אישית לכל החייבים
+              {sending ? "שולח…" : "שליחה אישית לכל החייבים"}
             </button>
           ) : null}
         </div>
@@ -776,6 +794,8 @@ function MembersTab({
   const { act } = useApp();
   const admin = isAdmin(me);
   const [open, setOpen] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const busy = useRef(false);
 
   return (
     <div className="space-y-5">
@@ -817,13 +837,21 @@ function MembersTab({
                   size="sm"
                   variant="outline"
                   className="shrink-0 rounded-full"
-                  onClick={() =>
+                  disabled={sending !== null}
+                  onClick={() => {
+                    if (busy.current) return;
+                    busy.current = true;
+                    setSending(row.memberId);
                     void act({ type: "sendExpenseNotice", memberId: row.memberId, scope })
-                      .then(() => toast.success(`נשלח ל${member?.displayName ?? "חבר"}`))
+                      .then(noticeSent(`נשלח ל${member?.displayName ?? "חבר"}`))
                       .catch(fail("השליחה נכשלה"))
-                  }
+                      .finally(() => {
+                        busy.current = false;
+                        setSending(null);
+                      });
+                  }}
                 >
-                  שלח
+                  {sending === row.memberId ? "שולח…" : "שלח"}
                 </Button>
               ) : null}
             </div>
