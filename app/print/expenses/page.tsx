@@ -14,9 +14,11 @@ function money(value: number) {
   return formatShekels(value);
 }
 
-const th = "border-b border-[#a9782c] bg-[#f5f0e7] px-2 py-1.5 text-start font-medium";
+const th = "border-b border-[#a9782c] bg-[#f5f0e7] px-2 py-1.5 font-medium";
 const td = "border-b border-[#e3e7ec] px-2 py-1.5 align-top";
 const num = "whitespace-nowrap text-end tabular-nums";
+const thText = `${th} text-start`;
+const thNum = `${th} ${num}`;
 
 export default async function PrintExpensesPage({
   searchParams,
@@ -71,12 +73,12 @@ export default async function PrintExpensesPage({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={th}>חבר</th>
-              <th className={`${th} ${num}`}>קנה</th>
-              <th className={`${th} ${num}`}>החלק שלו</th>
-              <th className={`${th} ${num}`}>העביר</th>
-              <th className={`${th} ${num}`}>קיבל</th>
-              <th className={`${th} ${num}`}>יתרה</th>
+              <th className={thText}>חבר</th>
+              <th className={thNum}>קנה</th>
+              <th className={thNum}>החלק שלו</th>
+              <th className={thNum}>העביר</th>
+              <th className={thNum}>קיבל</th>
+              <th className={thNum}>יתרה</th>
             </tr>
           </thead>
           <tbody>
@@ -104,9 +106,9 @@ export default async function PrintExpensesPage({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className={th}>מי מעביר</th>
-                <th className={th}>למי</th>
-                <th className={`${th} ${num}`}>סכום</th>
+                <th className={thText}>מי מעביר</th>
+                <th className={thText}>למי</th>
+                <th className={thNum}>סכום</th>
               </tr>
             </thead>
             <tbody>
@@ -128,11 +130,11 @@ export default async function PrintExpensesPage({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className={th}>תאריך</th>
-                <th className={th}>מה נקנה</th>
-                <th className={th}>מי קנה</th>
-                {report.showEvent ? <th className={th}>חברה</th> : null}
-                <th className={`${th} ${num}`}>סכום</th>
+                <th className={thText}>תאריך</th>
+                <th className={thText}>מה נקנה</th>
+                <th className={thText}>מי קנה</th>
+                {report.showEvent ? <th className={thText}>חברה</th> : null}
+                <th className={thNum}>סכום</th>
               </tr>
             </thead>
             <tbody>
@@ -166,12 +168,12 @@ export default async function PrintExpensesPage({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className={th}>תאריך</th>
-                <th className={th}>מי שילם</th>
-                <th className={th}>למי</th>
-                <th className={th}>איך</th>
-                {report.showEvent ? <th className={th}>חברה</th> : null}
-                <th className={`${th} ${num}`}>סכום</th>
+                <th className={thText}>תאריך</th>
+                <th className={thText}>מי שילם</th>
+                <th className={thText}>למי</th>
+                <th className={thText}>איך</th>
+                {report.showEvent ? <th className={thText}>חברה</th> : null}
+                <th className={thNum}>סכום</th>
               </tr>
             </thead>
             <tbody>

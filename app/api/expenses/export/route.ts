@@ -86,7 +86,11 @@ export async function GET(request: NextRequest) {
 
   const scope = reportScope(state, request.nextUrl.searchParams.get("scope"));
   const report = buildExpenseReport(state, scope);
-  const stamp = new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
+  const stamp = new Intl.DateTimeFormat("he-IL", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Jerusalem",
+  }).format(new Date());
   const subtitle = `${report.groupName} · ${report.scopeLabel} · הופק ${stamp}`;
 
   const book = new ExcelJS.Workbook();
