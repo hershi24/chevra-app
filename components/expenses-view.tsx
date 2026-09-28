@@ -319,7 +319,12 @@ function StatusCard({
           )}
         >
           {headline.text}
-          {facts.length ? <span className="text-white/55"> · {facts.join(", ")}</span> : null}
+          {facts.map((fact, index) => (
+            <span key={fact} className="text-white/55">
+              {index === 0 ? " · " : ", "}
+              <span className="whitespace-nowrap">{fact}</span>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -376,7 +381,10 @@ function StatusCard({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <UserAvatar member={memberById(members, item.fromId)} size="sm" />
-                    <span className="truncate text-[14px]">{name(item.fromId)} יעביר לך</span>
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px]">{name(item.fromId)}</div>
+                      <div className="text-[12px] font-light text-white/55">יעביר לך</div>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="text-[14px] tabular-nums">{formatAgorot(item.amountAgorot)}</span>
