@@ -64,6 +64,7 @@ export type Attachment = {
   type: MediaType | "file";
   url: string;
   name: string;
+  size?: number;
 };
 
 export type PollOption = {

@@ -18,7 +18,7 @@ export function MediaProgressOverlay({
   remainingSeconds,
   className,
   mediaClassName,
-  name: _name,
+  name,
   onReady,
 }: {
   src: string;
@@ -30,6 +30,28 @@ export function MediaProgressOverlay({
   name?: string;
   onReady?: () => void;
 }) {
+  if (type === "file") {
+    return (
+      <div
+        data-upload-progress=""
+        className={cn("flex flex-col justify-center gap-2 bg-[#1f2328] px-4 text-white", className)}
+      >
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="truncate" dir="auto">
+            {name || "קובץ"}
+          </span>
+          <span className="shrink-0 tabular-nums">{progress}%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/25">
+          <div
+            className="h-full rounded-full bg-white transition-[width] duration-150"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="text-[12px] font-light text-white/70">{formatUploadRemaining(remainingSeconds)}</div>
+      </div>
+    );
+  }
   return (
     <div
       data-upload-progress=""

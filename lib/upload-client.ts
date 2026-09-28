@@ -1,3 +1,5 @@
+import { mediaKind } from "./media-kind";
+
 export type UploadResult = {
   id?: string;
   url: string;
@@ -18,13 +20,6 @@ export type LocalUpload = {
   type: "image" | "video" | "audio" | "file";
   name: string;
 };
-
-export function mediaKind(type: string): LocalUpload["type"] {
-  if (type.startsWith("video")) return "video";
-  if (type.startsWith("audio")) return "audio";
-  if (type.startsWith("image")) return "image";
-  return "file";
-}
 
 export function preloadMedia(url: string, type: LocalUpload["type"]) {
   return new Promise<void>((resolve) => {
@@ -62,7 +57,7 @@ export function createLocalUpload(file: File): LocalUpload {
     id: crypto.randomUUID(),
     file,
     previewUrl: URL.createObjectURL(file),
-    type: mediaKind(file.type),
+    type: mediaKind(file.type, file.name),
     name: file.name,
   };
 }
