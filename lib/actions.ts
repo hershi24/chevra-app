@@ -1,4 +1,4 @@
-import type { BankAccount, Gathering, Message, Role, RsvpStatus } from "./types";
+import type { BankAccount, Gathering, Message, PaymentMethod, Role, RsvpStatus } from "./types";
 
 export type ActionBody =
   | { type: "rsvp"; eventId: string; status: RsvpStatus }
@@ -92,13 +92,21 @@ export type ActionBody =
       fromId: string;
       toId: string;
       amount: number;
+      method?: PaymentMethod | null;
       eventId?: string | null;
       note?: string;
     }
   | {
       type: "updatePayment";
       paymentId: string;
-      patch: { fromId?: string; toId?: string; amount?: number; eventId?: string | null; note?: string };
+      patch: {
+        fromId?: string;
+        toId?: string;
+        amount?: number;
+        method?: PaymentMethod | null;
+        eventId?: string | null;
+        note?: string;
+      };
     }
   | { type: "deletePayment"; paymentId: string }
   | { type: "setBankAccount"; memberId: string; account: Partial<BankAccount> | null };

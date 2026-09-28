@@ -117,11 +117,14 @@ export type Expense = {
   createdAt: string;
 };
 
+export type PaymentMethod = "cash" | "transfer";
+
 export type ExpensePayment = {
   id: string;
   fromId: string;
   toId: string;
   amount: number;
+  method?: PaymentMethod;
   eventId?: string;
   note: string;
   createdBy: string;

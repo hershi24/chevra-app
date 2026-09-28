@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { BankAccounts, BankLines } from "@/components/bank-accounts";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  PAYMENT_METHODS,
   SCOPE_ALL,
   SCOPE_NONE,
   canEditExpense,
@@ -18,6 +19,7 @@ import {
   expensesOpen,
   formatAgorot,
   formatShekels,
+  paymentMethodLabel,
   scopedSettlement,
   type ExpenseScope,
   type Transfer,
@@ -25,10 +27,12 @@ import {
 import { formatDateShortHe, gatheringLabel, memberById } from "@/lib/format";
 import { isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { BankAccount, Expense, ExpensePayment, Gathering, Member } from "@/lib/types";
+import type { BankAccount, Expense, ExpensePayment, Gathering, Member, PaymentMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const panel = "rounded-[20px] border border-[#d5dbe3] bg-[#fbfcfd]";
+const exportLink =
+  "inline-flex items-center gap-1.5 rounded-full border border-[#dfe3e8] bg-[#fbfcfd] px-3.5 py-1.5 text-[13px] text-foreground/80 hover:text-foreground";
 const selectClass =
   "h-8 w-full rounded-[10px] border border-input bg-transparent px-2.5 text-sm text-foreground";
 
@@ -91,13 +95,30 @@ export function ExpensesView() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 md:gap-8">
-      <header>
-        <p className="text-[13px] font-light text-muted-foreground">כל חבר רושם מה שקנה ומה ששילם</p>
-        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">באו חשבון</h1>
-        <p className="mt-2 max-w-2xl text-sm font-light leading-6 text-muted-foreground">
-          הסכום שנכנס לחשבון מתחלק שווה בשווה. מה שכל אחד קנה ומה שכבר העביר יורד מהחלק שלו. סכום מוחרג לא נכנס
-          לחלוקה.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0 flex-1 basis-[22rem]">
+          <p className="text-[13px] font-light text-muted-foreground">כל חבר רושם מה שקנה ומה ששילם</p>
+          <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">באו חשבון</h1>
+          <p className="mt-2 max-w-2xl text-sm font-light leading-6 text-muted-foreground">
+            הסכום שנכנס לחשבון מתחלק שווה בשווה. מה שכל אחד קנה ומה שכבר העביר יורד מהחלק שלו. סכום מוחרג לא
+            נכנס לחלוקה.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <a href={`/api/expenses/export?scope=${encodeURIComponent(scope)}`} download className={exportLink}>
+            <FileSpreadsheet className="size-4 text-[#3d8f62]" />
+            אקסל
+          </a>
+          <a
+            href={`/print/expenses?scope=${encodeURIComponent(scope)}`}
+            target="_blank"
+            rel="noopener"
+            className={exportLink}
+          >
+            <FileText className="size-4 text-[#a4453a]" />
+            PDF להדפסה
+          </a>
+        </div>
       </header>
 
       <nav
@@ -258,6 +279,7 @@ export function ExpensesView() {
             transfers={transfers}
             members={state.members}
             accounts={accounts}
+            gatherings={gatherings}
             me={me}
             eventId={scopeEventId}
           />
@@ -273,18 +295,19 @@ function TransfersPanel({
   transfers,
   members,
   accounts,
+  gatherings,
   me,
   eventId,
 }: {
   transfers: Transfer[];
   members: Member[];
   accounts: Record<string, BankAccount>;
+  gatherings: Gathering[];
   me: Member;
   eventId?: string;
 }) {
-  const { act } = useApp();
   const admin = isAdmin(me);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const mine = transfers.filter((item) => item.fromId === me.id || item.toId === me.id);
   const list = admin ? transfers : mine;
 
@@ -323,30 +346,25 @@ function TransfersPanel({
                     <p className="mt-1 text-xs font-light text-[#9aa1ab]">{to} עדיין לא מילא פרטי חשבון</p>
                   )
                 ) : null}
-                {canMark ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 rounded-full"
-                    disabled={busy === key}
-                    onClick={async () => {
-                      setBusy(key);
-                      try {
-                        await act({
-                          type: "addPayment",
-                          fromId: item.fromId,
-                          toId: item.toId,
-                          amount: item.amountAgorot / 100,
-                          eventId: eventId ?? null,
-                        });
-                        toast.success("התשלום סומן");
-                      } catch (error) {
-                        fail("הסימון נכשל")(error);
-                      } finally {
-                        setBusy(null);
-                      }
-                    }}
-                  >
+                {canMark && open === key ? (
+                  <div className="mt-2">
+                    <PaymentForm
+                      members={members}
+                      gatherings={gatherings}
+                      me={me}
+                      title="למי שולם ואיך"
+                      initial={{
+                        fromId: item.fromId,
+                        toId: item.toId,
+                        amount: item.amountAgorot / 100,
+                        eventId,
+                        method: "transfer",
+                      }}
+                      onDone={() => setOpen(null)}
+                    />
+                  </div>
+                ) : canMark ? (
+                  <Button size="sm" variant="outline" className="mt-2 rounded-full" onClick={() => setOpen(key)}>
                     {iPay ? "סימנתי ששילמתי" : item.toId === me.id ? "קיבלתי" : "סימון כשולם"}
                   </Button>
                 ) : null}
@@ -394,7 +412,7 @@ function PaymentsPanel({
           members={members}
           gatherings={gatherings}
           me={me}
-          initial={{ fromId: me.id, eventId: defaultEventId }}
+          initial={{ fromId: me.id, eventId: defaultEventId, method: "transfer" }}
           onDone={() => setAdding(false)}
         />
       ) : null}
@@ -420,7 +438,12 @@ function PaymentsPanel({
         const from = memberById(members, payment.fromId)?.displayName ?? "חבר";
         const to = memberById(members, payment.toId)?.displayName ?? "חבר";
         const where = showEvent ? eventName(gatherings, payment.eventId) : null;
-        const meta = [formatDateShortHe(payment.createdAt), where, payment.note.trim()].filter(Boolean);
+        const meta = [
+          formatDateShortHe(payment.createdAt),
+          paymentMethodLabel(payment.method),
+          where,
+          payment.note.trim(),
+        ].filter(Boolean);
         return (
           <article key={payment.id} className={cn(panel, "rounded-[16px] px-4 py-3")}>
             <div className="flex items-start justify-between gap-3">
@@ -463,6 +486,7 @@ function PaymentForm({
   gatherings,
   me,
   payment,
+  title,
   initial,
   onDone,
 }: {
@@ -470,6 +494,7 @@ function PaymentForm({
   gatherings: Gathering[];
   me: Member;
   payment?: ExpensePayment;
+  title?: string;
   initial: Partial<ExpensePayment>;
   onDone: () => void;
 }) {
@@ -482,6 +507,7 @@ function PaymentForm({
   const [amount, setAmount] = useState(initial.amount ? String(initial.amount) : "");
   const [eventId, setEventId] = useState(initial.eventId ?? "");
   const [note, setNote] = useState(initial.note ?? "");
+  const [method, setMethod] = useState<PaymentMethod | "">(initial.method ?? "");
   const [saving, setSaving] = useState(false);
   const toChoices = members.filter(
     (member) => member.id !== fromId && (admin || fromId === me.id || member.id === me.id)
@@ -502,7 +528,14 @@ function PaymentForm({
         if (saving) return;
         setSaving(true);
         try {
-          const fields = { fromId, toId, amount: Number(amount), eventId: eventId || null, note };
+          const fields = {
+            fromId,
+            toId,
+            amount: Number(amount),
+            method: method || null,
+            eventId: eventId || null,
+            note,
+          };
           if (payment) await act({ type: "updatePayment", paymentId: payment.id, patch: fields });
           else await act({ type: "addPayment", ...fields });
           toast.success(payment ? "התשלום עודכן" : "התשלום סומן");
@@ -514,6 +547,7 @@ function PaymentForm({
         }
       }}
     >
+      {title ? <div className="text-sm font-medium">{title}</div> : null}
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="grid gap-1 text-xs font-light text-muted-foreground">
           מי שילם
@@ -549,7 +583,34 @@ function PaymentForm({
         </label>
         <GatheringSelect gatherings={gatherings} value={eventId} onChange={setEventId} />
       </div>
-      <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="הערה, למשל בביט" maxLength={200} />
+      <div className="grid gap-1 text-xs font-light text-muted-foreground">
+        איך שולם
+        <div role="radiogroup" aria-label="איך שולם" className="flex gap-2">
+          {PAYMENT_METHODS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={method === option.id}
+              onClick={() => setMethod(method === option.id ? "" : option.id)}
+              className={cn(
+                "rounded-full border px-4 py-1.5 text-[13px] transition-colors",
+                method === option.id
+                  ? "border-[#a9782c] bg-[#f5f0e7] text-[#7d5a22]"
+                  : "border-[#dfe3e8] text-foreground/75 hover:text-foreground"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Input
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        placeholder="הערה, למשל בביט או מספר אסמכתא"
+        maxLength={200}
+      />
       <div className="flex gap-2">
         <Button type="submit" className="rounded-full" disabled={saving || !toId}>
           {payment ? "שמירה" : "סימון"}
