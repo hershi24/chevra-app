@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Copy,
   Ellipsis,
   Forward,
   Hash,
@@ -1013,6 +1014,23 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     {deletePreview(menuMessage)}
                   </p>
                   <div className="mt-4 flex flex-col gap-2">
+                    {copyableText(menuMessage) ? (
+                      <Button
+                        className="h-12 w-full rounded-xl"
+                        variant="outline"
+                        onClick={() => {
+                          const text = copyableText(menuMessage);
+                          setMenuMessage(null);
+                          void copyText(text).then(
+                            () => toast.success("ההודעה הועתקה"),
+                            () => toast.error("ההעתקה נכשלה")
+                          );
+                        }}
+                      >
+                        <Copy data-icon="inline-start" />
+                        העתקה
+                      </Button>
+                    ) : null}
                     {menuMessage.authorId === me.id ? (
                       <Button className="h-12 w-full rounded-xl" variant="outline" onClick={() => beginEdit(menuMessage)}>
                         <Pencil data-icon="inline-start" />
@@ -1344,6 +1362,30 @@ function sameMinute(a: string, b: string) {
 function onlineLabel(count: number) {
   if (count === 1) return "מחובר אחד כעת";
   return `${count} מחוברים כעת`;
+}
+
+function copyableText(message: Message) {
+  if (message.poll) {
+    return [message.poll.question, ...message.poll.options.map((option) => `• ${option.label}`)].join("\n");
+  }
+  return message.text.trim() ? message.text : "";
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  const ok = document.execCommand("copy");
+  area.remove();
+  if (!ok) throw new Error("copy failed");
 }
 
 function deletePreview(message: Message) {
