@@ -251,6 +251,7 @@ function MemberRow({
   });
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const isMe = member.id === meId;
 
   function syncDraft() {
@@ -292,6 +293,7 @@ function MemberRow({
     setSaving(true);
     try {
       await act({ type: "resetMemberPassword", memberId: member.id });
+      setConfirmReset(false);
       toast.success("הסיסמה אופסה ל-1234. בכניסה הבאה תופיע בקשה להחליף.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "האיפוס נכשל");
@@ -340,6 +342,20 @@ function MemberRow({
           >
             <Copy />
           </Button>
+          {!isMe ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="איפוס סיסמה"
+              title="איפוס סיסמה"
+              aria-expanded={confirmReset}
+              className={cn("rounded-xl", confirmReset && "bg-[#f5f0e7] text-primary hover:bg-[#f5f0e7]")}
+              onClick={() => setConfirmReset((value) => !value)}
+            >
+              <KeyRound />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -356,6 +372,33 @@ function MemberRow({
           </Button>
         </div>
       </div>
+
+      {confirmReset && !isMe ? (
+        <div className="mx-3 mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#ecdcc0] bg-[#f5f0e7] px-3.5 py-3 md:flex-nowrap">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-primary">
+            <KeyRound className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px]">לאפס את הסיסמה של {member.displayName.split(" ")[0]}?</div>
+            <div className="text-[12.5px] font-light text-[#6b5a40]">
+              הסיסמה תחזור ל־1234, ובכניסה הבאה הוא יתבקש לבחור סיסמה חדשה.
+            </div>
+          </div>
+          <div className="flex w-full shrink-0 gap-1 md:w-auto">
+            <Button
+              type="button"
+              className="h-9 flex-1 rounded-full px-5 md:flex-none"
+              disabled={saving}
+              onClick={() => void resetPassword()}
+            >
+              {saving ? "מאפס…" : "איפוס ל־1234"}
+            </Button>
+            <Button type="button" variant="ghost" className="h-9 rounded-full" onClick={() => setConfirmReset(false)}>
+              ביטול
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {open ? (
         <div className="grid gap-2.5 px-3.5 pb-4 md:grid-cols-2 md:px-4.5">
@@ -393,16 +436,18 @@ function MemberRow({
               ביטול
             </Button>
             <div className="ms-auto flex flex-wrap items-center gap-1.5">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-9 rounded-full text-muted-foreground"
-                disabled={saving}
-                onClick={() => void resetPassword()}
-              >
-                <KeyRound data-icon="inline-start" />
-                איפוס סיסמה ל-1234
-              </Button>
+              {!isMe ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 rounded-full text-muted-foreground"
+                  disabled={saving}
+                  onClick={() => void resetPassword()}
+                >
+                  <KeyRound data-icon="inline-start" />
+                  איפוס סיסמה ל-1234
+                </Button>
+              ) : null}
               {!isMe ? (
                 confirmRemove ? (
                   <>

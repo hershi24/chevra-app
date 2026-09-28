@@ -6,15 +6,13 @@ import {
   BookOpen,
   Hash,
   Megaphone,
-  Pencil,
   Search,
   Trees,
   Utensils,
 } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { guideChatTitle, isGuideChannel, isRoshChevra } from "@/lib/channels";
-import { memberById } from "@/lib/format";
+import { memberById, roleLabel } from "@/lib/format";
 import { dmName } from "@/lib/selectors";
 import type { Channel, Member, Message } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -147,7 +145,6 @@ export function ChatSidebar({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [newOpen, setNewOpen] = useState(false);
   const online = useMemo(() => new Set(onlineIds), [onlineIds]);
   const others = useMemo(
     () =>
@@ -205,6 +202,21 @@ export function ChatSidebar({
   const guides = rows.filter((row) => row.guide && match(row)).sort(byRecent);
   const dms = rows.filter((row) => row.channel.type === "dm" && !row.guide && match(row)).sort(byRecent);
   const onlineOthers = others.filter((member) => online.has(member.id)).length;
+  const talkedTo = new Set(
+    rows.filter((row) => row.channel.type === "dm" && row.channel.memberIds.length === 2).flatMap((row) => row.channel.memberIds)
+  );
+  const fresh = others
+    .filter((member) => !talkedTo.has(member.id) && (!q || member.displayName.includes(q)))
+    .sort(
+      (a, b) =>
+        Number(online.has(b.id)) - Number(online.has(a.id)) || a.displayName.localeCompare(b.displayName, "he")
+    );
+  const guidePair = (member: Member) => (member.role === "leader") !== (me.role === "leader");
+  const freshGuides = fresh.filter(guidePair);
+  const freshDms = fresh.filter((member) => !guidePair(member));
+  const freshRow = (member: Member) => (
+    <PersonRow key={member.id} member={member} online={online.has(member.id)} onOpen={() => onOpenPerson(member)} />
+  );
 
   const rowProps = (row: Row) => ({
     row,
@@ -216,7 +228,7 @@ export function ChatSidebar({
 
   return (
     <aside className={cn("flex min-h-0 min-w-0 flex-col bg-[#f8f9fa] font-sans", className)}>
-      <div className="space-y-3 px-4 pb-3 pt-4 md:pt-5">
+      <div className="space-y-3 border-b border-[#e9ecef] px-4 pb-3.5 pt-4 md:pt-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-[1.3rem] font-normal tracking-tight">צ׳אט החבורה</h1>
@@ -225,55 +237,16 @@ export function ChatSidebar({
               {onlineOthers === 1 ? "מחובר אחד עכשיו" : `${onlineOthers} מחוברים עכשיו`}
             </p>
           </div>
-          <Popover open={newOpen} onOpenChange={setNewOpen}>
-            <PopoverTrigger
-              aria-label="שיחה חדשה"
-              title="שיחה חדשה"
-              className="grid size-9 shrink-0 place-items-center rounded-xl border border-[#e3e7ec] bg-white text-primary outline-none hover:border-[#cfd5dd]"
-            >
-              <Pencil className="size-4" />
-            </PopoverTrigger>
-            <PopoverContent
-              dir="rtl"
-              align="end"
-              className="w-[min(19rem,calc(100vw-2rem))] gap-1 rounded-2xl p-2.5 font-sans"
-            >
-              <NewChatList
-                members={others}
-                online={online}
-                onPick={(member) => {
-                  setNewOpen(false);
-                  onOpenPerson(member);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
         </div>
         <label className="flex items-center gap-2 rounded-xl border border-[#e3e7ec] bg-white px-3 py-2">
           <Search className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש בשיחות"
+            placeholder="חיפוש שיחה או חבר"
             className="min-w-0 flex-1 bg-transparent text-[13px] font-normal outline-none placeholder:text-muted-foreground/70"
           />
         </label>
-      </div>
-
-      <div className="flex gap-3 overflow-x-auto border-b border-[#e9ecef] px-4 pb-3.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {others.map((member) => (
-          <button
-            key={member.id}
-            type="button"
-            onClick={() => onOpenPerson(member)}
-            className="flex w-12 shrink-0 flex-col items-center gap-1"
-          >
-            <PresenceAvatar member={member} online={online.has(member.id)} ring="ring-[#f8f9fa]" />
-            <span className="w-full truncate text-center text-[11px] font-light text-foreground/75">
-              {member.displayName.split(" ")[0]}
-            </span>
-          </button>
-        ))}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6">
@@ -285,21 +258,23 @@ export function ChatSidebar({
             ))}
           </Section>
         ) : null}
-        {guides.length ? (
+        {guides.length || freshGuides.length ? (
           <Section title={isRoshChevra(me) ? "שיחות עם חברים" : "ראש החברה"}>
             {guides.map((row) => (
               <ChannelRow key={row.channel.id} {...rowProps(row)} />
             ))}
+            {freshGuides.map(freshRow)}
           </Section>
         ) : null}
-        {dms.length ? (
+        {dms.length || freshDms.length ? (
           <Section title="שיחות אישיות">
             {dms.map((row) => (
               <ChannelRow key={row.channel.id} {...rowProps(row)} />
             ))}
+            {freshDms.map(freshRow)}
           </Section>
         ) : null}
-        {q && !rooms.length && !guides.length && !dms.length ? (
+        {q && !rooms.length && !guides.length && !dms.length && !fresh.length ? (
           <p className="px-3 py-8 text-center text-[13px] font-light text-muted-foreground">
             לא נמצאו שיחות
           </p>
@@ -431,68 +406,25 @@ function ChannelRow({
   );
 }
 
-function NewChatList({
-  members,
-  online,
-  onPick,
-}: {
-  members: Member[];
-  online: Set<string>;
-  onPick: (member: Member) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const list = members.filter((member) => member.displayName.includes(query.trim()));
-  const on = list.filter((member) => online.has(member.id));
-  const off = list.filter((member) => !online.has(member.id));
-  const item = (member: Member) => (
-    <button
-      key={member.id}
-      type="button"
-      onClick={() => onPick(member)}
-      className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-start hover:bg-[#f4f6f8]"
-    >
-      <PresenceAvatar member={member} online={online.has(member.id)} ring="ring-popover" size="sm" />
-      <span className="min-w-0 text-[13px] leading-tight">
-        <span className="block truncate">{member.displayName}</span>
-        <span className="block text-[11px] font-light text-muted-foreground">
-          {isRoshChevra(member) ? "ראש החברה" : "שיחה אישית"}
-        </span>
-      </span>
-    </button>
-  );
-
+function PersonRow({ member, online, onOpen }: { member: Member; online: boolean; onOpen: () => void }) {
   return (
-    <div className="space-y-1">
-      <div className="px-1.5 pb-1 pt-0.5 text-[14px] font-normal">שיחה חדשה</div>
-      <label className="flex items-center gap-2 rounded-xl border border-[#e3e7ec] bg-white px-3 py-1.5">
-        <Search className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
-        <input
-          autoFocus
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="חיפוש חבר…"
-          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
-        />
-      </label>
-      <div className="max-h-[min(22rem,60vh)] overflow-y-auto">
-        {on.length ? (
-          <>
-            <div className="px-2 pb-0.5 pt-2 text-[11px] font-light text-muted-foreground">מחוברים עכשיו</div>
-            {on.map(item)}
-          </>
-        ) : null}
-        {off.length ? (
-          <>
-            <div className="px-2 pb-0.5 pt-2 text-[11px] font-light text-muted-foreground">
-              {on.length ? "כל השאר" : "כל החברים"}
-            </div>
-            {off.map(item)}
-          </>
-        ) : null}
-        {!list.length ? (
-          <p className="px-2 py-4 text-center text-[12px] font-light text-muted-foreground">לא נמצא חבר</p>
-        ) : null}
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-start transition hover:bg-black/[0.03]"
+    >
+      <PresenceAvatar member={member} online={online} ring="ring-[#f8f9fa]" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[14px] font-normal">{member.displayName}</div>
+        <div className="mt-0.5 flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate font-chat text-[12.5px] text-muted-foreground/80">
+            {online ? "מחובר עכשיו" : roleLabel(member.role)}
+          </p>
+          <span className="shrink-0 rounded-full bg-[#f5f0e7] px-2 py-px text-[11px] font-light text-primary opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+            התחלת שיחה
+          </span>
+        </div>
       </div>
-    </div>
+    </button>
   );
 }
