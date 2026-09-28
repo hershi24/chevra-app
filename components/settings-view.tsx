@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Eye, KeyRound, LogOut, Mail, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbf
 export function SettingsView() {
   const { state, me, logout, onlineIds } = useApp();
   const [active, setActive] = useState<SectionId>("account");
+  const pinnedUntil = useRef(0);
 
   const visible = SECTIONS.filter((section) => {
     if (!me) return false;
@@ -43,28 +44,34 @@ export function SettingsView() {
 
   useEffect(() => {
     const ids = visibleKey.split(",").filter(Boolean) as SectionId[];
-    const nodes = ids
-      .map((id) => document.getElementById(`settings-${id}`))
-      .filter((node): node is HTMLElement => Boolean(node));
-    if (!nodes.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const hit = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActive(hit.target.id.replace("settings-", "") as SectionId);
-      },
-      { rootMargin: "-20% 0px -65% 0px" }
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (performance.now() < pinnedUntil.current) return;
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      let current = ids[0];
+      for (const id of ids) {
+        const node = document.getElementById(`settings-${id}`);
+        if (node && node.getBoundingClientRect().top <= window.innerHeight * 0.3) current = id;
+      }
+      setActive(atBottom ? ids[ids.length - 1] : current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [visibleKey]);
 
   if (!state || !me) return null;
   const memberCount = state.members.length;
 
-  function jump(id: SectionId) {
+  function jump(id: SectionId, at: number) {
     setActive(id);
+    pinnedUntil.current = at + 900;
     document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -83,7 +90,7 @@ export function SettingsView() {
             <button
               key={section.id}
               type="button"
-              onClick={() => jump(section.id)}
+              onClick={(e) => jump(section.id, e.timeStamp)}
               className={cn(
                 "flex items-center gap-2.5 rounded-[14px] border px-3.5 py-2.5 text-start text-sm transition-colors",
                 active === section.id
@@ -115,7 +122,7 @@ export function SettingsView() {
               <button
                 key={section.id}
                 type="button"
-                onClick={() => jump(section.id)}
+                onClick={(e) => jump(section.id, e.timeStamp)}
                 className={cn(
                   "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px]",
                   active === section.id
@@ -129,7 +136,7 @@ export function SettingsView() {
             ))}
           </nav>
 
-          <div className="grid gap-10 md:gap-12">
+          <div className="grid gap-10 md:gap-12 [&>*]:min-w-0">
             <Section id="account" title="החשבון שלי" subtitle="איך החברים רואים אותך, והסיסמה לכניסה.">
               <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
             </Section>
@@ -199,7 +206,7 @@ function AccountPanel({ member, online, onLogout }: { member: Member; online: bo
     <div className={PANEL}>
       <div className="flex items-center gap-4 p-4 md:p-5">
         <span className="relative shrink-0">
-          <UserAvatar member={member} size="lg" className="size-14 md:size-16" />
+          <UserAvatar member={member} size="lg" className="data-[size=lg]:size-14 md:data-[size=lg]:size-16" />
           {online ? (
             <span className="absolute bottom-0.5 start-0.5 size-3.5 rounded-full bg-[#3ba55d] ring-2 ring-[#fbfcfd]" />
           ) : null}
