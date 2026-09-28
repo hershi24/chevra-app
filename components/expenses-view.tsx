@@ -261,10 +261,10 @@ export function ExpensesView() {
             me={me}
             eventId={scopeEventId}
           />
-
-          <BankAccounts members={state.members} accounts={accounts} me={me} />
         </div>
       </div>
+
+      <BankAccounts members={state.members} accounts={accounts} me={me} />
     </div>
   );
 }
@@ -314,13 +314,15 @@ function TransfersPanel({
                   </div>
                   <b className="shrink-0 text-sm font-medium">{formatAgorot(item.amountAgorot)}</b>
                 </div>
-                {account ? (
-                  <div className="mt-1.5 rounded-[12px] bg-[#f3f5f7] px-3 py-2">
-                    <BankLines account={account} compact />
-                  </div>
-                ) : (
-                  <p className="mt-1 text-xs font-light text-[#9aa1ab]">{to} עדיין לא מילא פרטי חשבון</p>
-                )}
+                {iPay ? (
+                  account ? (
+                    <div className="mt-1.5 rounded-[12px] bg-[#f3f5f7] px-3 py-2">
+                      <BankLines account={account} compact />
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs font-light text-[#9aa1ab]">{to} עדיין לא מילא פרטי חשבון</p>
+                  )
+                ) : null}
                 {canMark ? (
                   <Button
                     size="sm"

@@ -39,7 +39,7 @@ export function BankAccounts({
       <p className="mt-1 text-xs font-light leading-5 text-muted-foreground">
         כל אחד ממלא את הפרטים שלו, וכולם רואים אותם כדי להעביר. {admin ? "כמנהל אפשר לערוך לכל חבר." : ""}
       </p>
-      <div className="mt-3 divide-y divide-[#e9ecef]">
+      <div className="mt-3 grid divide-y divide-[#e9ecef] md:grid-cols-2 md:gap-x-8 md:divide-y-0 [&>*]:border-[#e9ecef] md:[&>*]:border-b">
         {visible.map((member) => {
           const account = accounts[member.id];
           const canEdit = admin || member.id === me.id;
