@@ -1,40 +1,324 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Eye, KeyRound, LogOut, Mail, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
-import { MediaProgressOverlay } from "@/components/media-progress";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, memberById, roleLabel } from "@/lib/format";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel } from "@/lib/format";
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { EmailDelivery, Member } from "@/lib/types";
-import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
+import type { EmailDelivery, Gathering, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+type SectionId = "account" | "members" | "invites" | "system";
+
+const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon }[] = [
+  { id: "account", label: "החשבון שלי", short: "החשבון", icon: User },
+  { id: "members", label: "חברי החבורה", short: "חברים", icon: Users },
+  { id: "invites", label: "הזמנות", short: "הזמנות", icon: Mail },
+  { id: "system", label: "מערכת", short: "מערכת", icon: SlidersHorizontal },
+];
+
+const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
+
 export function SettingsView() {
-  const { state, me, act, logout, onlineIds } = useApp();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const { state, me, logout, onlineIds } = useApp();
+  const [active, setActive] = useState<SectionId>("account");
+
+  const visible = SECTIONS.filter((section) => {
+    if (!me) return false;
+    if (section.id === "invites") return can(me, "sendInvites");
+    if (section.id === "system") return isAdmin(me);
+    return true;
+  });
+  const visibleKey = visible.map((section) => section.id).join(",");
+
+  useEffect(() => {
+    const ids = visibleKey.split(",").filter(Boolean) as SectionId[];
+    const nodes = ids
+      .map((id) => document.getElementById(`settings-${id}`))
+      .filter((node): node is HTMLElement => Boolean(node));
+    if (!nodes.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (hit) setActive(hit.target.id.replace("settings-", "") as SectionId);
+      },
+      { rootMargin: "-20% 0px -65% 0px" }
+    );
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [visibleKey]);
+
+  if (!state || !me) return null;
+  const memberCount = state.members.length;
+
+  function jump(id: SectionId) {
+    setActive(id);
+    document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <div>
+        <p className="text-[13px] font-light text-muted-foreground">
+          {isAdmin(me) ? "החשבון, החברים והמערכת" : "החשבון שלך וחברי החבורה"}
+        </p>
+        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">הגדרות</h1>
+      </div>
+
+      <div className="mt-4 md:mt-7 md:grid md:grid-cols-[210px_minmax(0,1fr)] md:items-start md:gap-9">
+        <aside className="sticky top-24 hidden gap-0.5 md:grid">
+          {visible.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => jump(section.id)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-[14px] border px-3.5 py-2.5 text-start text-sm transition-colors",
+                active === section.id
+                  ? "border-[#d5dbe3] bg-[#fbfcfd] text-foreground shadow-[0_6px_16px_rgba(80,90,105,0.06)]"
+                  : "border-transparent text-[#3f4650] hover:bg-black/[0.03]"
+              )}
+            >
+              <section.icon className={cn("size-4", active === section.id && "text-primary")} />
+              {section.label}
+              {section.id === "members" ? (
+                <span className="ms-auto text-[11px] text-[#9aa1ab] tabular-nums">{memberCount}</span>
+              ) : null}
+            </button>
+          ))}
+          <div className="mx-3.5 my-2.5 border-t border-[#e9ecef]" />
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="flex items-center gap-2.5 rounded-[14px] px-3.5 py-2.5 text-start text-sm text-[#a4453a] hover:bg-[#a4453a]/5"
+          >
+            <LogOut className="size-4" />
+            יציאה מהחשבון
+          </button>
+        </aside>
+
+        <div className="min-w-0">
+          <nav className="sticky top-0 z-10 -mx-5 mb-5 flex gap-1.5 overflow-x-auto bg-background px-5 py-2 [scrollbar-width:none] md:hidden">
+            {visible.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => jump(section.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px]",
+                  active === section.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-[#d5dbe3] bg-[#fbfcfd] text-[#3f4650]"
+                )}
+              >
+                {section.short}
+                {section.id === "members" ? ` · ${memberCount}` : ""}
+              </button>
+            ))}
+          </nav>
+
+          <div className="grid gap-10 md:gap-12">
+            <Section id="account" title="החשבון שלי" subtitle="איך החברים רואים אותך, והסיסמה לכניסה.">
+              <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
+            </Section>
+
+            <Section
+              id="members"
+              title="חברי החבורה"
+              subtitle={`${memberCount} חברים · ${onlineCountLabel(onlineIds.length)}`}
+            >
+              {can(me, "manageMembers") ? <MemberAdmin /> : <MemberDirectory members={state.members} />}
+            </Section>
+
+            {can(me, "sendInvites") ? <InvitesSection /> : null}
+
+            {isAdmin(me) ? (
+              <Section id="system" title="מערכת" subtitle="רק למנהל המערכת.">
+                <SystemPanel />
+              </Section>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function onlineCountLabel(count: number) {
+  if (count === 0) return "אף אחד לא מחובר עכשיו";
+  if (count === 1) return "מחובר אחד עכשיו";
+  return `${count} מחוברים עכשיו`;
+}
+
+function Section({
+  id,
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  id: SectionId;
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section id={`settings-${id}`} className="scroll-mt-16 md:scroll-mt-24">
+      <div className="mb-3.5 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[1.2rem] font-normal">{title}</h2>
+          {subtitle ? <p className="mt-0.5 text-[13px] font-light text-muted-foreground">{subtitle}</p> : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AccountPanel({ member, online, onLogout }: { member: Member; online: boolean; onLogout: () => void }) {
+  const facts = [
+    { label: "שם משתמש", value: member.username },
+    { label: "טלפון", value: member.phone },
+    { label: "מייל", value: member.email?.endsWith("@chevra.local") ? "" : member.email },
+  ];
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center gap-4 p-4 md:p-5">
+        <span className="relative shrink-0">
+          <UserAvatar member={member} size="lg" className="size-14 md:size-16" />
+          {online ? (
+            <span className="absolute bottom-0.5 start-0.5 size-3.5 rounded-full bg-[#3ba55d] ring-2 ring-[#fbfcfd]" />
+          ) : null}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-lg md:text-xl">{member.displayName}</div>
+          <div className="mt-0.5 text-[13px] font-light text-muted-foreground">
+            {roleLabel(member.role)}
+            {online ? " · מחובר עכשיו" : ""}
+          </div>
+        </div>
+        <Button variant="outline" className="rounded-full" onClick={onLogout}>
+          <LogOut data-icon="inline-start" />
+          יציאה
+        </Button>
+      </div>
+      <dl className="grid border-t border-[#e9ecef] md:grid-cols-3">
+        {facts.map((fact, index) => (
+          <div
+            key={fact.label}
+            className={cn(
+              "flex items-center justify-between gap-3 px-4 py-3 md:block md:px-5",
+              index > 0 && "border-t border-[#e9ecef] md:border-t-0 md:border-s"
+            )}
+          >
+            <dt className="text-[11px] text-[#9aa1ab]">{fact.label}</dt>
+            <dd className="truncate text-sm [unicode-bidi:plaintext]" dir="ltr">
+              {fact.value || "—"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <PasswordForm />
+    </div>
+  );
+}
+
+function PasswordForm() {
+  const { act } = useApp();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div id="password" className="scroll-mt-24 border-t border-[#e9ecef] px-4 pt-4 pb-4 md:px-5 md:pb-5">
+      <div className="flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#f1f3f6] text-[#4b5563]">
+          <KeyRound className="size-4" />
+        </span>
+        <div>
+          <div className="text-[15px]">סיסמה</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">
+            מומלץ להחליף את הסיסמה הזמנית שקיבלת
+          </div>
+        </div>
+      </div>
+      <form
+        className="mt-3.5 grid gap-2.5 md:grid-cols-[1fr_1fr_auto] md:items-end"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          try {
+            await act({ type: "changePassword", currentPassword, newPassword });
+            setCurrentPassword("");
+            setNewPassword("");
+            toast.success("הסיסמה הוחלפה");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "ההחלפה נכשלה");
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <label className="grid gap-1.5 text-[12px] text-muted-foreground">
+          סיסמה נוכחית
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="h-10 rounded-xl bg-white"
+            required
+          />
+        </label>
+        <label className="grid gap-1.5 text-[12px] text-muted-foreground">
+          סיסמה חדשה
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="h-10 rounded-xl bg-white"
+            required
+          />
+        </label>
+        <Button type="submit" disabled={saving} className="h-10 rounded-full px-6">
+          {saving ? "שומר…" : "שמירה"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function InvitesSection() {
+  const { state, me } = useApp();
   const [sending, setSending] = useState(false);
   const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
-  const [pendingBg, setPendingBg] = useState<{
-    previewUrl: string;
-    progress: number;
-    remainingSeconds: number | null;
-  } | null>(null);
+  const [showReport, setShowReport] = useState(false);
 
   if (!state || !me) return null;
-  const user = me;
   const event = upcomingGathering(state);
+  const lastLog = state.emailLog.find((entry) => entry.eventId === event?.id);
+  const report = deliveries ?? lastLog?.deliveries ?? null;
+  const reachable = state.members.filter((member) => {
+    const address = member.email?.trim() ?? "";
+    return address && !address.endsWith("@chevra.local");
+  }).length;
+  const unreachable = state.members.length - reachable;
 
   async function sendInvites() {
     if (!event || sending) return;
@@ -51,6 +335,7 @@ export function SettingsView() {
         return;
       }
       setDeliveries(data.deliveries ?? []);
+      setShowReport(true);
       if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
       else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
       else toast.error("אף מייל לא נשלח");
@@ -60,15 +345,11 @@ export function SettingsView() {
   }
 
   async function pingIvr() {
+    if (!me) return;
     const res = await fetch("/api/ivr", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: user.phone,
-        digits: "1",
-        action: "tzintuk",
-        eventId: event?.id,
-      }),
+      body: JSON.stringify({ phone: me.phone, digits: "1", action: "tzintuk", eventId: event?.id }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -78,198 +359,211 @@ export function SettingsView() {
     toast.success("צילצול / עדכון IVR נרשם");
   }
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      <div>
-        <p className="text-[13px] font-light text-muted-foreground">
-          {can(me, "manageMembers") ? "ניהול חברים, הרשאות והזמנות" : "החשבון, החברים והאווירה"}
-        </p>
-        <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">הגדרות</h1>
-      </div>
+  const previewHref = event
+    ? `/api/invitations/preview?eventId=${encodeURIComponent(event.id)}&note=${encodeURIComponent(inviteNote)}`
+    : null;
 
-      <Card className="paper-card rounded-[1.75rem]">
-        <CardHeader>
-          <CardTitle>החשבון שלי</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <UserAvatar member={me} size="lg" />
-            <div>
-              <div className="font-medium">{me.displayName}</div>
-              <div className="text-sm text-muted-foreground">
-                שם משתמש: {me.username} · {roleLabel(me.role)}
+  return (
+    <Section
+      id="invites"
+      title="הזמנות במייל"
+      subtitle="כל חבר מקבל מייל אישי עם כפתורי הגעה — בלי להתחבר."
+      action={
+        previewHref ? (
+          <a
+            href={previewHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 text-[13px] text-primary hover:underline"
+          >
+            <Eye className="size-4" />
+            תצוגה מקדימה
+          </a>
+        ) : null
+      }
+    >
+      {event ? (
+        <div className={cn(PANEL, "md:grid md:grid-cols-[minmax(0,1fr)_250px]")}>
+          <div className="grid gap-3.5 p-4 md:p-5">
+            <div className="flex items-center gap-3.5">
+              <DateBox iso={event.startsAt} />
+              <div className="min-w-0">
+                <div className="truncate text-[17px]">{gatheringLabel(event)}</div>
+                <div className="text-[12.5px] font-light text-muted-foreground">
+                  {weekday(event.startsAt)} · {formatTimeHe(event.startsAt)}
+                  {memberById(state.members, event.hostId)
+                    ? ` · אצל ${memberById(state.members, event.hostId)!.displayName}`
+                    : ""}
+                </div>
               </div>
             </div>
-          </div>
-          <Button variant="outline" onClick={() => void logout()}>
-            יציאה
-          </Button>
-        </CardContent>
-      </Card>
-
-      <PasswordCard />
-
-      {isAdmin(me) ? <ExpensesVisibility /> : null}
-
-      {isAdmin(me) ? <OnlineNow members={state.members} onlineIds={onlineIds} /> : null}
-
-      {can(me, "manageMembers") ? (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">ניהול חברים והרשאות</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MemberAdmin />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">חברי החבורה</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MemberDirectory members={state.members} />
-          </CardContent>
-        </Card>
-      )}
-
-      {can(me, "uploadBackground") ? (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">אווירת החדר</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-[13px] font-light text-muted-foreground">
-              מסך האתר לבן. תמונה מחברה קודמת נשמרת כאן ולא נצבעת על הרקע.
-            </p>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {state.settings.backgrounds.map((bg) => (
-                <button
-                  key={bg.id}
-                  onClick={() => void act({ type: "setBackground", backgroundImageId: bg.id })}
-                  className={cn(
-                    "overflow-hidden rounded-xl ring-2 ring-transparent",
-                    state.settings.backgroundImageId === bg.id && "ring-primary"
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={bg.url} alt={bg.label} className="aspect-[4/3] w-full object-cover" />
-                  <div className="bg-white px-2 py-1.5 text-start text-[11px]">{bg.label}</div>
-                </button>
-              ))}
-              {pendingBg ? (
-                <div className="overflow-hidden rounded-xl ring-2 ring-primary">
-                  <MediaProgressOverlay
-                    src={pendingBg.previewUrl}
-                    type="image"
-                    progress={pendingBg.progress}
-                    remainingSeconds={pendingBg.remainingSeconds}
-                    mediaClassName="aspect-[4/3] max-h-none"
-                  />
-                  <div className="bg-white px-2 py-1.5 text-start text-[11px]">מעלה…</div>
-                </div>
-              ) : null}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const local = createLocalUpload(file);
-                setPendingBg({
-                  previewUrl: local.previewUrl,
-                  progress: 0,
-                  remainingSeconds: null,
-                });
-                if (fileRef.current) fileRef.current.value = "";
-                try {
-                  const data = await uploadWithProgress(file, {}, ({ percent, remainingSeconds }) => {
-                    setPendingBg((prev) =>
-                      prev ? { ...prev, progress: percent, remainingSeconds } : prev
-                    );
-                  });
-                  await preloadMedia(data.url, "image");
-                  await act({
-                    type: "addBackground",
-                    url: data.url,
-                    label: file.name.replace(/\.[^.]+$/, ""),
-                  });
-                  toast.success("הרקע נוסף");
-                } catch {
-                  toast.error("העלאה נכשלה");
-                } finally {
-                  URL.revokeObjectURL(local.previewUrl);
-                  setPendingBg(null);
-                }
-              }}
-            />
-            <Button variant="outline" onClick={() => fileRef.current?.click()}>
-              העלאת תמונה מחברה קודמת
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {can(me, "sendInvites") ? (
-        <Card className="paper-card rounded-[1.75rem]">
-          <CardHeader>
-            <CardTitle className="font-medium">הזמנות במייל · לחיצה אחת</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              שליחת HTML עם כפתורי [מאשר הגעה] / [אולי] / [לא אוכל להגיע]. כל קישור מעדכן את היומן בלי התחברות.
-              בלי מפתח Resend ההזמנות נשמרות כאן עם קישורים לבדיקה.
-            </p>
-            <div className="grid gap-2">
-              <Label htmlFor="invite-note">הודעה אישית למייל</Label>
+            <label className="grid gap-1.5 text-[12px] text-muted-foreground">
+              מילה אישית שתופיע בכל הזמנה (לא חובה)
               <Textarea
-                id="invite-note"
-                rows={4}
+                rows={3}
                 value={inviteNote}
                 onChange={(e) => setInviteNote(e.target.value)}
-                placeholder="אפשר לכתוב כאן משהו שיופיע בכל הזמנה. אם משאירים ריק, נשלחת ההזמנה בלי תוספת."
+                placeholder="למשל: השבוע נלמד יחד את משנה ה׳. מי שיכול — שיביא סידור."
+                className="resize-none rounded-xl bg-white text-sm text-foreground"
               />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void sendInvites()} disabled={!event || sending}>
-                {sending ? "שולח…" : "שליחת הזמנות לחברה הקרובה"}
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={() => void sendInvites()}
+                disabled={sending || reachable === 0}
+                className="h-10 flex-1 rounded-full px-5 md:flex-none"
+              >
+                <Mail data-icon="inline-start" />
+                {sending ? "שולח…" : `שליחה ל־${reachable} חברים`}
               </Button>
               {can(me, "triggerIvr") ? (
-                <Button variant="outline" onClick={() => void pingIvr()}>
-                  צילצול / IVR
+                <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => void pingIvr()}>
+                  <Phone data-icon="inline-start" />
+                  צינתוק IVR
                 </Button>
               ) : null}
+              {unreachable ? (
+                <span className="w-full text-[12px] font-light text-[#9aa1ab] md:ms-auto md:w-auto">
+                  {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
+                </span>
+              ) : null}
             </div>
-            <InviteReport
-              deliveries={deliveries ?? state.emailLog.find((entry) => entry.eventId === event?.id)?.deliveries ?? null}
-              sentAt={deliveries ? null : state.emailLog.find((entry) => entry.eventId === event?.id)?.sentAt}
-            />
-            {state.ivrLog[0] ? (
-              <p className="text-xs text-muted-foreground">
-                IVR אחרון: {state.ivrLog[0].result} · {state.ivrLog[0].phone}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+          </div>
+          <InviteSide
+            event={event}
+            members={state.members}
+            report={report}
+            sentAt={deliveries ? null : lastLog?.sentAt}
+            showReport={showReport}
+            onToggleReport={() => setShowReport((value) => !value)}
+          />
+        </div>
+      ) : (
+        <div className={cn(PANEL, "px-5 py-8 text-center text-sm font-light text-muted-foreground")}>
+          אין חברה קרובה ביומן. אחרי שתיקבע חברה אפשר לשלוח הזמנות מכאן.
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function weekday(iso: string) {
+  return new Intl.DateTimeFormat("he-IL", { weekday: "long" }).format(new Date(iso));
+}
+
+function DateBox({ iso }: { iso: string }) {
+  const date = new Date(iso);
+  return (
+    <div className="w-[60px] shrink-0 rounded-2xl bg-[#f5f0e7] py-2 text-center text-primary">
+      <div className="text-2xl leading-none tabular-nums">{date.getDate()}</div>
+      <div className="mt-1 text-[11px]">{new Intl.DateTimeFormat("he-IL", { month: "long" }).format(date)}</div>
     </div>
   );
 }
 
-function ExpensesVisibility() {
-  const { state, act } = useApp();
-  const visible = state ? expensesOpen(state) : true;
+function InviteSide({
+  event,
+  members,
+  report,
+  sentAt,
+  showReport,
+  onToggleReport,
+}: {
+  event: Gathering;
+  members: Member[];
+  report: EmailDelivery[] | null;
+  sentAt?: string | null;
+  showReport: boolean;
+  onToggleReport: () => void;
+}) {
+  const statuses = members.map((member) => event.rsvps[member.id] ?? "pending");
+  const tally = [
+    { label: "מגיעים", value: statuses.filter((s) => s === "yes").length, tone: "text-[#3d8f62]" },
+    { label: "אולי", value: statuses.filter((s) => s === "maybe").length, tone: "" },
+    { label: "טרם", value: statuses.filter((s) => s === "pending").length, tone: "text-[#9aa1ab]" },
+  ];
+  const sent = report?.filter((row) => row.status === "sent").length ?? 0;
+  const failed = report?.filter((row) => row.status === "failed").length ?? 0;
+  const skipped = report?.filter((row) => row.status === "skipped").length ?? 0;
+
   return (
-    <Card className="paper-card rounded-[1.75rem]">
-      <CardContent className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-medium">הצגת באו חשבון</div>
-          <p className="mt-1 text-sm font-light text-muted-foreground">
-            רק מנהל המערכת. כיבוי מסתיר את הדף ואת הטאב מכולם.
-          </p>
+    <div className="grid content-start gap-3 border-t border-[#e9ecef] bg-gradient-to-b from-[#f6f1e8] to-[#fbfcfd] p-4 md:border-s md:border-t-0 md:p-[18px]">
+      <div className="text-[13px] text-muted-foreground">מי כבר ענה</div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {tally.map((item) => (
+          <div key={item.label} className="rounded-xl border border-[#ebe3d4] bg-white py-2 text-center">
+            <div className={cn("text-xl leading-tight tabular-nums", item.tone)}>{item.value}</div>
+            <div className="text-[11px] text-muted-foreground">{item.label}</div>
+          </div>
+        ))}
+      </div>
+      {report?.length ? (
+        <>
+          <div className="mt-1 text-[13px] text-muted-foreground">
+            שליחה אחרונה{sentAt ? ` · ${formatRelativeHe(sentAt)}` : " · עכשיו"}
+          </div>
+          <div className="grid gap-1.5 text-[12.5px]">
+            <div className="flex justify-between gap-2">
+              <span>{sent} נשלחו</span>
+              <span className="text-[#3d8f62]">✓</span>
+            </div>
+            {failed ? (
+              <div className="flex justify-between gap-2 text-destructive">
+                <span>{failed} נכשלו</span>
+                <span>!</span>
+              </div>
+            ) : null}
+            {skipped ? (
+              <div className="flex justify-between gap-2 text-muted-foreground">
+                <span>{skipped} לא נשלחו · אין מייל</span>
+                <span>—</span>
+              </div>
+            ) : null}
+          </div>
+          <button type="button" onClick={onToggleReport} className="justify-self-start text-[12px] text-primary hover:underline">
+            {showReport ? "הסתרת הפירוט" : "פירוט לפי חבר"}
+          </button>
+          {showReport ? (
+            <ul className="grid gap-1.5 border-t border-[#ebe3d4] pt-2.5 text-[12px]">
+              {report.map((row) => (
+                <li key={`${row.name}-${row.to}`} className="flex items-baseline justify-between gap-2">
+                  <span className="truncate">{row.name}</span>
+                  <span
+                    className={cn(
+                      "shrink-0",
+                      row.status === "failed" ? "text-destructive" : row.status === "sent" ? "text-[#3d8f62]" : "text-muted-foreground"
+                    )}
+                    title={row.error}
+                  >
+                    {row.status === "sent" ? "נשלח" : row.status === "failed" ? "נכשל" : "לא נשלח"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {sentAt ? <div className="text-[11px] text-[#9aa1ab]">{formatDateTimeHe(sentAt)}</div> : null}
+        </>
+      ) : (
+        <div className="text-[12.5px] font-light text-muted-foreground">עוד לא נשלחו הזמנות לחברה הזו.</div>
+      )}
+    </div>
+  );
+}
+
+function SystemPanel() {
+  const { state, act } = useApp();
+  if (!state) return null;
+  const visible = expensesOpen(state);
+  const lastIvr = state.ivrLog[0];
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center gap-3.5 px-4 py-4 md:px-5">
+        <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
+          <Wallet className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px]">הצגת באו חשבון</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">כיבוי מסתיר את הדף ואת הטאב מכולם</div>
         </div>
         <Switch
           checked={visible}
@@ -280,144 +574,20 @@ function ExpensesVisibility() {
           }
           aria-label="הצגת באו חשבון"
         />
-      </CardContent>
-    </Card>
-  );
-}
-
-function PasswordCard() {
-  const { act } = useApp();
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  return (
-    <Card id="password" className="paper-card scroll-mt-24 rounded-[1.75rem]">
-      <CardHeader>
-        <CardTitle className="font-medium">החלפת סיסמה</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid max-w-md gap-3"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setSaving(true);
-            try {
-              await act({ type: "changePassword", currentPassword, newPassword });
-              setCurrentPassword("");
-              setNewPassword("");
-              toast.success("הסיסמה הוחלפה");
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "ההחלפה נכשלה");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          <div className="grid gap-1.5">
-            <Label htmlFor="current-password">סיסמה נוכחית</Label>
-            <Input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
+      </div>
+      {lastIvr ? (
+        <div className="flex items-center gap-3.5 border-t border-[#e9ecef] px-4 py-4 md:px-5">
+          <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f1f3f6] text-[#4b5563]">
+            <Phone className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px]">IVR אחרון</div>
+            <div className="truncate text-[12.5px] font-light text-muted-foreground">
+              {lastIvr.result} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="new-password">סיסמה חדשה</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" disabled={saving}>
-            {saving ? "שומר…" : "החלפת הסיסמה"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-function InviteReport({
-  deliveries,
-  sentAt,
-}: {
-  deliveries: EmailDelivery[] | null;
-  sentAt?: string | null;
-}) {
-  if (!deliveries?.length) return null;
-  const sent = deliveries.filter((row) => row.status === "sent").length;
-  const failed = deliveries.filter((row) => row.status === "failed").length;
-  const skipped = deliveries.filter((row) => row.status === "skipped").length;
-  return (
-    <div className="rounded-xl bg-secondary p-3 text-sm">
-      <p className="font-medium">
-        {sent} נשלחו
-        {failed ? ` · ${failed} נכשלו` : ""}
-        {skipped ? ` · ${skipped} לא נשלחו` : ""}
-      </p>
-      {sentAt ? (
-        <p className="mt-1 text-xs text-muted-foreground">שליחה אחרונה: {formatDateTimeHe(sentAt)}</p>
+        </div>
       ) : null}
-      <ul className="mt-2 space-y-1">
-        {deliveries.map((row) => (
-          <li key={`${row.name}-${row.to}`} className="flex flex-wrap items-baseline justify-between gap-2">
-            <span>
-              {row.name}
-              <span className="text-muted-foreground"> · {row.to}</span>
-            </span>
-            <span className={row.status === "failed" ? "text-destructive" : "text-muted-foreground"}>
-              {row.status === "sent" ? "נשלח" : row.status === "failed" ? "נכשל" : "לא נשלח"}
-              {row.error ? ` — ${row.error}` : ""}
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
-  );
-}
-
-function OnlineNow({ members, onlineIds }: { members: Member[]; onlineIds: string[] }) {
-  const online = onlineIds
-    .map((id) => memberById(members, id))
-    .filter((member): member is Member => Boolean(member))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName, "he"));
-
-  return (
-    <Card className="paper-card rounded-[1.75rem]">
-      <CardHeader>
-        <CardTitle className="font-medium">מחוברים עכשיו</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm font-light text-muted-foreground">
-          {online.length === 1 ? "מחובר אחד כעת" : `${online.length} מחוברים כעת`}
-        </p>
-        {online.length === 0 ? (
-          <p className="mt-3 text-sm font-light text-muted-foreground">אין אף אחד מחובר כרגע.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {online.map((member) => (
-              <li key={member.id} className="flex items-center gap-3 rounded-xl bg-secondary px-3 py-2">
-                <span className="relative">
-                  <UserAvatar member={member} />
-                  <span className="absolute -bottom-0.5 start-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                </span>
-                <div>
-                  <div className="text-sm font-medium">{member.displayName}</div>
-                  <div className="text-[12px] font-light text-muted-foreground">{roleLabel(member.role)}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
   );
 }
