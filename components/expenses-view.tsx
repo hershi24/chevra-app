@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileSpreadsheet, FileText, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
-import { BankAccounts, BankLines } from "@/components/bank-accounts";
+import { BankAccounts } from "@/components/bank-accounts";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -16,12 +17,14 @@ import {
   SCOPE_NONE,
   canEditExpense,
   canEditPayment,
+  expenseScopeLabel,
   expensesOpen,
   formatAgorot,
   formatShekels,
   paymentMethodLabel,
   scopedSettlement,
   type ExpenseScope,
+  type Settlement,
   type Transfer,
 } from "@/lib/expenses";
 import { formatDateShortHe, gatheringLabel, memberById } from "@/lib/format";
@@ -46,11 +49,14 @@ function eventName(gatherings: Gathering[], id?: string) {
   return event ? `${gatheringLabel(event)} · ${formatDateShortHe(event.startsAt)}` : null;
 }
 
+type Tab = "expenses" | "payments" | "members" | "bank";
+
 export function ExpensesView() {
-  const { state, me, act } = useApp();
+  const { state, me } = useApp();
   const router = useRouter();
   const hidden = Boolean(state && !expensesOpen(state));
   const [picked, setPicked] = useState<ExpenseScope>(SCOPE_ALL);
+  const [tab, setTab] = useState<Tab>("expenses");
 
   useEffect(() => {
     if (hidden) router.replace("/");
@@ -58,7 +64,6 @@ export function ExpensesView() {
 
   if (!state || !me || hidden) return null;
 
-  const admin = isAdmin(me);
   const upcoming = upcomingGathering(state);
   const allExpenses = state.expenses ?? [];
   const allPayments = state.payments ?? [];
@@ -92,17 +97,21 @@ export function ExpensesView() {
     })),
     ...(hasUnassigned ? [{ id: SCOPE_NONE, label: "ללא שיוך" }] : []),
   ];
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: "expenses", label: "הוצאות", count: expenses.length },
+    { id: "payments", label: "תשלומים", count: payments.length },
+    { id: "members", label: "כולם" },
+    { id: "bank", label: "פרטי בנק" },
+  ];
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 md:gap-8">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0 flex-1 basis-[22rem]">
-          <p className="text-[13px] font-light text-muted-foreground">כל חבר רושם מה שקנה ומה ששילם</p>
-          <h1 className="mt-1 text-[1.65rem] font-medium tracking-tight md:text-[2rem]">באו חשבון</h1>
-          <p className="mt-2 max-w-2xl text-sm font-light leading-6 text-muted-foreground">
-            הסכום שנכנס לחשבון מתחלק שווה בשווה. מה שכל אחד קנה ומה שכבר העביר יורד מהחלק שלו. סכום מוחרג לא
-            נכנס לחלוקה.
-          </p>
+    <div className="mx-auto flex max-w-[880px] flex-col">
+      <header className="flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-light text-muted-foreground">{expenseScopeLabel(state, scope)}</p>
+          <h1 className="mt-0.5 text-[1.75rem] font-medium leading-tight tracking-tight md:text-[2.1rem]">
+            באו חשבון
+          </h1>
         </div>
         <div className="flex shrink-0 gap-2">
           <a href={`/api/expenses/export?scope=${encodeURIComponent(scope)}`} download className={exportLink}>
@@ -116,14 +125,14 @@ export function ExpensesView() {
             className={exportLink}
           >
             <FileText className="size-4 text-[#a4453a]" />
-            PDF להדפסה
+            PDF
           </a>
         </div>
       </header>
 
       <nav
         aria-label="שיוך לחברה"
-        className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
       >
         {chips.map((chip) => (
           <button
@@ -142,37 +151,68 @@ export function ExpensesView() {
         ))}
       </nav>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] [&>*]:min-w-0">
-        <div className="space-y-6">
-          <section className="space-y-3">
-            <h2 className="text-base font-medium">הוצאות</h2>
-            {expenses.length === 0 ? (
-              <p className={cn(panel, "px-5 py-8 text-sm font-light text-muted-foreground")}>
-                {scope === SCOPE_ALL
-                  ? "עדיין אין הוצאות. רושמים כאן מה נקנה, בכמה, ופירוט."
-                  : "אין הוצאות משויכות לכאן."}
-              </p>
-            ) : (
-              expenses.map((expense) => (
-                <ExpenseRow
-                  key={expense.id}
-                  expense={expense}
-                  members={state.members}
-                  gatherings={gatherings}
-                  showEvent={scope === SCOPE_ALL}
-                  editable={canEditExpense(me, expense)}
-                />
-              ))
+      <StatusCard
+        key={scope}
+        me={me}
+        members={state.members}
+        accounts={accounts}
+        gatherings={gatherings}
+        report={report}
+        transfers={transfers}
+        scope={scope}
+        eventId={scopeEventId}
+      />
+
+      <div
+        role="tablist"
+        className="-mx-5 mt-7 flex gap-6 overflow-x-auto border-b border-[#e3e7ec] px-5 sm:mx-0 sm:px-0"
+      >
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+            className={cn(
+              "-mb-px shrink-0 border-b-2 pb-2.5 text-[15px] transition-colors",
+              tab === item.id
+                ? "border-[#a9782c] text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
-            <ExpenseForm
-              key={`add-${defaultEventId ?? "none"}`}
+          >
+            {item.label}
+            {item.count ? <span className="ms-1.5 text-[#9aa1ab]">{item.count}</span> : null}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        {tab === "expenses" ? (
+          <>
+            <ExpenseList
+              key={`expenses-${scope}`}
+              expenses={expenses}
               members={state.members}
               gatherings={gatherings}
-              initial={{ memberId: me.id, eventId: defaultEventId }}
+              me={me}
+              showEvent={scope === SCOPE_ALL}
+              defaultEventId={defaultEventId}
             />
-          </section>
-
-          <PaymentsPanel
+            <p className="mt-3 text-xs font-light text-[#9aa1ab]">
+              {[
+                `${formatAgorot(report.includedAgorot)} בחשבון`,
+                `${report.memberCount} חברים`,
+                `${formatAgorot(report.shareAgorot)} לכל אחד`,
+                report.excludedAgorot ? `${formatAgorot(report.excludedAgorot)} מוחרג` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </>
+        ) : tab === "payments" ? (
+          <PaymentList
+            key={`payments-${scope}`}
             payments={payments}
             members={state.members}
             gatherings={gatherings}
@@ -180,204 +220,431 @@ export function ExpensesView() {
             showEvent={scope === SCOPE_ALL}
             defaultEventId={defaultEventId}
           />
-        </div>
-
-        <div className="space-y-6">
-          <section className={cn(panel, "space-y-3 p-4 md:p-5")}>
-            <h2 className="text-base font-medium">החלוקה</h2>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between gap-3">
-                <span>נכנס לחשבון</span>
-                <b className="font-medium">{formatAgorot(report.includedAgorot)}</b>
-              </div>
-              <div className="flex justify-between gap-3 text-muted-foreground">
-                <span>מוחרג</span>
-                <span>{formatAgorot(report.excludedAgorot)}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span>{report.memberCount} חברים</span>
-                <b className="font-medium">{formatAgorot(report.shareAgorot)} לחלק</b>
-              </div>
-              {report.paymentsAgorot > 0 ? (
-                <div className="flex justify-between gap-3 text-muted-foreground">
-                  <span>כבר הועבר</span>
-                  <span>{formatAgorot(report.paymentsAgorot)}</span>
-                </div>
-              ) : null}
-              {report.remainderAgorot > 0 ? (
-                <p className="text-xs font-light text-muted-foreground">
-                  נשארו {report.remainderAgorot} אגורות, והן נוספות לחלק של חלק מהחברים כדי שהחשבון ייסגר בדיוק.
-                </p>
-              ) : null}
-            </div>
-            <div className="divide-y divide-[#e9ecef]">
-              {report.rows.map((row) => {
-                const member = memberById(state.members, row.memberId);
-                const owed = row.balanceAgorot > 0;
-                const pays = row.owesAgorot > 0;
-                const moved = [
-                  `קנה ${formatAgorot(row.spentAgorot)}`,
-                  row.paidAgorot ? `העביר ${formatAgorot(row.paidAgorot)}` : "",
-                  row.receivedAgorot ? `קיבל ${formatAgorot(row.receivedAgorot)}` : "",
-                ].filter(Boolean);
-                return (
-                  <div key={row.memberId} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm">{member?.displayName ?? "חבר"}</div>
-                      <div className="text-xs font-light text-muted-foreground">{moved.join(" · ")}</div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {owed ? (
-                        <span className="rounded-full bg-[#f8edd9] px-2 py-0.5 text-[11px] text-[#8d6424]">
-                          מגיע לו {formatAgorot(row.balanceAgorot)}
-                        </span>
-                      ) : pays ? (
-                        <span className="rounded-full bg-[#f8e7e4] px-2 py-0.5 text-[11px] text-[#8d3a32]">
-                          לשלם {formatAgorot(row.owesAgorot)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">מאוזן</span>
-                      )}
-                      {admin && pays && row.memberId !== me.id ? (
-                        <Button
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() =>
-                            void act({ type: "sendExpenseNotice", memberId: row.memberId, scope })
-                              .then(() => toast.success(`נשלח ל${member?.displayName ?? "חבר"}`))
-                              .catch(fail("השליחה נכשלה"))
-                          }
-                        >
-                          שלח
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {admin ? (
-              <Button
-                className="w-full rounded-full"
-                onClick={() =>
-                  void act({ type: "sendExpenseNotice", scope })
-                    .then(() => toast.success("נשלח לכל מי שצריך לשלם"))
-                    .catch(fail("השליחה נכשלה"))
-                }
-              >
-                שליחה אישית לכל מי שצריך לשלם
-              </Button>
-            ) : null}
-            <p className="text-xs font-light leading-5 text-muted-foreground">
-              {admin
-                ? "רק מנהל המערכת שולח. לכל מי שחייב נשלחת הודעה אישית עם הסכום, למי להעביר, והפירוט."
-                : "החלק שווה לכולם. מה שכל אחד קנה ומה שכבר העביר יורד מהחלק שלו."}
-            </p>
-          </section>
-
-          <TransfersPanel
-            transfers={transfers}
+        ) : tab === "members" ? (
+          <MembersTab
+            me={me}
             members={state.members}
             accounts={accounts}
             gatherings={gatherings}
-            me={me}
+            report={report}
+            transfers={transfers}
+            scope={scope}
             eventId={scopeEventId}
           />
-        </div>
+        ) : (
+          <BankAccounts members={state.members} accounts={accounts} me={me} />
+        )}
       </div>
-
-      <BankAccounts members={state.members} accounts={accounts} me={me} />
     </div>
   );
 }
 
-function TransfersPanel({
-  transfers,
+function StatusCard({
+  me,
   members,
   accounts,
   gatherings,
-  me,
+  report,
+  transfers,
+  scope,
   eventId,
 }: {
-  transfers: Transfer[];
+  me: Member;
   members: Member[];
   accounts: Record<string, BankAccount>;
   gatherings: Gathering[];
-  me: Member;
+  report: Settlement;
+  transfers: Transfer[];
+  scope: ExpenseScope;
   eventId?: string;
 }) {
+  const { act } = useApp();
   const admin = isAdmin(me);
-  const [open, setOpen] = useState<string | null>(null);
-  const mine = transfers.filter((item) => item.fromId === me.id || item.toId === me.id);
-  const list = admin ? transfers : mine;
+  const [open, setOpen] = useState<{ key: string; method: PaymentMethod } | null>(null);
+  const row = report.rows.find((item) => item.memberId === me.id);
+  const name = (id: string) => memberById(members, id)?.displayName ?? "חבר";
+  const toPay = transfers.filter((item) => item.fromId === me.id);
+  const toGet = transfers.filter((item) => item.toId === me.id);
+  const openAgorot = report.rows.reduce((sum, item) => sum + item.owesAgorot, 0);
+  const totalFlow = openAgorot + report.paymentsAgorot;
+  const debtors = report.rows.filter((item) => item.owesAgorot > 0 && item.memberId !== me.id).length;
+  const firstName = me.displayName.split(" ")[0];
+
+  const facts = row
+    ? [
+        `החלק שלך ${formatAgorot(row.shareAgorot)}`,
+        `קנית ${formatAgorot(row.spentAgorot)}`,
+        row.paidAgorot ? `העברת ${formatAgorot(row.paidAgorot)}` : "",
+        row.receivedAgorot ? `קיבלת ${formatAgorot(row.receivedAgorot)}` : "",
+      ].filter(Boolean)
+    : [];
+
+  const headline = !row
+    ? { amount: null, text: "אין חשבון להצגה" }
+    : row.owesAgorot > 0
+      ? {
+          amount: row.owesAgorot,
+          text: toPay.length === 1 ? `להעביר ל${name(toPay[0].toId)}` : `להעביר ל־${toPay.length} חברים`,
+        }
+      : row.balanceAgorot > 0
+        ? { amount: row.balanceAgorot, text: "מגיע לך" }
+        : { amount: null, text: "הכל מאוזן, אין לך מה להעביר" };
+
+  const form = (item: Transfer, method: PaymentMethod) => (
+    <div className="mt-3">
+      <PaymentForm
+        members={members}
+        gatherings={gatherings}
+        me={me}
+        title="למי שולם ואיך"
+        initial={{ fromId: item.fromId, toId: item.toId, amount: item.amountAgorot / 100, eventId, method }}
+        onDone={() => setOpen(null)}
+      />
+    </div>
+  );
 
   return (
-    <section className={cn(panel, "p-4 md:p-5")}>
-      <h2 className="text-base font-medium">{admin ? "מי מעביר למי" : "ההעברות שלי"}</h2>
-      {list.length === 0 ? (
-        <p className="mt-2 text-sm font-light text-muted-foreground">
-          {transfers.length ? "אין לך העברות פתוחות." : "החשבון סגור, אין העברות פתוחות."}
-        </p>
-      ) : (
-        <div className="mt-2 divide-y divide-[#e9ecef]">
-          {list.map((item) => {
+    <section className="mt-5 rounded-[24px] bg-[#1f2328] p-5 text-white md:p-7">
+      <div className="text-[13px] font-light text-white/60">המצב שלך, {firstName}</div>
+      <div className="mt-1">
+        {headline.amount !== null ? (
+          <div className="text-[2.2rem] leading-none tabular-nums md:text-[2.75rem]">
+            {formatAgorot(headline.amount)}
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "font-light text-white/80",
+            headline.amount !== null ? "mt-2 text-[14px]" : "text-[1.35rem] text-white"
+          )}
+        >
+          {headline.text}
+          {facts.map((fact, index) => (
+            <span key={fact} className="text-white/55">
+              {index === 0 ? " · " : ", "}
+              <span className="whitespace-nowrap">{fact}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {toPay.map((item) => {
+        const key = `${item.fromId}-${item.toId}`;
+        const account = accounts[item.toId];
+        return (
+          <div key={key} className="mt-5 rounded-[16px] bg-white/[.06] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <UserAvatar member={memberById(members, item.toId)} size="sm" />
+                <div className="min-w-0">
+                  <div className="truncate text-[15px]">{name(item.toId)}</div>
+                  <div className="text-[13px] tabular-nums text-white/60">{formatAgorot(item.amountAgorot)}</div>
+                </div>
+              </div>
+              {open?.key !== key ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpen({ key, method: "transfer" })}
+                    className="rounded-full bg-[#c9a15a] px-4 py-2 text-[13px] text-[#1f2328] hover:bg-[#d4ae6a]"
+                  >
+                    שילמתי בהעברה
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpen({ key, method: "cash" })}
+                    className="rounded-full border border-white/25 px-4 py-2 text-[13px] text-white hover:bg-white/10"
+                  >
+                    שילמתי במזומן
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            {account ? (
+              <DarkBank account={account} />
+            ) : (
+              <p className="mt-3 text-[13px] font-light text-white/50">
+                {name(item.toId)} עדיין לא מילא פרטי חשבון. אפשר לשלם במזומן או לבקש ממנו.
+              </p>
+            )}
+            {open?.key === key ? form(item, open.method) : null}
+          </div>
+        );
+      })}
+
+      {toGet.length ? (
+        <div className="mt-5 divide-y divide-white/10 rounded-[16px] bg-white/[.06] px-4">
+          {toGet.map((item) => {
             const key = `${item.fromId}-${item.toId}`;
-            const from = memberById(members, item.fromId)?.displayName ?? "חבר";
-            const to = memberById(members, item.toId)?.displayName ?? "חבר";
-            const account = accounts[item.toId];
-            const iPay = item.fromId === me.id;
-            const canMark = iPay || item.toId === me.id || admin;
             return (
               <div key={key} className="py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-1.5 text-sm">
-                    <span className="truncate">{iPay ? "אני" : from}</span>
-                    <ArrowLeft className="size-3.5 shrink-0 text-[#9aa1ab]" />
-                    <span className="truncate">{item.toId === me.id ? "אני" : to}</span>
-                  </div>
-                  <b className="shrink-0 text-sm font-medium">{formatAgorot(item.amountAgorot)}</b>
-                </div>
-                {iPay ? (
-                  account ? (
-                    <div className="mt-1.5 rounded-[12px] bg-[#f3f5f7] px-3 py-2">
-                      <BankLines account={account} compact />
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <UserAvatar member={memberById(members, item.fromId)} size="sm" />
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px]">{name(item.fromId)}</div>
+                      <div className="text-[12px] font-light text-white/55">יעביר לך</div>
                     </div>
-                  ) : (
-                    <p className="mt-1 text-xs font-light text-[#9aa1ab]">{to} עדיין לא מילא פרטי חשבון</p>
-                  )
-                ) : null}
-                {canMark && open === key ? (
-                  <div className="mt-2">
-                    <PaymentForm
-                      members={members}
-                      gatherings={gatherings}
-                      me={me}
-                      title="למי שולם ואיך"
-                      initial={{
-                        fromId: item.fromId,
-                        toId: item.toId,
-                        amount: item.amountAgorot / 100,
-                        eventId,
-                        method: "transfer",
-                      }}
-                      onDone={() => setOpen(null)}
-                    />
                   </div>
-                ) : canMark ? (
-                  <Button size="sm" variant="outline" className="mt-2 rounded-full" onClick={() => setOpen(key)}>
-                    {iPay ? "סימנתי ששילמתי" : item.toId === me.id ? "קיבלתי" : "סימון כשולם"}
-                  </Button>
-                ) : null}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-[14px] tabular-nums">{formatAgorot(item.amountAgorot)}</span>
+                    {open?.key !== key ? (
+                      <button
+                        type="button"
+                        onClick={() => setOpen({ key, method: "transfer" })}
+                        className="rounded-full border border-white/25 px-3 py-1 text-[12px] hover:bg-white/10"
+                      >
+                        קיבלתי
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                {open?.key === key ? form(item, open.method) : null}
               </div>
             );
           })}
         </div>
-      )}
+      ) : null}
+
+      {totalFlow > 0 ? (
+        <div className="mt-5">
+          <div className="flex justify-between text-[12px] font-light text-white/60">
+            <span>החשבון נסגר</span>
+            <span className="tabular-nums">
+              {formatAgorot(report.paymentsAgorot)} מתוך {formatAgorot(totalFlow)}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-[#c9a15a]"
+              style={{ width: `${Math.max(3, Math.round((report.paymentsAgorot / totalFlow) * 100))}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {admin ? (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+          <span className="text-[13px] font-light text-white/70">
+            {debtors ? `${debtors} חייבים · ${formatAgorot(openAgorot)} פתוח` : "אין חייבים פתוחים"}
+          </span>
+          {debtors ? (
+            <button
+              type="button"
+              onClick={() =>
+                void act({ type: "sendExpenseNotice", scope })
+                  .then(() => toast.success("נשלח לכל מי שצריך לשלם"))
+                  .catch(fail("השליחה נכשלה"))
+              }
+              className="rounded-full border border-white/25 px-4 py-1.5 text-[13px] hover:bg-white/10"
+            >
+              שליחה אישית לכל החייבים
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function PaymentsPanel({
+function DarkBank({ account }: { account: BankAccount }) {
+  const bankLine = [account.holder, account.bank, account.branch ? `סניף ${account.branch}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+      <div className="min-w-0 text-[13px] font-light leading-6 text-white/75">
+        {bankLine ? <div className="truncate">{bankLine}</div> : null}
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          {account.account ? (
+            <span dir="ltr" className="text-[16px] text-white tabular-nums">
+              {account.account}
+            </span>
+          ) : null}
+          {account.phone ? (
+            <span>
+              ביט / פייבוקס{" "}
+              <span dir="ltr" className="text-white tabular-nums">
+                {account.phone}
+              </span>
+            </span>
+          ) : null}
+        </div>
+        {account.note ? <div className="text-white/55">{account.note}</div> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {account.account ? <CopyPill label="העתקת חשבון" value={account.account} /> : null}
+        {account.phone ? <CopyPill label="העתקת טלפון" value={account.phone} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function CopyPill({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          toast.success("הועתק");
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          toast.error("ההעתקה נכשלה");
+        }
+      }}
+      className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[12px] text-white/85 hover:bg-white/10"
+    >
+      {copied ? <Check className="size-3.5 text-[#8fd1a8]" /> : <Copy className="size-3.5" />}
+      {label}
+    </button>
+  );
+}
+
+function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-start text-[#a9782c] hover:bg-[#f5f0e7]/50"
+    >
+      <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#f5f0e7]">
+        <Plus className="size-4" />
+      </span>
+      {label}
+    </button>
+  );
+}
+
+function RowActions({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap gap-2 pe-4 ps-[3.75rem] pb-3.5">{children}</div>;
+}
+
+function ExpenseList({
+  expenses,
+  members,
+  gatherings,
+  me,
+  showEvent,
+  defaultEventId,
+}: {
+  expenses: Expense[];
+  members: Member[];
+  gatherings: Gathering[];
+  me: Member;
+  showEvent: boolean;
+  defaultEventId?: string;
+}) {
+  const { act } = useApp();
+  const [active, setActive] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <div className={cn(panel, "divide-y divide-[#e9ecef] overflow-hidden")}>
+      {expenses.length === 0 && !adding ? (
+        <p className="px-5 py-6 text-sm font-light text-muted-foreground">
+          {showEvent ? "עדיין אין הוצאות. רושמים כאן מה נקנה, בכמה, ופירוט." : "אין הוצאות משויכות לכאן."}
+        </p>
+      ) : null}
+      {expenses.map((expense) => {
+        if (editing === expense.id) {
+          return (
+            <div key={expense.id} className="p-3">
+              <ExpenseForm
+                members={members}
+                gatherings={gatherings}
+                expense={expense}
+                initial={expense}
+                onDone={() => setEditing(null)}
+              />
+            </div>
+          );
+        }
+        const buyer = memberById(members, expense.memberId);
+        const editable = canEditExpense(me, expense);
+        const meta = [
+          buyer?.displayName ?? "חבר",
+          expense.detail.trim(),
+          showEvent ? eventName(gatherings, expense.eventId) : null,
+          expense.excluded ? "מוחרג מהחשבון" : null,
+        ].filter(Boolean);
+        return (
+          <div key={expense.id}>
+            <button
+              type="button"
+              disabled={!editable}
+              onClick={() => setActive(active === expense.id ? null : expense.id)}
+              className={cn(
+                "flex w-full items-center gap-3 px-4 py-3.5 text-start",
+                editable && "hover:bg-[#f3f5f7]/60",
+                expense.excluded && "opacity-55"
+              )}
+            >
+              <UserAvatar member={buyer} />
+              <div className="min-w-0 flex-1">
+                <div className={cn("truncate text-[15px]", expense.excluded && "line-through")}>{expense.title}</div>
+                <div className="truncate text-xs font-light text-muted-foreground">{meta.join(" · ")}</div>
+              </div>
+              <div className={cn("shrink-0 text-[15px] tabular-nums", expense.excluded && "line-through")}>
+                {formatShekels(expense.amount)}
+              </div>
+            </button>
+            {editable && active === expense.id ? (
+              <RowActions>
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => setEditing(expense.id)}>
+                  <Pencil data-icon="inline-start" />
+                  עריכה
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() =>
+                    void act({
+                      type: "setExpenseExcluded",
+                      expenseId: expense.id,
+                      excluded: !expense.excluded,
+                    }).catch(fail("העדכון נכשל"))
+                  }
+                >
+                  {expense.excluded ? "להחזיר לחשבון" : "החרגה"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() =>
+                    void act({ type: "deleteExpense", expenseId: expense.id }).catch(fail("המחיקה נכשלה"))
+                  }
+                >
+                  <Trash2 data-icon="inline-start" />
+                  מחיקה
+                </Button>
+              </RowActions>
+            ) : null}
+          </div>
+        );
+      })}
+      {adding ? (
+        <div className="p-3">
+          <ExpenseForm
+            members={members}
+            gatherings={gatherings}
+            initial={{ memberId: me.id, eventId: defaultEventId }}
+            onDone={() => setAdding(false)}
+          />
+        </div>
+      ) : (
+        <AddRow label="הוספת הוצאה" onClick={() => setAdding(true)} />
+      )}
+    </div>
+  );
+}
+
+function PaymentList({
   payments,
   members,
   gatherings,
@@ -393,70 +660,63 @@ function PaymentsPanel({
   defaultEventId?: string;
 }) {
   const { act } = useApp();
+  const [active, setActive] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const sorted = [...payments].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-medium">תשלומים שסומנו</h2>
-        {!adding ? (
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setAdding(true)}>
-            סימון תשלום
-          </Button>
-        ) : null}
-      </div>
-      {adding ? (
-        <PaymentForm
-          members={members}
-          gatherings={gatherings}
-          me={me}
-          initial={{ fromId: me.id, eventId: defaultEventId, method: "transfer" }}
-          onDone={() => setAdding(false)}
-        />
-      ) : null}
+    <div className={cn(panel, "divide-y divide-[#e9ecef] overflow-hidden")}>
       {sorted.length === 0 && !adding ? (
-        <p className={cn(panel, "px-5 py-6 text-sm font-light text-muted-foreground")}>
-          עוד לא סומנו תשלומים. מי שהעביר כסף מסמן כאן למי וכמה.
+        <p className="px-5 py-6 text-sm font-light text-muted-foreground">
+          עוד לא סומנו תשלומים. מי שהעביר כסף מסמן כאן למי, כמה ואיך.
         </p>
       ) : null}
       {sorted.map((payment) => {
         if (editing === payment.id) {
           return (
-            <PaymentForm
-              key={payment.id}
-              members={members}
-              gatherings={gatherings}
-              me={me}
-              payment={payment}
-              initial={payment}
-              onDone={() => setEditing(null)}
-            />
+            <div key={payment.id} className="p-3">
+              <PaymentForm
+                members={members}
+                gatherings={gatherings}
+                me={me}
+                payment={payment}
+                initial={payment}
+                onDone={() => setEditing(null)}
+              />
+            </div>
           );
         }
-        const from = memberById(members, payment.fromId)?.displayName ?? "חבר";
+        const from = memberById(members, payment.fromId);
         const to = memberById(members, payment.toId)?.displayName ?? "חבר";
-        const where = showEvent ? eventName(gatherings, payment.eventId) : null;
+        const editable = canEditPayment(me, payment);
         const meta = [
           formatDateShortHe(payment.createdAt),
           paymentMethodLabel(payment.method),
-          where,
+          showEvent ? eventName(gatherings, payment.eventId) : null,
           payment.note.trim(),
         ].filter(Boolean);
         return (
-          <article key={payment.id} className={cn(panel, "rounded-[16px] px-4 py-3")}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm">
-                  {from} שילם ל{to}
+          <div key={payment.id}>
+            <button
+              type="button"
+              disabled={!editable}
+              onClick={() => setActive(active === payment.id ? null : payment.id)}
+              className={cn("flex w-full items-center gap-3 px-4 py-3.5 text-start", editable && "hover:bg-[#f3f5f7]/60")}
+            >
+              <UserAvatar member={from} />
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-1.5 text-[15px]">
+                  <span className="truncate">{from?.displayName ?? "חבר"}</span>
+                  <ArrowLeft className="size-3.5 shrink-0 text-[#9aa1ab]" />
+                  <span className="truncate">{to}</span>
                 </div>
-                <div className="mt-0.5 text-xs font-light text-muted-foreground">{meta.join(" · ")}</div>
+                <div className="truncate text-xs font-light text-muted-foreground">{meta.join(" · ")}</div>
               </div>
-              <div className="shrink-0 text-sm text-[#3d8f62]">{formatShekels(payment.amount)}</div>
-            </div>
-            {canEditPayment(me, payment) ? (
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="shrink-0 text-[15px] tabular-nums text-[#3d8f62]">{formatShekels(payment.amount)}</div>
+            </button>
+            {editable && active === payment.id ? (
+              <RowActions>
                 <Button variant="outline" size="sm" className="rounded-full" onClick={() => setEditing(payment.id)}>
                   <Pencil data-icon="inline-start" />
                   עריכה
@@ -472,12 +732,161 @@ function PaymentsPanel({
                   <Trash2 data-icon="inline-start" />
                   מחיקה
                 </Button>
-              </div>
+              </RowActions>
             ) : null}
-          </article>
+          </div>
         );
       })}
-    </section>
+      {adding ? (
+        <div className="p-3">
+          <PaymentForm
+            members={members}
+            gatherings={gatherings}
+            me={me}
+            initial={{ fromId: me.id, eventId: defaultEventId, method: "transfer" }}
+            onDone={() => setAdding(false)}
+          />
+        </div>
+      ) : (
+        <AddRow label="סימון תשלום" onClick={() => setAdding(true)} />
+      )}
+    </div>
+  );
+}
+
+function MembersTab({
+  me,
+  members,
+  accounts,
+  gatherings,
+  report,
+  transfers,
+  scope,
+  eventId,
+}: {
+  me: Member;
+  members: Member[];
+  accounts: Record<string, BankAccount>;
+  gatherings: Gathering[];
+  report: Settlement;
+  transfers: Transfer[];
+  scope: ExpenseScope;
+  eventId?: string;
+}) {
+  const { act } = useApp();
+  const admin = isAdmin(me);
+  const [open, setOpen] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-5">
+      <div className={cn(panel, "divide-y divide-[#e9ecef] overflow-hidden")}>
+        {report.rows.map((row) => {
+          const member = memberById(members, row.memberId);
+          const moved = [
+            `קנה ${formatAgorot(row.spentAgorot)}`,
+            row.paidAgorot ? `העביר ${formatAgorot(row.paidAgorot)}` : "",
+            row.receivedAgorot ? `קיבל ${formatAgorot(row.receivedAgorot)}` : "",
+          ].filter(Boolean);
+          const pays = row.owesAgorot > 0;
+          return (
+            <div key={row.memberId} className="flex items-center gap-3 px-4 py-3">
+              <UserAvatar member={member} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[15px]">
+                  {member?.displayName ?? "חבר"}
+                  {row.memberId === me.id ? <span className="text-muted-foreground"> · אני</span> : null}
+                </div>
+                <div className="truncate text-xs font-light text-muted-foreground">
+                  {moved.join(" · ")}
+                  {accounts[row.memberId] ? " · יש פרטי בנק" : ""}
+                </div>
+              </div>
+              {row.balanceAgorot > 0 ? (
+                <span className="shrink-0 rounded-full bg-[#f8edd9] px-2.5 py-1 text-[12px] tabular-nums text-[#8d6424]">
+                  מגיע לו {formatAgorot(row.balanceAgorot)}
+                </span>
+              ) : pays ? (
+                <span className="shrink-0 rounded-full bg-[#f8e7e4] px-2.5 py-1 text-[12px] tabular-nums text-[#8d3a32]">
+                  לשלם {formatAgorot(row.owesAgorot)}
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs text-muted-foreground">מאוזן</span>
+              )}
+              {admin && pays && row.memberId !== me.id ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 rounded-full"
+                  onClick={() =>
+                    void act({ type: "sendExpenseNotice", memberId: row.memberId, scope })
+                      .then(() => toast.success(`נשלח ל${member?.displayName ?? "חבר"}`))
+                      .catch(fail("השליחה נכשלה"))
+                  }
+                >
+                  שלח
+                </Button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {report.remainderAgorot > 0 ? (
+        <p className="text-xs font-light text-[#9aa1ab]">
+          נשארו {report.remainderAgorot} אגורות, והן נוספות לחלק של חלק מהחברים כדי שהחשבון ייסגר בדיוק.
+        </p>
+      ) : null}
+
+      {transfers.length ? (
+        <section>
+          <h2 className="mb-2 text-[15px] font-medium">מי מעביר למי</h2>
+          <div className={cn(panel, "divide-y divide-[#e9ecef] overflow-hidden")}>
+            {transfers.map((item) => {
+              const key = `${item.fromId}-${item.toId}`;
+              const canMark = admin || item.fromId === me.id || item.toId === me.id;
+              return (
+                <div key={key} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-1.5 text-[14px]">
+                      <span className="truncate">{memberById(members, item.fromId)?.displayName ?? "חבר"}</span>
+                      <ArrowLeft className="size-3.5 shrink-0 text-[#9aa1ab]" />
+                      <span className="truncate">{memberById(members, item.toId)?.displayName ?? "חבר"}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[14px] tabular-nums">{formatAgorot(item.amountAgorot)}</span>
+                      {canMark && open !== key ? (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(key)}>
+                          שולם
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {open === key ? (
+                    <div className="mt-3">
+                      <PaymentForm
+                        members={members}
+                        gatherings={gatherings}
+                        me={me}
+                        title="למי שולם ואיך"
+                        initial={{
+                          fromId: item.fromId,
+                          toId: item.toId,
+                          amount: item.amountAgorot / 100,
+                          eventId,
+                          method: "transfer",
+                        }}
+                        onDone={() => setOpen(null)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <p className="text-sm font-light text-muted-foreground">החשבון סגור, אין העברות פתוחות.</p>
+      )}
+    </div>
   );
 }
 
@@ -647,91 +1056,6 @@ function GatheringSelect({
   );
 }
 
-function ExpenseRow({
-  expense,
-  members,
-  gatherings,
-  showEvent,
-  editable,
-}: {
-  expense: Expense;
-  members: Member[];
-  gatherings: Gathering[];
-  showEvent: boolean;
-  editable: boolean;
-}) {
-  const { act } = useApp();
-  const [editing, setEditing] = useState(false);
-  const buyer = memberById(members, expense.memberId);
-  const where = showEvent ? eventName(gatherings, expense.eventId) : null;
-
-  if (editing) {
-    return (
-      <ExpenseForm
-        members={members}
-        gatherings={gatherings}
-        expense={expense}
-        initial={expense}
-        onDone={() => setEditing(false)}
-      />
-    );
-  }
-
-  return (
-    <article className={cn(panel, "rounded-[16px] px-4 py-3")}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className={cn("text-sm", expense.excluded && "text-muted-foreground line-through")}>
-            {expense.title}
-          </div>
-          <div className="mt-0.5 text-xs font-light text-muted-foreground">
-            {[buyer?.displayName ?? "חבר", expense.detail.trim(), where].filter(Boolean).join(" · ")}
-          </div>
-        </div>
-        <div className={cn("shrink-0 text-sm", expense.excluded && "text-muted-foreground line-through")}>
-          {formatShekels(expense.amount)}
-        </div>
-      </div>
-      {expense.excluded ? (
-        <div className="mt-2 inline-flex rounded-full bg-[#f8e7e4] px-2 py-0.5 text-[11px] text-[#8d3a32]">
-          מוחרג מהחשבון
-        </div>
-      ) : null}
-      {editable ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => setEditing(true)}>
-            <Pencil data-icon="inline-start" />
-            עריכה
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            onClick={() =>
-              void act({
-                type: "setExpenseExcluded",
-                expenseId: expense.id,
-                excluded: !expense.excluded,
-              }).catch(fail("העדכון נכשל"))
-            }
-          >
-            {expense.excluded ? "להחזיר לחשבון" : "החרגה"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full"
-            onClick={() => void act({ type: "deleteExpense", expenseId: expense.id }).catch(fail("המחיקה נכשלה"))}
-          >
-            <Trash2 data-icon="inline-start" />
-            מחיקה
-          </Button>
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
 function ExpenseForm({
   members,
   gatherings,
@@ -828,7 +1152,7 @@ function ExpenseForm({
         <Button type="submit" className="rounded-full" disabled={saving}>
           {saving ? "שומר…" : expense ? "שמירה" : "הוספה"}
         </Button>
-        {expense ? (
+        {onDone ? (
           <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>
             ביטול
           </Button>
