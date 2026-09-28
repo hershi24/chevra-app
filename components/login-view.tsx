@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Eye, EyeOff } from "lucide-react";
 
 type Choice = { id: string; displayName: string; initials: string; avatarColor: string };
 
 export function LoginView() {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [choices, setChoices] = useState<Choice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,56 +44,49 @@ export function LoginView() {
 
   return (
     <div
-      className="flex min-h-dvh items-start justify-center bg-[#1a120c] bg-cover bg-bottom bg-fixed px-4 pt-[5vh] pb-[18vh]"
-      style={{
-        backgroundImage:
-          "linear-gradient(to bottom, rgba(20,12,8,0.12), rgba(20,12,8,0.28)), url(/login-bg.jpg)",
-      }}
+      className="min-h-dvh bg-[#1a120c] bg-cover bg-fixed"
+      style={{ backgroundImage: "url(/login-bg.jpg)", backgroundPosition: "center 30%" }}
     >
-      <div className="w-full max-w-[26rem]">
-        <p
-          className="text-center text-[11px] font-light tracking-[0.28em] text-white"
-          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
-        >
-          אש קודש
-        </p>
-        <h1
-          className="mt-3 text-center text-[2.35rem] font-medium tracking-tight text-white md:text-[2.6rem]"
-          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
-        >
-          מיין חברה
-        </h1>
-        <div className="mx-auto mt-4 h-px w-12 bg-white/70" />
-        <p
-          className="mx-auto mt-5 max-w-[26rem] text-center text-[15px] font-light leading-7 text-white"
-          style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}
-        >
-          האתר הרשמי של חבורת &ldquo;אש קודש&rdquo; או בשמה השני{" "}
-          <span className="whitespace-nowrap">
-            מיין חברה<span dir="ltr">.com</span>
-          </span>
-          . בהנאה!
-        </p>
-
+      <div
+        className="flex min-h-dvh flex-col items-center justify-center px-[18px] py-8 backdrop-blur-[3px]"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse at center, rgba(20,12,8,0.35), rgba(20,12,8,0.8)), linear-gradient(to top, rgba(20,12,8,0.85), rgba(20,12,8,0) 45%)",
+        }}
+      >
         <div
-          className="mt-8 rounded-[1.5rem] bg-white p-6 ring-1 ring-[#e6e2da] md:p-8"
-          style={{ boxShadow: "0 18px 50px rgba(0,0,0,0.28)" }}
+          className="w-full max-w-[420px] rounded-[28px] border border-white/30 bg-white/[0.12] px-[22px] pt-[30px] pb-6 text-center text-white backdrop-blur-[22px] backdrop-saturate-[1.4] md:px-[34px] md:pt-9 md:pb-[30px]"
+          style={{ boxShadow: "0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25)" }}
         >
+          <img
+            src="/brand-logo.png"
+            alt="אש קודש · מיין חברה"
+            width={900}
+            height={471}
+            className="mx-auto block h-auto w-[180px] md:w-[220px]"
+            style={{ filter: "drop-shadow(0 6px 18px rgba(0,0,0,0.45))" }}
+          />
+          <div className="mx-auto mt-[18px] h-0.5 w-11 bg-gradient-to-r from-transparent via-[#d9b36a] to-transparent" />
+          <h1 className="mt-4 text-[26px] font-normal">ברוכים הבאים לחבורה</h1>
+          <p className="mt-1.5 text-sm leading-7 text-white/70">
+            האתר הרשמי של &ldquo;אש קודש&rdquo; · מיין חברה
+          </p>
+
           <form
-            className="space-y-4"
+            className="mt-[26px] text-right"
             onSubmit={(e) => {
               e.preventDefault();
               setChoices(null);
               void submit();
             }}
           >
-            <div className="grid gap-1.5">
-              <Label htmlFor="password" className="font-light text-[#6f6a62]">
-                סיסמה
-              </Label>
-              <Input
+            <label htmlFor="password" className="sr-only">
+              סיסמה
+            </label>
+            <div className="relative">
+              <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoFocus
                 autoComplete="current-password"
                 value={password}
@@ -103,22 +95,34 @@ export function LoginView() {
                   setChoices(null);
                 }}
                 placeholder="הסיסמה שלכם"
-                className="h-12 rounded-xl border-[#e6e2da] bg-[#faf9f7] px-4 text-base"
+                className="h-[54px] w-full rounded-2xl border border-white/35 bg-white/[0.92] ps-[18px] pe-12 text-base text-[#1f2328] outline-none placeholder:text-[#9aa1ab] focus:border-[#d9b36a] focus:ring-4 focus:ring-[#d9b36a]/25"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? "הסתרת הסיסמה" : "הצגת הסיסמה"}
+                className="absolute end-3 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-[#9aa1ab] hover:text-[#6b7280]"
+              >
+                {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+              </button>
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button
+            {error ? <p className="mt-2.5 text-center text-sm text-[#ffb4a8]">{error}</p> : null}
+            <button
               type="submit"
-              className="h-12 w-full rounded-xl bg-[#a9782c] text-base text-white hover:bg-[#8d6424]"
               disabled={loading || !password}
+              className="mt-3.5 h-[54px] w-full rounded-2xl text-[17px] text-white transition-opacity disabled:opacity-60"
+              style={{
+                background: "linear-gradient(180deg, #c9a15a, #a9782c)",
+                boxShadow: "0 12px 28px -10px rgba(201,161,90,0.9), inset 0 1px 0 rgba(255,255,255,0.35)",
+              }}
             >
-              {loading ? "נכנס…" : "כניסה לחבורה"}
-            </Button>
+              {loading ? "נכנס…" : "כניסה"}
+            </button>
           </form>
 
           {choices ? (
-            <div className="mt-6 border-t border-[#eeeae3] pt-5">
-              <p className="mb-3 text-[13px] font-light leading-6 text-[#6f6a62]">
+            <div className="mt-6 border-t border-white/20 pt-5 text-right">
+              <p className="mb-3 text-[13px] leading-6 text-white/75">
                 הסיסמה הזו פתוחה לכמה חברים. בחרו את השם שלכם.
               </p>
               <div className="flex flex-col gap-2">
@@ -128,7 +132,7 @@ export function LoginView() {
                     type="button"
                     disabled={loading}
                     onClick={() => void submit(choice.id)}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-start ring-1 ring-[#e6e2da] hover:bg-[#f6f4f0]"
+                    className="flex items-center gap-3 rounded-2xl border border-white/25 bg-white/10 px-3 py-2 text-start hover:bg-white/20"
                   >
                     <span
                       className="flex size-8 items-center justify-center rounded-full text-xs text-white"
@@ -142,7 +146,10 @@ export function LoginView() {
               </div>
             </div>
           ) : null}
+
+          <p className="mt-4 text-[12.5px] text-white/60">שכחתם סיסמה? פנו למנהל החבורה</p>
         </div>
+        <p className="mt-6 text-xs text-white/50">בהנאה!</p>
       </div>
     </div>
   );
