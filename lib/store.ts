@@ -15,7 +15,12 @@ import { ensureMemberSecrets, publicMember } from "./password";
 import { isLeader } from "./permissions";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
 import { ensureExpenses } from "./expenses";
-import { loadExpenseLedger, syncExpenseLedger } from "./supabase-expenses";
+import {
+  loadBankAccounts,
+  loadExpenseLedger,
+  syncBankAccounts,
+  syncExpenseLedger,
+} from "./supabase-expenses";
 import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -110,7 +115,10 @@ export async function readState(): Promise<AppState> {
     if (ledger) {
       state.expenses = ledger.items;
       state.settings.showExpenses = ledger.visible;
+      if (ledger.payments) state.payments = ledger.payments;
     }
+    const accounts = await loadBankAccounts();
+    if (accounts) state.bankAccounts = accounts;
   } catch (error) {
     console.error("Supabase chat read failed", error);
   }
@@ -131,6 +139,7 @@ export async function persistQuietly(
         await syncChatDiff(before, current);
         await syncGatheringsDiff(before, current);
         await syncExpenseLedger(before, current);
+        await syncBankAccounts(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -158,6 +167,7 @@ export async function updateState(
         await syncChatDiff(before, current);
         await syncGatheringsDiff(before, current);
         await syncExpenseLedger(before, current);
+        await syncBankAccounts(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -197,6 +207,8 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     messages: visibleMessages,
     settings: state.settings,
     expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
+    payments: state.settings.showExpenses === false ? [] : (state.payments ?? []),
+    bankAccounts: state.settings.showExpenses === false ? {} : (state.bankAccounts ?? {}),
     emailLog: state.emailLog,
     ivrLog: state.ivrLog,
     revision: state.revision,

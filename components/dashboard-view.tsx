@@ -139,7 +139,7 @@ function Dashboard({
 
   const showExpenses = expensesOpen(state);
   const myRow = showExpenses
-    ? settlement(state.expenses ?? [], state.members.map((m) => m.id)).rows.find(
+    ? settlement(state.expenses ?? [], state.members.map((m) => m.id), state.payments ?? []).rows.find(
         (row) => row.memberId === me.id
       )
     : undefined;

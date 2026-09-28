@@ -1,4 +1,4 @@
-import type { Gathering, Message, Role, RsvpStatus } from "./types";
+import type { BankAccount, Gathering, Message, Role, RsvpStatus } from "./types";
 
 export type ActionBody =
   | { type: "rsvp"; eventId: string; status: RsvpStatus }
@@ -69,8 +69,36 @@ export type ActionBody =
       detail?: string;
       amount: number;
       excluded?: boolean;
+      eventId?: string | null;
+    }
+  | {
+      type: "updateExpense";
+      expenseId: string;
+      patch: {
+        memberId?: string;
+        title?: string;
+        detail?: string;
+        amount?: number;
+        excluded?: boolean;
+        eventId?: string | null;
+      };
     }
   | { type: "setExpenseExcluded"; expenseId: string; excluded: boolean }
   | { type: "deleteExpense"; expenseId: string }
   | { type: "setExpensesVisible"; visible: boolean }
-  | { type: "sendExpenseNotice"; memberId?: string };
+  | { type: "sendExpenseNotice"; memberId?: string; scope?: string }
+  | {
+      type: "addPayment";
+      fromId: string;
+      toId: string;
+      amount: number;
+      eventId?: string | null;
+      note?: string;
+    }
+  | {
+      type: "updatePayment";
+      paymentId: string;
+      patch: { fromId?: string; toId?: string; amount?: number; eventId?: string | null; note?: string };
+    }
+  | { type: "deletePayment"; paymentId: string }
+  | { type: "setBankAccount"; memberId: string; account: Partial<BankAccount> | null };
