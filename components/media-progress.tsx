@@ -30,6 +30,28 @@ export function MediaProgressOverlay({
   name?: string;
   onReady?: () => void;
 }) {
+  if (type === "file") {
+    return (
+      <div
+        data-upload-progress=""
+        className={cn("flex flex-col justify-center gap-2 bg-[#1f2328] px-4 text-white", className)}
+      >
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="truncate" dir="auto">
+            {name || "קובץ"}
+          </span>
+          <span className="shrink-0 tabular-nums">{progress}%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/25">
+          <div
+            className="h-full rounded-full bg-white transition-[width] duration-150"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="text-[12px] font-light text-white/70">{formatUploadRemaining(remainingSeconds)}</div>
+      </div>
+    );
+  }
   return (
     <div
       data-upload-progress=""
@@ -57,11 +79,7 @@ export function MediaProgressOverlay({
           <VoiceNotePlayer src={src} onReady={onReady} />
         </div>
       ) : (
-        <div className="flex h-24 items-start px-4 pt-3 text-sm text-white/85">
-          <span className="truncate" dir="auto">
-            {name || "קובץ"}
-          </span>
-        </div>
+        <div className="flex h-32 items-center justify-center text-sm text-white/80">מעלה קובץ…</div>
       )}
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white">
         <div className="text-2xl font-medium tabular-nums">{progress}%</div>
