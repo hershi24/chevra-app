@@ -33,7 +33,7 @@ export function ChatMediaGrid({
   }
   const odd = items.length % 2 === 1;
   return (
-    <div className={cn("grid w-[17rem] max-w-full grid-cols-2 gap-1", className)}>
+    <div className={cn("grid w-[12.5rem] max-w-full grid-cols-2 gap-1 md:w-[17rem]", className)}>
       {items.map((item, index) => (
         <MediaTile
           key={item.id}
@@ -65,7 +65,11 @@ function SingleMedia({
       onOpen={onOpen}
       onRatio={(value) => setRatio(Math.min(MAX_RATIO, Math.max(MIN_RATIO, value)))}
       style={{ aspectRatio: ratio }}
-      className={cn("w-[17rem] max-w-full rounded-2xl", className)}
+      className={cn(
+        "max-w-full rounded-2xl md:w-[17rem]",
+        ratio < 1 ? "w-[10.625rem]" : "w-[12.5rem]",
+        className
+      )}
     />
   );
 }
