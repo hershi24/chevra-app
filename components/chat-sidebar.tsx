@@ -60,7 +60,7 @@ export function useChatReads(activeId: string | null, lastActiveMessageId: strin
       fetch("/api/chat/read", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ channelId: activeId }),
+        body: JSON.stringify({ channelId: activeId, lastMessageId: lastActiveMessageId }),
       })
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { channelId?: string; at?: string } | null) => {
