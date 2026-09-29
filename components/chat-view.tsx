@@ -826,7 +826,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     <div className="mb-0.5 px-1 text-[11px] text-[#5f6368]">מעלה…</div>
                     <div
                       className={cn(
-                        "w-[17rem] max-w-full",
+                        "w-[12.5rem] max-w-full md:w-[17rem]",
                         pendingUploads.length > 1 && "grid grid-cols-2 gap-1"
                       )}
                     >

@@ -162,7 +162,7 @@ export function SeenAvatar({ member }: { member: Member | undefined }) {
   if (!member) return null;
   return (
     <span
-      className="pointer-events-none absolute -right-[22px] bottom-0"
+      className="pointer-events-none absolute -right-[7px] -bottom-[5px] z-10"
       title={`${member.displayName} קרא`}
       aria-label={`${member.displayName} קרא`}
     >
