@@ -121,7 +121,7 @@ export function MessageResult({
 }) {
   const author = memberById(members, message.authorId);
   const image = message.attachments.find((file) => file.type === "image");
-  const where = channel.type === "dm" ? "הודעה פרטית" : channelTitle;
+  const where = channel.type === "dm" ? `פרטי עם ${channelTitle}` : channelTitle;
   return (
     <button
       type="button"
