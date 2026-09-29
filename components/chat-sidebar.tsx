@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Hash,
@@ -9,7 +10,16 @@ import {
   Search,
   Trees,
   Utensils,
+  X,
 } from "lucide-react";
+import {
+  JUMP_KEY,
+  MessageResult,
+  SEARCH_FILTERS,
+  searchMessages,
+  type JumpRequest,
+  type SearchFilter,
+} from "@/components/chat-search";
 import { UserAvatar } from "@/components/user-avatar";
 import { guideChatTitle, isGuideChannel, isRoshChevra } from "@/lib/channels";
 import { memberById, roleLabel } from "@/lib/format";
@@ -111,6 +121,19 @@ function RoomGlyph({ channel, guide }: { channel: Channel; guide: boolean }) {
   return <Hash className={cls} aria-hidden />;
 }
 
+const RESULTS_PAGE = 30;
+
+/** Survives switching chats, which remounts the sidebar with the new page. */
+const lastSearch: { query: string; filter: SearchFilter; openedId: string | null } = {
+  query: "",
+  filter: "all",
+  openedId: null,
+};
+
+function rememberSearch(patch: Partial<typeof lastSearch>) {
+  Object.assign(lastSearch, patch);
+}
+
 type Row = {
   channel: Channel;
   title: string;
@@ -144,7 +167,27 @@ export function ChatSidebar({
   top?: React.ReactNode;
   className?: string;
 }) {
-  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const [query, setQueryState] = useState(() => lastSearch.query);
+  const [filter, setFilterState] = useState<SearchFilter>(() => lastSearch.filter);
+  const [openedId, setOpenedId] = useState<string | null>(() => lastSearch.openedId);
+  const [shown, setShown] = useState(RESULTS_PAGE);
+  const setQuery = (value: string) => {
+    rememberSearch({ query: value });
+    setQueryState(value);
+    setShown(RESULTS_PAGE);
+  };
+  const setFilter = (value: SearchFilter) => {
+    rememberSearch({ filter: value });
+    setFilterState(value);
+    setShown(RESULTS_PAGE);
+  };
+  const clearSearch = () => {
+    setQuery("");
+    setFilter("all");
+    rememberSearch({ openedId: null });
+    setOpenedId(null);
+  };
   const online = useMemo(() => new Set(onlineIds), [onlineIds]);
   const others = useMemo(
     () =>
@@ -195,8 +238,23 @@ export function ChatSidebar({
   }, [channels, members, messages, me, reads, activeId]);
 
   const q = query.trim();
+  const searching = Boolean(q) || filter !== "all";
+  const rowById = useMemo(() => new Map(rows.map((row) => [row.channel.id, row])), [rows]);
+  const results = useMemo(
+    () => searchMessages(messages, new Set(rowById.keys()), q, filter),
+    [messages, rowById, q, filter]
+  );
+  const openResult = (message: Message) => {
+    rememberSearch({ openedId: message.id });
+    setOpenedId(message.id);
+    const jump: JumpRequest = { messageId: message.id, q };
+    sessionStorage.setItem(JUMP_KEY, JSON.stringify(jump));
+    if (message.channelId === activeId) window.dispatchEvent(new CustomEvent(JUMP_KEY));
+    else router.push(`/chat/${message.channelId}`);
+  };
   const match = (row: Row) =>
-    !q || row.title.includes(q) || (row.last ? preview(row.last).includes(q) : false);
+    filter === "all" &&
+    (!q || row.title.includes(q) || (row.last ? preview(row.last).includes(q) : false));
   const byRecent = (a: Row, b: Row) => (b.last?.createdAt ?? "").localeCompare(a.last?.createdAt ?? "");
   const rooms = rows.filter((row) => row.channel.type !== "dm" && !row.guide && match(row));
   const guides = rows.filter((row) => row.guide && match(row)).sort(byRecent);
@@ -206,7 +264,9 @@ export function ChatSidebar({
     rows.filter((row) => row.channel.type === "dm" && row.channel.memberIds.length === 2).flatMap((row) => row.channel.memberIds)
   );
   const fresh = others
-    .filter((member) => !talkedTo.has(member.id) && (!q || member.displayName.includes(q)))
+    .filter(
+      (member) => filter === "all" && !talkedTo.has(member.id) && (!q || member.displayName.includes(q))
+    )
     .sort(
       (a, b) =>
         Number(online.has(b.id)) - Number(online.has(a.id)) || a.displayName.localeCompare(b.displayName, "he")
@@ -238,19 +298,96 @@ export function ChatSidebar({
             </p>
           </div>
         </div>
-        <label className="flex items-center gap-2 rounded-xl border border-[#e3e7ec] bg-white px-3 py-2">
+        <label
+          className={cn(
+            "flex items-center gap-2 rounded-xl border bg-white px-3 py-2 transition",
+            searching ? "border-primary/60 shadow-[0_0_0_3px_rgba(184,134,47,0.12)]" : "border-[#e3e7ec]"
+          )}
+        >
           <Search className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש שיחה או חבר"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") clearSearch();
+            }}
+            placeholder="חיפוש שיחה, חבר או הודעה"
             className="min-w-0 flex-1 bg-transparent text-[13px] font-normal outline-none placeholder:text-muted-foreground/70"
           />
+          {searching ? (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="ניקוי החיפוש"
+              className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-black/5"
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
         </label>
+        {searching ? (
+          <div className="flex flex-wrap gap-1.5">
+            {SEARCH_FILTERS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setFilter(item.id)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-[11.5px] font-light transition",
+                  filter === item.id
+                    ? "border-[#e6d3ad] bg-[#f5f0e7] text-primary"
+                    : "border-[#e3e7ec] bg-white text-foreground/75 hover:bg-black/[0.03]"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-6">
         {top}
+        {searching ? (
+          <div className="pt-3">
+            <div className="flex items-baseline justify-between px-2.5 pb-1 text-[11px] font-light tracking-wide text-muted-foreground">
+              <span>הודעות</span>
+              <span>{results.length === 1 ? "תוצאה אחת" : `${results.length} תוצאות`}</span>
+            </div>
+            {results.length ? (
+              <div className="space-y-0.5">
+                {results.slice(0, shown).map((message) => {
+                  const row = rowById.get(message.channelId)!;
+                  return (
+                    <MessageResult
+                      key={message.id}
+                      message={message}
+                      query={q}
+                      members={members}
+                      channel={row.channel}
+                      channelTitle={row.title}
+                      active={openedId === message.id}
+                      onOpen={() => openResult(message)}
+                    />
+                  );
+                })}
+                {results.length > shown ? (
+                  <button
+                    type="button"
+                    onClick={() => setShown((count) => count + RESULTS_PAGE)}
+                    className="w-full rounded-xl px-2.5 py-2 text-start text-[12.5px] text-primary hover:bg-black/[0.03]"
+                  >
+                    עוד {Math.min(RESULTS_PAGE, results.length - shown)} תוצאות
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="px-2.5 py-3 text-[12.5px] font-light text-muted-foreground">
+                {q ? `לא נמצאו הודעות עם «${q}»` : "אין עדיין הודעות מהסוג הזה"}
+              </p>
+            )}
+          </div>
+        ) : null}
         {rooms.length ? (
           <Section title="ערוצים">
             {rooms.map((row) => (
@@ -274,7 +411,7 @@ export function ChatSidebar({
             {freshDms.map(freshRow)}
           </Section>
         ) : null}
-        {q && !rooms.length && !guides.length && !dms.length && !fresh.length ? (
+        {q && !results.length && !rooms.length && !guides.length && !dms.length && !fresh.length ? (
           <p className="px-3 py-8 text-center text-[13px] font-light text-muted-foreground">
             לא נמצאו שיחות
           </p>
