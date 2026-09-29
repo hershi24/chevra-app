@@ -157,7 +157,8 @@ export async function persistQuietly(
 }
 
 export async function updateState(
-  mutator: (state: AppState) => void
+  mutator: (state: AppState) => void,
+  { announce = true }: { announce?: boolean } = {}
 ): Promise<AppState> {
   const run = (g.__chevraWrite ?? Promise.resolve()).then(async () => {
     const current = structuredClone(await readState());
@@ -178,7 +179,7 @@ export async function updateState(
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
       }
     }
-    emitUpdate(current.revision);
+    if (announce) emitUpdate(current.revision);
     return current;
   });
   g.__chevraWrite = run.then(
