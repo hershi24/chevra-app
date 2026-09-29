@@ -33,6 +33,7 @@ import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
 import { ChatSidebar, useChatReads } from "@/components/chat-sidebar";
 import { ChatFileCard } from "@/components/chat-file-card";
+import { JUMP_KEY, markText, type JumpRequest } from "@/components/chat-search";
 import { SeenAvatar, TypingIndicator, useDmSeen, useTypers, useTypingSignal } from "@/components/chat-live";
 import { ChatMediaGrid, isVisualAttachment } from "@/components/chat-media-grid";
 import { EmojiPicker } from "@/components/emoji-picker";
@@ -118,6 +119,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [pollOpen, setPollOpen] = useState(false);
   const [zoomMedia, setZoomMedia] = useState<{ src: string; type: "image" | "video" } | null>(null);
   const flashTimer = useRef<number | null>(null);
+  const [searchMark, setSearchMark] = useState<JumpRequest | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const pendingChatRef = useRef<HTMLElement>(null);
 
@@ -174,6 +176,33 @@ export function ChatView({ channelId }: { channelId?: string }) {
     }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, active?.id, pendingUploads.length, typerIds.length]);
+
+  useEffect(() => {
+    const jump = () => {
+      const raw = sessionStorage.getItem(JUMP_KEY);
+      if (!raw) return;
+      let request: JumpRequest;
+      try {
+        request = JSON.parse(raw) as JumpRequest;
+      } catch {
+        sessionStorage.removeItem(JUMP_KEY);
+        return;
+      }
+      const el = document.getElementById(`message-${request.messageId}`);
+      if (!el) return;
+      sessionStorage.removeItem(JUMP_KEY);
+      window.setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setSearchMark(request);
+        setFlashId(request.messageId);
+        if (flashTimer.current) window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => setFlashId(null), 1600);
+      }, 350);
+    };
+    jump();
+    window.addEventListener(JUMP_KEY, jump);
+    return () => window.removeEventListener(JUMP_KEY, jump);
+  }, [active?.id, messages.length]);
 
   useEffect(() => {
     const el = composerRef.current;
@@ -718,7 +747,10 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           </div>
                         ) : null}
                         <div className={message.quote ? "px-2.5 pt-1" : undefined}>
-                        {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(message.text)}</p> : null}
+                        {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(
+                              message.text,
+                              searchMark?.messageId === message.id ? searchMark.q : undefined
+                            )}</p> : null}
                         {message.voiceUrl ? (
                           <VoiceNotePlayer src={message.voiceUrl} className={cn("ring-0", tightMedia ? (mine ? "bg-[#d3e3fd]" : "bg-[#f1f3f4]") : "mt-2 bg-white/70")} />
                         ) : null}
@@ -1551,15 +1583,15 @@ function deletePreview(message: Message) {
   return "הודעה";
 }
 
-function highlightMentions(text: string) {
+function highlightMentions(text: string, term?: string) {
   const parts = text.split(/(@[^\s]+(?:\s[^\s]+)?)/g);
   return parts.map((part, i) =>
     part.startsWith("@") ? (
       <span key={i} className="rounded bg-primary/10 px-1 text-primary">
-        {part}
+        {markText(part, term)}
       </span>
     ) : (
-      <span key={i}>{part}</span>
+      <span key={i}>{markText(part, term)}</span>
     )
   );
 }
