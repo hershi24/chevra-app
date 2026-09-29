@@ -183,6 +183,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
         authorId: message.authorId,
         text: (message.poll?.question || message.text).slice(0, 140),
       });
+      requestAnimationFrame(() => composerRef.current?.focus());
       return true;
     };
     const fromQuery = new URLSearchParams(window.location.search).get("reply");
