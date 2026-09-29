@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { readState } from "./store";
+import { readState, readStateQuick } from "./store";
 import type { Member } from "./types";
 
 export const SESSION_COOKIE = "chevra_user";
@@ -48,4 +48,22 @@ export function findMemberByUsername(members: Member[], username: string) {
       m.username === q ||
       m.displayName.replaceAll(" ", "") === q.replaceAll(" ", "")
   );
+}
+
+/** Session lookup for live chat signals; see `readStateQuick`. */
+export async function getQuickSession(channelId: string) {
+  const jar = await cookies();
+  const id = jar.get(SESSION_COOKIE)?.value;
+  let state = await readStateQuick();
+  if (!id) return { me: null, channel: null, state };
+  const find = () => ({
+    me: state.members.find((member) => member.id === id) ?? null,
+    channel: state.channels.find((item) => item.id === channelId) ?? null,
+  });
+  let found = find();
+  if (!found.me || !found.channel) {
+    state = await readStateQuick({ fresh: true });
+    found = find();
+  }
+  return { ...found, state };
 }

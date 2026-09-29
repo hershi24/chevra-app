@@ -247,3 +247,32 @@ export function pastGatherings(state: AppState) {
     .filter((gth) => gth.status === "past" || new Date(gth.startsAt).getTime() < Date.now() - 3 * 3600_000)
     .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
 }
+
+const quick = globalThis as unknown as {
+  __chevraQuick?: { at: number; state: AppState };
+  __chevraQuickLoad?: Promise<AppState>;
+};
+
+function loadQuick() {
+  quick.__chevraQuickLoad ??= readState()
+    .then((state) => {
+      quick.__chevraQuick = { at: Date.now(), state };
+      return state;
+    })
+    .finally(() => {
+      quick.__chevraQuickLoad = undefined;
+    });
+  return quick.__chevraQuickLoad;
+}
+
+/**
+ * A recent snapshot for high-frequency live signals (typing, read receipts) that must not
+ * wait for a full cloud load. Callers that miss a record should retry with `fresh: true`.
+ */
+export async function readStateQuick({ fresh = false } = {}): Promise<AppState> {
+  const hit = quick.__chevraQuick;
+  const age = hit ? Date.now() - hit.at : Infinity;
+  if (fresh || !hit || age > 60_000) return loadQuick();
+  if (age > 5_000) void loadQuick().catch(() => undefined);
+  return hit.state;
+}

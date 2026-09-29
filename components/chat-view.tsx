@@ -146,10 +146,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const seenBy = useMemo(() => {
     const marks = new Map<string, string[]>();
     if (!me || active?.type !== "dm") return marks;
-    for (const [memberId, at] of Object.entries(seenAt)) {
-      const last = [...messages]
-        .reverse()
-        .find((message) => message.authorId === me.id && +new Date(message.createdAt) <= +new Date(at));
+    for (const [memberId, mark] of Object.entries(seenAt)) {
+      const readUntil = Math.max(
+        messages.findIndex((message) => message.id === mark.messageId),
+        messages.findLastIndex((message) => +new Date(message.createdAt) <= +new Date(mark.at))
+      );
+      const last = messages.slice(0, readUntil + 1).findLast((message) => message.authorId === me.id);
       if (last) marks.set(last.id, [...(marks.get(last.id) ?? []), memberId]);
     }
     return marks;

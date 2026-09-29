@@ -8,7 +8,8 @@ const PING_EVERY_MS = 3000;
 const TYPING_TTL_MS = 6000;
 
 type TypingEvent = { channelId?: string; memberId?: string; typing?: boolean };
-type SeenEvent = { channelId?: string; memberId?: string; at?: string };
+type SeenEvent = { channelId?: string; memberId?: string; at?: string; messageId?: string };
+export type SeenMark = { at: string; messageId?: string };
 
 function postTyping(channelId: string, typing: boolean) {
   void fetch("/api/chat/typing", {
@@ -94,7 +95,7 @@ export function useTypers(channelId: string | null, myId: string | undefined) {
 /** When each other member of a private chat last had it open. */
 export function useDmSeen(channel: Channel | null) {
   const dmId = channel?.type === "dm" ? channel.id : null;
-  const [seen, setSeen] = useState<{ channelId: string; at: Record<string, string> } | null>(null);
+  const [seen, setSeen] = useState<{ channelId: string; at: Record<string, SeenMark> } | null>(null);
 
   useEffect(() => {
     if (!dmId) return;
@@ -103,19 +104,23 @@ export function useDmSeen(channel: Channel | null) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { seen?: Record<string, string> } | null) => {
         if (cancelled || !data?.seen) return;
-        setSeen((prev) => ({
-          channelId: dmId,
-          at: { ...(prev?.channelId === dmId ? prev.at : {}), ...data.seen },
-        }));
+        const loaded = data.seen;
+        setSeen((prev) => {
+          const at = { ...(prev?.channelId === dmId ? prev.at : {}) };
+          for (const [memberId, when] of Object.entries(loaded)) {
+            if (!at[memberId] || at[memberId].at < when) at[memberId] = { at: when };
+          }
+          return { channelId: dmId, at };
+        });
       })
       .catch(() => undefined);
     const onSeen = (event: Event) => {
       const data = (event as CustomEvent<SeenEvent>).detail;
       if (data?.channelId !== dmId || !data.memberId || !data.at) return;
-      const { memberId, at } = data;
+      const { memberId, at, messageId } = data;
       setSeen((prev) => ({
         channelId: dmId,
-        at: { ...(prev?.channelId === dmId ? prev.at : {}), [memberId]: at },
+        at: { ...(prev?.channelId === dmId ? prev.at : {}), [memberId]: { at, messageId } },
       }));
     };
     window.addEventListener("chevra-seen", onSeen);
