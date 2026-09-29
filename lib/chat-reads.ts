@@ -64,3 +64,9 @@ export async function loadChatReads(memberId: string): Promise<ChatReads> {
   }
   return reads;
 }
+
+export async function channelReadAt(memberId: string, channelId: string): Promise<string | null> {
+  const cloud = await loadCloud(memberId);
+  const reads = cloud ?? (await readState()).chatReads?.[memberId] ?? {};
+  return reads[channelId] ?? null;
+}
