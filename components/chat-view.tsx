@@ -33,6 +33,7 @@ import { NotificationToggle } from "@/components/chat-alerts";
 import { ChatBubble } from "@/components/chat-bubble";
 import { ChatSidebar, useChatReads } from "@/components/chat-sidebar";
 import { ChatFileCard } from "@/components/chat-file-card";
+import { SeenAvatar, TypingIndicator, useDmSeen, useTypers, useTypingSignal } from "@/components/chat-live";
 import { ChatMediaGrid, isVisualAttachment } from "@/components/chat-media-grid";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PollCard } from "@/components/poll-card";
@@ -139,6 +140,20 @@ export function ChatView({ channelId }: { channelId?: string }) {
     .filter((m) => m.channelId === active?.id)
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
   const reads = useChatReads(active?.id ?? null, messages[messages.length - 1]?.id);
+  useTypingSignal(active?.id ?? null, draft);
+  const typerIds = useTypers(active?.id ?? null, me?.id);
+  const seenAt = useDmSeen(active);
+  const seenBy = useMemo(() => {
+    const marks = new Map<string, string[]>();
+    if (!me || active?.type !== "dm") return marks;
+    for (const [memberId, at] of Object.entries(seenAt)) {
+      const last = [...messages]
+        .reverse()
+        .find((message) => message.authorId === me.id && +new Date(message.createdAt) <= +new Date(at));
+      if (last) marks.set(last.id, [...(marks.get(last.id) ?? []), memberId]);
+    }
+    return marks;
+  }, [messages, seenAt, me, active?.type]);
   const leaderPolls =
     me && isRoshChevra(me)
       ? (state?.messages ?? [])
@@ -156,7 +171,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
       return;
     }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, active?.id, pendingUploads.length]);
+  }, [messages.length, active?.id, pendingUploads.length, typerIds.length]);
 
   useEffect(() => {
     const el = composerRef.current;
@@ -779,6 +794,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           </PopoverContent>
                         </Popover>
                       </div>
+                      {seenBy.get(message.id)?.slice(0, 1).map((memberId) => (
+                        <SeenAvatar key={memberId} member={memberById(state.members, memberId)} />
+                      ))}
                       </div>
                       {Object.keys(message.reactions).length > 0 ? (
                         <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -838,6 +856,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   </div>
                 </article>
               ) : null}
+              <TypingIndicator
+                members={typerIds
+                  .map((id) => memberById(state.members, id))
+                  .filter((member): member is Member => Boolean(member))}
+              />
               <div ref={endRef} />
             </div>
 

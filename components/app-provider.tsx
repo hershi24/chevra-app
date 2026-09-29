@@ -104,6 +104,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setOnlineIds(data.ids);
           if (data.type === "presence") return;
         }
+        if (data.type === "typing" || data.type === "seen") {
+          window.dispatchEvent(new CustomEvent(`chevra-${data.type}`, { detail: data }));
+          return;
+        }
       } catch {
         // keep refreshing on malformed payloads
       }

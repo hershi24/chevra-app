@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel } from "@/lib/channels";
 import { loadChatReads, markChannelRead } from "@/lib/chat-reads";
+import { emitToMembers } from "@/lib/realtime";
 import { readState } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -30,6 +31,12 @@ export async function POST(request: Request) {
   }
   try {
     const at = await markChannelRead(me.id, channel.id);
+    if (channel.type === "dm") {
+      emitToMembers(
+        channel.memberIds.filter((id) => id !== me.id),
+        { type: "seen", channelId: channel.id, memberId: me.id, at }
+      );
+    }
     return NextResponse.json({ channelId: channel.id, at });
   } catch (error) {
     console.error("chat read save failed", error);

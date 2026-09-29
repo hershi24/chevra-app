@@ -45,3 +45,17 @@ export function emitUpdate(revision: number) {
     }
   }
 }
+
+export function emitToMembers(memberIds: Iterable<string>, event: Record<string, unknown>) {
+  const targets = new Set(memberIds);
+  if (!targets.size) return;
+  const payload = `data: ${JSON.stringify(event)}\n\n`;
+  for (const client of clients) {
+    if (!client.memberId || !targets.has(client.memberId)) continue;
+    try {
+      client.send(payload);
+    } catch {
+      clients.delete(client);
+    }
+  }
+}
