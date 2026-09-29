@@ -99,13 +99,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const es = new EventSource("/api/stream");
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as { type?: string; ids?: string[] };
+        const data = JSON.parse(event.data) as {
+          type?: string;
+          ids?: string[];
+          message?: Message;
+          messageId?: string;
+        };
         if ((data.type === "presence" || data.type === "hello") && Array.isArray(data.ids)) {
           setOnlineIds(data.ids);
           if (data.type === "presence") return;
         }
         if (data.type === "typing" || data.type === "seen") {
           window.dispatchEvent(new CustomEvent(`chevra-${data.type}`, { detail: data }));
+          return;
+        }
+        if (data.type === "message" && data.message) {
+          const incoming = data.message;
+          setState((prev) => {
+            if (!prev || !prev.channels.some((channel) => channel.id === incoming.channelId)) return prev;
+            if (!prev.messages.some((message) => message.id === incoming.id)) {
+              pendingIds.current.add(incoming.id);
+            }
+            return { ...prev, messages: upsertMessage(prev.messages, incoming) };
+          });
+          return;
+        }
+        if (data.type === "message-removed" && data.messageId) {
+          const gone = data.messageId;
+          pendingIds.current.delete(gone);
+          setState((prev) => (prev ? { ...prev, messages: removeMessage(prev.messages, gone) } : prev));
           return;
         }
       } catch {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
-import { getSessionUser } from "@/lib/auth";
+import { getQuickSession, getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { notifyChatEmail } from "@/lib/chat-email";
 import { normalizeChatEmailPrefs } from "@/lib/chat-email-prefs";
@@ -20,6 +20,7 @@ import {
   scopedSettlement,
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
+import { emitToMembers } from "@/lib/realtime";
 import { inviteOrigin } from "@/lib/request-origin";
 import { updateState, toPublicState } from "@/lib/store";
 import type {
@@ -77,18 +78,57 @@ async function mailExpenseNotice(
   }
 }
 
+const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Hands a new chat message to everyone in the room before the (slow) full save, so it
+ * shows up live. Returns who got it, so a failed save can take it back.
+ */
+async function broadcastNewMessage(body: ActionBody, sentAt: string): Promise<string[] | null> {
+  if (body.type !== "sendMessage" || !body.id || !MESSAGE_ID.test(body.id)) return null;
+  const { me, channel, state } = await getQuickSession(body.channelId);
+  if (!me || !channel || !can(me, "chat") || !canSeeChannel(me, channel)) return null;
+  if (channel.type === "announcements" && !isGeneralChannel(channel) && !can(me, "postAnnouncement")) {
+    return null;
+  }
+  if (state.messages.some((item) => item.id === body.id)) return null;
+  const message: Message = {
+    id: body.id,
+    channelId: channel.id,
+    authorId: me.id,
+    text: body.text.trim(),
+    createdAt: sentAt,
+    quote: body.quote,
+    reactions: {},
+    attachments: body.attachments ?? [],
+    voiceUrl: body.voiceUrl,
+    mentions: body.mentions ?? [],
+  };
+  if (!message.text && !message.attachments.length && !message.voiceUrl) return null;
+  const viewers = state.members
+    .filter((member) => canSeeChannel(member, channel))
+    .map((member) => member.id);
+  emitToMembers(viewers, { type: "message", message });
+  return viewers;
+}
+
 export async function POST(request: Request) {
+  const body = (await request.json()) as ActionBody;
+  const sentAt = new Date().toISOString();
+  const broadcastTo = await broadcastNewMessage(body, sentAt).catch(() => null);
+
   const me = await getSessionUser();
   if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const body = (await request.json()) as ActionBody;
-
   try {
     const pushed: Message[] = [];
-    const state = await updateState((s) => {
-      applyAction(s, me, body, pushed);
-      ensureGuideChannels(s);
-    });
+    const state = await updateState(
+      (s) => {
+        applyAction(s, me, body, pushed, sentAt);
+        ensureGuideChannels(s);
+      },
+      { announce: !broadcastTo }
+    );
     const alert = messageToAlert(state, me.id, body);
     if (alert) {
       void notifyChatPush(state, alert);
@@ -105,6 +145,9 @@ export async function POST(request: Request) {
     const fresh = state.members.find((m) => m.id === me.id)!;
     return NextResponse.json({ ...toPublicState(state, fresh), ...(mail ? { mail } : {}) });
   } catch (error) {
+    if (broadcastTo && body.type === "sendMessage") {
+      emitToMembers(broadcastTo, { type: "message-removed", messageId: body.id });
+    }
     const message = error instanceof Error ? error.message : "שגיאה";
     const status = message === "forbidden" ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
@@ -137,7 +180,13 @@ function canReadMessage(me: Member, channel: Channel, message: Message) {
   return Boolean(message.poll && canAccessPoll(me, channel));
 }
 
-function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[]) {
+function applyAction(
+  s: AppState,
+  me: Member,
+  body: ActionBody,
+  pushed: Message[],
+  now = new Date().toISOString()
+) {
   switch (body.type) {
     case "rsvp": {
       if (!can(me, "rsvp")) throw new Error("forbidden");
@@ -256,17 +305,14 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         throw new Error("רק מנהל או ראש החברה יכולים לכתוב בהודעות רשמיות");
       }
       const clientId = body.id?.trim();
-      const id =
-        clientId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId)
-          ? clientId
-          : crypto.randomUUID();
+      const id = clientId && MESSAGE_ID.test(clientId) ? clientId : crypto.randomUUID();
       if (s.messages.some((item) => item.id === id)) return;
       const message: Message = {
         id,
         channelId: body.channelId,
         authorId: me.id,
         text: body.text.trim(),
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         quote: body.quote,
         reactions: {},
         attachments: body.attachments ?? [],
