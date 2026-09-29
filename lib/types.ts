@@ -175,6 +175,14 @@ export type IvrLog = {
   result: string;
 };
 
+export type ChatEmailMode = "off" | "dm" | "custom";
+
+export type ChatEmailPrefs = {
+  mode: ChatEmailMode;
+  dm: boolean;
+  channelIds: string[];
+};
+
 export type AppState = {
   members: Member[];
   gatherings: Gathering[];
@@ -189,9 +197,11 @@ export type AppState = {
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
   chatReads?: Record<string, Record<string, string>>;
+  chatEmailPrefs?: Record<string, ChatEmailPrefs>;
   revision: number;
 };
 
-export type PublicState = Omit<AppState, "tokens" | "chatReads"> & {
+export type PublicState = Omit<AppState, "tokens" | "chatReads" | "chatEmailPrefs"> & {
   me: Member;
+  myChatEmailPrefs: ChatEmailPrefs;
 };

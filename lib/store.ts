@@ -11,6 +11,7 @@ import {
   syncChatDiff,
   upsertMembers,
 } from "./supabase-chat";
+import { chatEmailPrefsFor, loadChatEmailPrefs, syncChatEmailPrefs } from "./chat-email-prefs";
 import { ensureMemberSecrets, publicMember } from "./password";
 import { isLeader } from "./permissions";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
@@ -119,6 +120,8 @@ export async function readState(): Promise<AppState> {
     }
     const accounts = await loadBankAccounts();
     if (accounts) state.bankAccounts = accounts;
+    const emailPrefs = await loadChatEmailPrefs();
+    if (emailPrefs) state.chatEmailPrefs = emailPrefs;
   } catch (error) {
     console.error("Supabase chat read failed", error);
   }
@@ -140,6 +143,7 @@ export async function persistQuietly(
         await syncGatheringsDiff(before, current);
         await syncExpenseLedger(before, current);
         await syncBankAccounts(before, current);
+        await syncChatEmailPrefs(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -168,6 +172,7 @@ export async function updateState(
         await syncGatheringsDiff(before, current);
         await syncExpenseLedger(before, current);
         await syncBankAccounts(before, current);
+        await syncChatEmailPrefs(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -213,6 +218,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     ivrLog: state.ivrLog,
     revision: state.revision,
     me: publicMember(me),
+    myChatEmailPrefs: chatEmailPrefsFor(state, me.id),
   };
 }
 

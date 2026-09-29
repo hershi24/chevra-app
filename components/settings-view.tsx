@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Eye, KeyRound, LogOut, Mail, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
+import { Bell, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
@@ -15,13 +15,14 @@ import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, membe
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { EmailDelivery, Gathering, Member } from "@/lib/types";
+import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type SectionId = "account" | "members" | "invites" | "system";
+type SectionId = "account" | "notify" | "members" | "invites" | "system";
 
 const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon }[] = [
   { id: "account", label: "החשבון שלי", short: "החשבון", icon: User },
+  { id: "notify", label: "התראות במייל", short: "התראות", icon: Bell },
   { id: "members", label: "חברי החבורה", short: "חברים", icon: Users },
   { id: "invites", label: "הזמנות", short: "הזמנות", icon: Mail },
   { id: "system", label: "מערכת", short: "מערכת", icon: SlidersHorizontal },
@@ -142,6 +143,14 @@ export function SettingsView() {
             </Section>
 
             <Section
+              id="notify"
+              title="התראות במייל"
+              subtitle="אילו הודעות בצ׳אט יגיעו אליך גם למייל, עם כפתור השבה ישיר."
+            >
+              <ChatEmailPanel />
+            </Section>
+
+            <Section
               id="members"
               title="חברי החבורה"
               subtitle={`${memberCount} חברים · ${onlineCountLabel(onlineIds.length)}`}
@@ -240,6 +249,124 @@ function AccountPanel({ member, online, onLogout }: { member: Member; online: bo
         ))}
       </dl>
       <PasswordForm />
+    </div>
+  );
+}
+
+const EMAIL_MODES: { id: ChatEmailMode; title: string; hint: string }[] = [
+  { id: "off", title: "לא לקבל", hint: "ההודעות מופיעות רק באתר ובהתראות בטלפון." },
+  { id: "dm", title: "רק הודעות פרטיות", hint: "מייל על כל הודעה פרטית שנשלחת אליך." },
+  { id: "custom", title: "צ׳אטים שאבחר", hint: "בוחרים חדרים, ואפשר להוסיף גם הודעות פרטיות." },
+];
+
+function ChatEmailPanel() {
+  const { state, me, act } = useApp();
+  const [saving, setSaving] = useState(false);
+  if (!state || !me) return null;
+  const prefs = state.myChatEmailPrefs;
+  const rooms = state.channels.filter((channel) => channel.type !== "dm");
+  const email = me.email?.trim() ?? "";
+  const hasEmail = Boolean(email) && !email.endsWith("@chevra.local");
+
+  async function save(next: ChatEmailPrefs) {
+    setSaving(true);
+    try {
+      await act({ type: "setChatEmailPrefs", prefs: next });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "השמירה נכשלה");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleRoom(id: string, on: boolean) {
+    const channelIds = on ? [...prefs.channelIds, id] : prefs.channelIds.filter((item) => item !== id);
+    void save({ ...prefs, channelIds });
+  }
+
+  return (
+    <div className={PANEL}>
+      <div className="grid gap-2 p-3 md:grid-cols-3 md:p-4">
+        {EMAIL_MODES.map((mode) => {
+          const selected = prefs.mode === mode.id;
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              disabled={saving}
+              aria-pressed={selected}
+              onClick={() => {
+                if (!selected) void save({ ...prefs, mode: mode.id });
+              }}
+              className={cn(
+                "flex items-start gap-3 rounded-2xl border px-3.5 py-3 text-start transition-colors",
+                selected ? "border-primary bg-[#f8f1e5]" : "border-[#e3e7ec] bg-white hover:bg-black/[0.02]"
+              )}
+            >
+              <span
+                className={cn(
+                  "mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-full border",
+                  selected ? "border-primary" : "border-[#c5ccd6]"
+                )}
+              >
+                {selected ? <span className="size-2.5 rounded-full bg-primary" /> : null}
+              </span>
+              <span>
+                <span className="block text-[14.5px]">{mode.title}</span>
+                <span className="mt-0.5 block text-[12px] font-light leading-5 text-muted-foreground">{mode.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {prefs.mode === "custom" ? (
+        <div className="divide-y divide-[#e9ecef] border-t border-[#e9ecef]">
+          <label className="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
+            <span className="flex items-center gap-2.5 text-sm">
+              <Mail className="size-4 text-[#6b7280]" />
+              הודעות פרטיות
+            </span>
+            <Switch
+              checked={prefs.dm}
+              disabled={saving}
+              onCheckedChange={(on) => void save({ ...prefs, dm: on })}
+            />
+          </label>
+          {rooms.map((room) => (
+            <label key={room.id} className="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
+              <span className="flex min-w-0 items-center gap-2.5 text-sm">
+                {room.type === "announcements" ? (
+                  <Megaphone className="size-4 shrink-0 text-[#6b7280]" />
+                ) : (
+                  <Hash className="size-4 shrink-0 text-[#6b7280]" />
+                )}
+                <span className="truncate">{room.name}</span>
+              </span>
+              <Switch
+                checked={prefs.channelIds.includes(room.id)}
+                disabled={saving}
+                onCheckedChange={(on) => toggleRoom(room.id, on)}
+              />
+            </label>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="border-t border-[#e9ecef] px-4 py-3 text-[12.5px] font-light text-muted-foreground md:px-5">
+        {hasEmail ? (
+          <>
+            המיילים יישלחו אל{" "}
+            <span dir="ltr" className="text-foreground">
+              {email}
+            </span>
+          </>
+        ) : (
+          <span className="text-[#a4453a]">
+            אין כתובת מייל בחשבון שלך, ולכן לא יישלחו מיילים. בקשו מהמנהל להוסיף אותה.
+          </span>
+        )}
+      </div>
     </div>
   );
 }

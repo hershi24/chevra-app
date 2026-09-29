@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { ActionBody } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
+import { notifyChatEmail } from "@/lib/chat-email";
+import { normalizeChatEmailPrefs } from "@/lib/chat-email-prefs";
 import { deliverExpenseMail, expenseNoticeHtml } from "@/lib/expense-email";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
@@ -88,7 +90,10 @@ export async function POST(request: Request) {
       ensureGuideChannels(s);
     });
     const alert = messageToAlert(state, me.id, body);
-    if (alert) void notifyChatPush(state, alert);
+    if (alert) {
+      void notifyChatPush(state, alert);
+      void notifyChatEmail(state, alert, inviteOrigin(request));
+    }
     for (const message of pushed) {
       if (alert?.id === message.id) continue;
       void notifyChatPush(state, message);
@@ -491,6 +496,11 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
         (item) => item.fromId !== member.id && item.toId !== member.id
       );
       if (s.bankAccounts) delete s.bankAccounts[member.id];
+      if (s.chatEmailPrefs) {
+        const prefs = { ...s.chatEmailPrefs };
+        delete prefs[member.id];
+        s.chatEmailPrefs = prefs;
+      }
       return;
     }
     case "changePassword": {
@@ -690,6 +700,15 @@ function applyAction(s: AppState, me: Member, body: ActionBody, pushed: Message[
       if (account) accounts[body.memberId] = account;
       else delete accounts[body.memberId];
       s.bankAccounts = accounts;
+      return;
+    }
+    case "setChatEmailPrefs": {
+      const prefs = normalizeChatEmailPrefs(body.prefs);
+      const rooms = new Set(
+        s.channels.filter((c) => c.type !== "dm" && canSeeChannel(me, c)).map((c) => c.id)
+      );
+      prefs.channelIds = prefs.channelIds.filter((id) => rooms.has(id));
+      s.chatEmailPrefs = { ...(s.chatEmailPrefs ?? {}), [me.id]: prefs };
       return;
     }
     default:

@@ -6,7 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 type Choice = { id: string; displayName: string; initials: string; avatarColor: string };
 
-export function LoginView() {
+export function LoginView({ next }: { next?: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +35,7 @@ export function LoginView() {
       if (data.mustChangePassword) {
         sessionStorage.setItem("chevra-password-alert", "1");
       }
-      router.push(data.mustChangePassword ? "/?password=1" : "/");
+      router.push(next ?? (data.mustChangePassword ? "/?password=1" : "/"));
       router.refresh();
     } finally {
       setLoading(false);
