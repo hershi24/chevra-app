@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import {
   BookOpen,
   Copy,
   Ellipsis,
+  FileText,
   Forward,
   Hash,
   Megaphone,
@@ -24,6 +25,7 @@ import {
   Trash2,
   Trees,
   Utensils,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
@@ -70,7 +72,12 @@ import {
   pickRecorderMime,
   requestMicrophone,
 } from "@/lib/microphone";
-import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
+import {
+  createLocalUpload,
+  preloadMedia,
+  uploadWithProgress,
+  type LocalUpload,
+} from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
 type PendingChatUpload = {
@@ -95,6 +102,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [recording, setRecording] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingChatUpload[]>([]);
+  const [pasted, setPasted] = useState<{ channelId: string; items: LocalUpload[] } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [menuMessage, setMenuMessage] = useState<Message | null>(null);
@@ -244,9 +252,9 @@ export function ChatView({ channelId }: { channelId?: string }) {
     await act({ type: "votePoll", messageId, optionId });
   }
 
-  async function send(extra?: Partial<Message>) {
+  async function send(extra?: Partial<Message>, caption?: string) {
     if (!active || !me || !state) return;
-    const text = draft.trim();
+    const text = (caption ?? draft).trim();
     if (!extra?.voiceUrl && !extra?.attachments?.length && text.replace(/\s+/g, " ") === "התחל סקר") {
       if (!isLeader(me)) {
         toast.error("רק מנהל או ראש החברה יכולים לפתוח סקר");
@@ -354,6 +362,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
   async function attach(files: FileList | null) {
     if (!files?.length || !active) return;
     const items = Array.from(files).map((file) => createLocalUpload(file));
+    if (fileRef.current) fileRef.current.value = "";
+    await uploadAndSend(items);
+  }
+
+  async function uploadAndSend(items: LocalUpload[], caption?: string) {
     setPendingUploads((prev) => [
       ...prev,
       ...items.map((item) => ({
@@ -365,7 +378,6 @@ export function ChatView({ channelId }: { channelId?: string }) {
         name: item.name,
       })),
     ]);
-    if (fileRef.current) fileRef.current.value = "";
 
     const uploaded: (Attachment | null)[] = items.map(() => null);
     await Promise.all(
@@ -393,9 +405,42 @@ export function ChatView({ channelId }: { channelId?: string }) {
     );
 
     const attachments = uploaded.filter((file): file is Attachment => file !== null);
-    if (attachments.length) await send({ attachments });
+    if (attachments.length) await send({ attachments }, caption);
+    else if (caption?.trim()) setDraft(caption);
     items.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     setPendingUploads((prev) => prev.filter((p) => !items.some((item) => item.id === p.id)));
+  }
+
+  const staged = pasted && active && pasted.channelId === active.id ? pasted.items : [];
+
+  function stagePasted(files: File[]) {
+    if (!active) return;
+    const items = files.map((file) => createLocalUpload(file));
+    setPasted((prev) => ({
+      channelId: active.id,
+      items: [...(prev?.channelId === active.id ? prev.items : []), ...items],
+    }));
+  }
+
+  function unstage(id: string) {
+    setPasted((prev) => {
+      if (!prev) return prev;
+      const gone = prev.items.find((item) => item.id === id);
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      const items = prev.items.filter((item) => item.id !== id);
+      return items.length ? { ...prev, items } : null;
+    });
+  }
+
+  function submitComposer() {
+    if (staged.length) {
+      const caption = draft;
+      setPasted(null);
+      setDraft("");
+      void uploadAndSend(staged, caption);
+      return;
+    }
+    void send();
   }
 
   async function toggleRecord() {
@@ -545,6 +590,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
             >
               {messages.map((message, index) => {
                 const previous = messages[index - 1];
+                const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
                 const continuation = Boolean(
                   previous &&
                     previous.authorId === message.authorId &&
@@ -565,8 +611,15 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   ? memberById(state.members, message.quote.authorId)
                   : null;
                 return (
+                  <Fragment key={message.id}>
+                  {newDay ? (
+                    <div className="flex justify-center pt-1">
+                      <span className="rounded-full bg-white/85 px-3 py-0.5 text-[11px] text-[#5f6368] shadow-sm ring-1 ring-black/5">
+                        {dayLabel(message.createdAt)}
+                      </span>
+                    </div>
+                  ) : null}
                   <article
-                    key={message.id}
                     id={`message-${message.id}`}
                     className={cn(
                       "group flex scroll-my-4 gap-2 rounded-2xl transition-colors",
@@ -594,7 +647,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                             <span className="text-xs text-[#1f1f1f]">{author?.displayName}</span>
                           )}
                           <span className="text-[11px] text-[#5f6368]">
-                            {formatTimeHe(message.createdAt)}
+                            {messageTime(message.createdAt)}
                           </span>
                         </div>
                       )}
@@ -745,6 +798,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       ) : null}
                     </div>
                   </article>
+                  </Fragment>
                 );
               })}
               {pendingUploads.length ? (
@@ -795,12 +849,44 @@ export function ChatView({ channelId }: { channelId?: string }) {
                   <button onClick={() => setQuote(undefined)}>×</button>
                 </div>
               ) : null}
+              {canWrite && staged.length ? (
+                <div className="mb-1.5 flex gap-2 overflow-x-auto px-1 pt-1 [scrollbar-width:none]">
+                  {staged.map((item) => (
+                    <div
+                      key={item.id}
+                      className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-[#f1f3f4] ring-1 ring-black/10"
+                    >
+                      {item.type === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.previewUrl} alt={item.name} className="size-full object-cover" />
+                      ) : item.type === "video" ? (
+                        <video src={item.previewUrl} muted playsInline className="size-full object-cover" />
+                      ) : (
+                        <div className="flex size-full flex-col items-center justify-center gap-0.5 px-1 text-[#5f6368]">
+                          {item.type === "audio" ? <Mic className="size-5" /> : <FileText className="size-5" />}
+                          <span className="w-full truncate text-center text-[10px] leading-3" dir="ltr">
+                            {item.name}
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="הסרה"
+                        onClick={() => unstage(item.id)}
+                        className="absolute end-0.5 top-0.5 flex size-5 items-center justify-center rounded-full bg-black/60 text-white"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {canWrite ? (
                 <form
                   className="flex items-center gap-0.5 md:gap-1"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void send();
+                    submitComposer();
                   }}
                 >
                   <input
@@ -861,8 +947,14 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          void send();
+                          submitComposer();
                         }
+                      }}
+                      onPaste={(e) => {
+                        const files = Array.from(e.clipboardData.files);
+                        if (!files.length) return;
+                        e.preventDefault();
+                        stagePasted(files);
                       }}
                     />
                   </div>
@@ -1342,6 +1434,43 @@ function RoomIcon({ channel, members = [] }: { channel: Channel; members?: Membe
       <Hash className="size-4" />
     </span>
   );
+}
+
+function sameDay(a: string, b: string) {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+function daysAgo(iso: string) {
+  const day = new Date(iso);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((today.getTime() - day.getTime()) / 86_400_000);
+}
+
+function dayLabel(iso: string) {
+  const diff = daysAgo(iso);
+  if (diff <= 0) return "היום";
+  if (diff === 1) return "אתמול";
+  const date = new Date(iso);
+  if (diff < 7) return new Intl.DateTimeFormat("he-IL", { weekday: "long" }).format(date);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return new Intl.DateTimeFormat("he-IL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+function messageTime(iso: string) {
+  const time = formatTimeHe(iso);
+  const diff = daysAgo(iso);
+  if (diff <= 0) return time;
+  if (diff === 1) return `אתמול ${time}`;
+  const date = new Date(iso);
+  if (diff < 7) return `${new Intl.DateTimeFormat("he-IL", { weekday: "short" }).format(date)} ${time}`;
+  return `${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric" }).format(date)} ${time}`;
 }
 
 function sameMinute(a: string, b: string) {
