@@ -360,11 +360,11 @@ export function ChatView({ channelId }: { channelId?: string }) {
     }
   }
 
-  async function attach(files: FileList | null) {
+  function attach(files: FileList | null) {
     if (!files?.length || !active) return;
-    const items = Array.from(files).map((file) => createLocalUpload(file));
+    stagePasted(Array.from(files));
     if (fileRef.current) fileRef.current.value = "";
-    await uploadAndSend(items);
+    composerRef.current?.focus();
   }
 
   async function uploadAndSend(items: LocalUpload[], caption?: string) {
@@ -895,7 +895,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     type="file"
                     className="hidden"
                     multiple
-                    onChange={(e) => void attach(e.target.files)}
+                    onChange={(e) => attach(e.target.files)}
                   />
                   <Button
                     type="button"
