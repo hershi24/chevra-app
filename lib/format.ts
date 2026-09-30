@@ -71,17 +71,41 @@ function hebrewYear(year: number) {
   return out;
 }
 
-export function formatHebrewDate(iso: string) {
-  const date = new Date(iso);
+export function hebrewDateParts(iso: string) {
   const parts = new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).formatToParts(date);
+  }).formatToParts(new Date(iso));
   const day = Number(parts.find((part) => part.type === "day")?.value);
   const month = parts.find((part) => part.type === "month")?.value ?? "";
   const year = Number(parts.find((part) => part.type === "year")?.value);
-  return `${hebrewDay(day)} ב${month} ${hebrewYear(year)}`;
+  return { day: hebrewDay(day), month, year: hebrewYear(year) };
+}
+
+export function formatHebrewDate(iso: string) {
+  const { day, month, year } = hebrewDateParts(iso);
+  return `${day} ב${month} ${year}`;
+}
+
+export function formatDayMonth(iso: string) {
+  const date = new Date(iso);
+  return `${date.getDate()}.${date.getMonth() + 1}`;
+}
+
+export function splitGatheringTitle(event: { title?: string; topic?: string; startsAt: string }) {
+  const label = gatheringLabel(event);
+  const [kind, ...rest] = label.split(" · ");
+  if (!rest.length) return { kind: null, heading: label };
+  return { kind, heading: rest.join(" · ") };
+}
+
+export function journalHeading(event: { title?: string; topic?: string; startsAt: string }) {
+  const { heading } = splitGatheringTitle(event);
+  const topic = event.topic?.trim();
+  if (!topic) return heading;
+  if (!heading || topic.includes(heading) || heading.includes(topic)) return topic;
+  return `${topic} · ${heading}`;
 }
 
 export function formatRelativeHe(iso: string) {

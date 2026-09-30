@@ -35,9 +35,11 @@ export function VoiceNotePlayer({
   src,
   className,
   onReady,
+  tone = "light",
 }: {
   src: string;
   className?: string;
+  tone?: "light" | "dark";
   onReady?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -106,12 +108,20 @@ export function VoiceNotePlayer({
     <div
       dir="ltr"
       className={cn(
-        "flex h-10 w-full max-w-[20rem] items-center gap-2.5 rounded-full bg-white px-3.5 ring-1 ring-[#c5d4f5]",
+        "flex h-10 w-full items-center gap-2.5 rounded-full px-3.5",
+        tone === "dark"
+          ? "max-w-none bg-transparent text-white"
+          : "max-w-[20rem] bg-white ring-1 ring-[#c5d4f5]",
         className
       )}
     >
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
-      <span className="w-8 shrink-0 text-[13px] font-normal tabular-nums text-[#4b5563]">
+      <span
+        className={cn(
+          "w-8 shrink-0 text-[13px] font-normal tabular-nums",
+          tone === "dark" ? "text-white/80" : "text-[#4b5563]"
+        )}
+      >
         {formatClock(playing || current > 0 ? current : duration)}
       </span>
       <div className="flex h-5 min-w-0 flex-1 items-center justify-between gap-px" aria-hidden>
@@ -128,7 +138,13 @@ export function VoiceNotePlayer({
               <span
                 className={cn(
                   "block w-[2px] max-w-full rounded-full",
-                  reached && (playing || current > 0) ? "bg-[#3f4650]" : "bg-[#5b6570]"
+                  reached && (playing || current > 0)
+                    ? tone === "dark"
+                      ? "bg-[#e6c27a]"
+                      : "bg-[#3f4650]"
+                    : tone === "dark"
+                      ? "bg-white/35"
+                      : "bg-[#5b6570]"
                 )}
                 style={{ height: `${Math.round(height * 100)}%` }}
               />
@@ -140,7 +156,12 @@ export function VoiceNotePlayer({
         type="button"
         onClick={toggle}
         aria-label={playing ? "השהה" : "נגן"}
-        className="flex size-7 shrink-0 items-center justify-center text-[#3f4650]"
+        className={cn(
+          "flex shrink-0 items-center justify-center",
+          tone === "dark"
+            ? "size-11 rounded-full bg-[#b8862f] text-white"
+            : "size-7 text-[#3f4650]"
+        )}
       >
         {playing ? (
           <Pause className="size-4 fill-current" />
