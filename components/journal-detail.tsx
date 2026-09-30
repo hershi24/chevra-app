@@ -16,6 +16,7 @@ import {
   formatDateHe,
   formatHebrewDate,
   formatTimeHe,
+  journalHeading,
   memberById,
   rsvpLabel,
   splitGatheringTitle,
@@ -100,7 +101,9 @@ export function JournalDetail({
   }, [pending.length]);
 
   const event = state?.gatherings.find((g) => g.id === id);
-  const visual = event?.media.filter((m) => m.type === "image" || m.type === "video") ?? [];
+  const visual = [...(event?.media.filter((m) => m.type === "image" || m.type === "video") ?? [])].sort(
+    (a, b) => Number(a.url.startsWith("/")) - Number(b.url.startsWith("/"))
+  );
   const visualCount = visual.length;
 
   useEffect(() => {
@@ -127,9 +130,12 @@ export function JournalDetail({
   const lecturer = memberById(state.members, event.lecturerId);
   const kibud = memberById(state.members, event.kibudId);
   const currentSummary = summary ?? event.summary ?? "";
-  const { kind, heading } = splitGatheringTitle(event);
+  const { kind } = splitGatheringTitle(event);
+  const heading = journalHeading(event);
   const isUpcoming = event.status === "upcoming";
-  const cover = event.media.find((m) => m.type === "image");
+  const cover =
+    event.media.find((m) => m.type === "image" && m.url.startsWith("http")) ??
+    event.media.find((m) => m.type === "image");
   const audios = event.media.filter((m) => m.type === "audio");
   const coming = state.members.filter((m) => event.rsvps[m.id] === "yes");
   const absent = state.members.filter((m) => event.rsvps[m.id] !== "yes");
@@ -247,8 +253,8 @@ export function JournalDetail({
   const viewing = viewer === null ? null : visual[viewer];
 
   return (
-    <div className="pb-4">
-      <section className="relative -mx-5 -mt-6 h-[300px] overflow-hidden bg-linear-to-br from-[#3b2f1e] to-[#8a5f1c] md:-mx-8 md:-mt-10 md:h-[380px]">
+    <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:pb-16">
+      <section className="relative h-[300px] overflow-hidden bg-linear-to-br from-[#3b2f1e] to-[#8a5f1c] md:h-[380px]">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover.url} alt="" className="h-full w-full object-cover" />
@@ -301,7 +307,7 @@ export function JournalDetail({
         </div>
       </section>
 
-      <div className="mx-auto max-w-[720px] pt-8">
+      <div className="mx-auto max-w-[720px] px-5 pt-8 md:px-8">
         {host || lecturer || kibud ? (
           <div className="grid gap-3 sm:grid-cols-3">
             <Credit label="מארח" member={host} />
@@ -421,22 +427,14 @@ export function JournalDetail({
                     {track.name ? <small className="text-[12px] font-light opacity-70">{track.name}</small> : null}
                   </div>
                 </div>
-                <VoiceNotePlayer src={track.url} className="flex-1 rounded-full bg-white px-3 py-1.5" />
+                <VoiceNotePlayer src={track.url} tone="dark" className="min-w-0 flex-1" />
               </div>
             ))}
           </div>
         ) : null}
-
-        {event.topic ? (
-          <div className="my-8 px-4 text-center text-[20px] leading-relaxed text-[#8a5f1c] md:px-8 md:text-[23px]">
-            <div className="mx-auto mb-3.5 h-0.5 w-[60px] bg-[#e6d3ad]" />
-            ״{event.topic}״
-            <div className="mx-auto mt-3.5 h-0.5 w-[60px] bg-[#e6d3ad]" />
-          </div>
-        ) : null}
       </div>
 
-      <div className="mx-auto mt-8 max-w-[1120px]">
+      <div className="mx-auto mt-8 max-w-[1120px] px-5 md:px-8">
         {visual.length ? (
           showAll ? (
             <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
@@ -551,7 +549,7 @@ export function JournalDetail({
       </div>
 
       {!isUpcoming && coming.length ? (
-        <div className="mx-auto mt-9 max-w-[720px] text-center">
+        <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">מי היה שם</h3>
           <span className="inline-flex -space-x-2.5">
             {coming.map((m) => (
@@ -566,7 +564,7 @@ export function JournalDetail({
           </div>
         </div>
       ) : isUpcoming && coming.length ? (
-        <div className="mx-auto mt-9 max-w-[720px] text-center">
+        <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">מי מגיע</h3>
           <span className="inline-flex -space-x-2.5">
             {coming.map((m) => (
@@ -577,7 +575,7 @@ export function JournalDetail({
       ) : null}
 
       {can(me, "viewRsvps") ? (
-        <div className="mx-auto mt-9 max-w-[720px]">
+        <div className="mx-auto mt-9 max-w-[720px] px-5 md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">אישורי הגעה</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
@@ -596,7 +594,7 @@ export function JournalDetail({
       ) : null}
 
       {newer || older ? (
-        <div className="mx-auto mt-10 grid max-w-[1120px] gap-4 md:grid-cols-2">
+        <div className="mx-auto mt-10 grid max-w-[1120px] gap-4 px-5 md:grid-cols-2 md:px-8">
           <NeighborCard event={newer} label="← החברה הבאה" />
           <NeighborCard event={older} label="החברה הקודמת →" />
         </div>

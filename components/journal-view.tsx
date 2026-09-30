@@ -11,11 +11,12 @@ import {
   formatTimeHe,
   gatheringLabel,
   hebrewDateParts,
+  journalHeading,
   memberById,
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
-import type { Gathering, Member } from "@/lib/types";
+import type { EventMedia, Gathering, Member } from "@/lib/types";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,21 @@ import { cn } from "@/lib/utils";
 const weekday = new Intl.DateTimeFormat("he-IL", { weekday: "long" });
 
 function images(event: Gathering) {
-  return event.media.filter((m) => m.type === "image");
+  const pics = event.media.filter((m) => m.type === "image");
+  return [...pics].sort((a, b) => Number(a.url.startsWith("/")) - Number(b.url.startsWith("/")));
+}
+
+function bandCovers(gatherings: Gathering[]) {
+  const ordered = [...gatherings].sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
+  const remote: EventMedia[] = [];
+  const local: EventMedia[] = [];
+  for (const event of ordered) {
+    const pics = images(event);
+    const photo = pics.find((item) => item.url.startsWith("http")) ?? pics[0];
+    if (!photo) continue;
+    (photo.url.startsWith("http") ? remote : local).push(photo);
+  }
+  return (remote.length ? remote : local).slice(0, 4);
 }
 
 function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" }) {
@@ -66,10 +81,7 @@ export function JournalView() {
     .filter((g) => g.status !== "upcoming")
     .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
   const next = upcoming[0];
-  const bandImages = [...state.gatherings]
-    .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt))
-    .flatMap((g) => images(g).slice(0, 2))
-    .slice(0, 4);
+  const bandImages = bandCovers(state.gatherings);
   const trips = state.gatherings.filter((g) => gatheringLabel(g).includes("טיול")).length;
   const photoCount = state.gatherings.reduce((sum, g) => sum + images(g).length, 0);
   const count = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
@@ -121,80 +133,93 @@ export function JournalView() {
     );
   }
 
+  const hostName = next ? memberById(state.members, next.hostId)?.displayName : null;
+
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:px-8 md:pt-10 md:pb-16">
+      <div className="mx-auto max-w-6xl">
       <section className="relative overflow-hidden rounded-[26px] md:h-[190px]">
-        <div className="grid h-[120px] grid-cols-4 md:absolute md:inset-y-0 md:left-0 md:h-full md:w-[66%]">
-          {bandImages.map((image) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={image.id} src={image.url} alt="" className="h-full w-full object-cover" />
-          ))}
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[120px] bg-linear-to-t from-background to-transparent to-70% md:inset-0 md:h-auto md:bg-linear-to-l md:from-background md:via-background/90 md:via-38% md:to-transparent md:to-75%" />
-        <div className="relative -mt-6 flex flex-col justify-center md:absolute md:inset-y-0 md:right-0 md:mt-0 md:px-[34px]">
-          <h1 className="text-[1.75rem] font-medium tracking-tight md:text-[2rem]">יומן החבורה</h1>
-          <p className="mt-1 text-[14px] font-light text-[#4b5563]">{stats.join(" · ")}</p>
-          <div className="mt-3.5 flex flex-wrap items-center gap-2.5 text-[13px]">
-            {next ? (
-              <>
-                <Link
-                  href={`/journal/${next.id}`}
-                  className="rounded-full bg-white/85 px-3 py-1.5 font-light text-[#1f2328] shadow-[0_1px_2px_rgba(15,23,42,.06)] ring-1 ring-[#ecdcbc]"
-                >
-                  הבאה: {weekday.format(new Date(next.startsAt))} {formatDayMonth(next.startsAt)} ·{" "}
-                  {formatTimeHe(next.startsAt)} · {splitGatheringTitle(next).heading}
-                  {memberById(state.members, next.hostId)
-                    ? ` אצל ${memberById(state.members, next.hostId)!.displayName}`
-                    : ""}
-                </Link>
-                {can(me, "rsvp") ? (
-                  next.rsvps[me.id] === "yes" ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf5ee] px-3 py-1.5 text-[#256b43]">
-                      <Check className="size-3.5" />
-                      אתה מגיע
-                    </span>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="rounded-full px-4"
-                      disabled={rsvping}
-                      onClick={() => void comeTo(next)}
-                    >
-                      אני מגיע
-                    </Button>
-                  )
-                ) : null}
-              </>
-            ) : null}
-            {can(me, "createEvent") ? (
-              <EventDialog
-                trigger={
-                  <Button type="button" variant="outline" size="sm" className="rounded-full bg-white/80">
-                    <Plus data-icon="inline-start" />
-                    חברה חדשה
-                  </Button>
-                }
-              />
-            ) : null}
+        {bandImages.length ? (
+          <div
+            className="grid h-[132px] md:absolute md:inset-y-0 md:left-0 md:h-full md:w-[68%]"
+            style={{ gridTemplateColumns: `repeat(${bandImages.length}, minmax(0, 1fr))` }}
+          >
+            {bandImages.map((image) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={image.id} src={image.url} alt="" className="h-full w-full object-cover" />
+            ))}
           </div>
+        ) : null}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-[132px] md:hidden"
+          style={{
+            background:
+              "linear-gradient(to top, #faf8f4 0%, rgba(250,248,244,0) 72%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 hidden md:block"
+          style={{
+            background:
+              "linear-gradient(to left, #faf8f4 0%, rgba(250,248,244,.94) 36%, rgba(250,248,244,0) 74%)",
+          }}
+        />
+        <div className="relative -mt-8 flex flex-col justify-center md:absolute md:inset-y-0 md:right-0 md:mt-0 md:max-w-[58%] md:px-[34px]">
+          <h1 className="text-[1.75rem] font-medium tracking-tight md:text-[32px]">יומן החבורה</h1>
+          <p className="mt-1.5 text-[14px] font-light text-[#4b5563]">{stats.join(" · ")}</p>
+          {next ? (
+            <div className="mt-3.5 flex flex-wrap items-center gap-2.5 text-[13px]">
+              <Link
+                href={`/journal/${next.id}`}
+                className="max-w-full truncate rounded-full bg-white px-3 py-1.5 font-light text-[#1f2328] shadow-[0_1px_2px_rgba(15,23,42,.05)]"
+              >
+                הבאה: {weekday.format(new Date(next.startsAt)).replace("יום ", "")}{" "}
+                {formatDayMonth(next.startsAt)} · {formatTimeHe(next.startsAt)} ·{" "}
+                {splitGatheringTitle(next).heading}
+                {hostName ? ` אצל ${hostName}` : ""}
+              </Link>
+              {can(me, "rsvp") ? (
+                <button
+                  type="button"
+                  disabled={rsvping || next.rsvps[me.id] === "yes"}
+                  onClick={() => void comeTo(next)}
+                  className="inline-flex items-center gap-1 rounded-full bg-[#b8862f] px-3.5 py-1.5 text-[13px] text-white disabled:opacity-100"
+                >
+                  {next.rsvps[me.id] === "yes" ? <Check className="size-3.5" /> : null}
+                  אני מגיע
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </section>
+      {can(me, "createEvent") ? (
+        <div className="mt-4">
+          <EventDialog
+            trigger={
+              <button type="button" className="text-[13px] font-light text-[#8a5f1c]">
+                <Plus className="me-1 inline size-3.5" />
+                חברה חדשה
+              </button>
+            }
+          />
+        </div>
+      ) : null}
 
-      <div className="relative mt-8 md:pr-[110px]">
-        <div className="absolute top-2 bottom-0 right-[86px] hidden w-0.5 bg-linear-to-b from-[#e6d3ad] to-[#eef0f3] md:block" />
-        {upcoming.length ? (
-          <>
-            <MonthLabel>בקרוב</MonthLabel>
-            {upcoming.map(entry)}
-          </>
-        ) : null}
+      <div className="relative mt-7 md:pr-[110px]">
+        <div className="absolute top-2 bottom-0 right-[86px] hidden w-0.5 bg-linear-to-b from-[#e6d3ad] to-[#eee6d6] md:block" />
         {groupByMonth(past).map((group) => (
           <div key={group.key}>
             <MonthLabel>{group.key}</MonthLabel>
             {group.items.map(entry)}
           </div>
         ))}
+        {upcoming.length ? (
+          <>
+            <MonthLabel>בקרוב</MonthLabel>
+            {upcoming.map(entry)}
+          </>
+        ) : null}
         {state.gatherings.length === 0 ? (
           <p className="py-10 text-center font-light text-muted-foreground">עדיין אין חברות ביומן.</p>
         ) : null}
@@ -230,6 +255,7 @@ export function JournalView() {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
@@ -257,7 +283,8 @@ function JournalEntry({
   onDelete: () => void;
 }) {
   const href = `/journal/${event.id}`;
-  const { kind, heading } = splitGatheringTitle(event);
+  const { kind } = splitGatheringTitle(event);
+  const heading = journalHeading(event);
   const { day, month } = hebrewDateParts(event.startsAt);
   const isUpcoming = event.status === "upcoming";
   const host = memberById(members, event.hostId);
@@ -282,7 +309,7 @@ function JournalEntry({
       className={cn(
         "relative mb-[18px] grid gap-4 rounded-[22px] p-4 shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_22px_rgba(15,23,42,.04)] md:gap-5 md:px-5 md:py-[18px]",
         pics.length ? "md:grid-cols-[1fr_300px]" : "",
-        isUpcoming ? "bg-[#fffaf0] ring-1 ring-[#ecdcbc]" : "bg-white"
+        "bg-white"
       )}
     >
       <div className="absolute -right-[110px] top-3.5 hidden w-16 text-center md:block">

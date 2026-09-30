@@ -100,6 +100,14 @@ export function splitGatheringTitle(event: { title?: string; topic?: string; sta
   return { kind, heading: rest.join(" · ") };
 }
 
+export function journalHeading(event: { title?: string; topic?: string; startsAt: string }) {
+  const { heading } = splitGatheringTitle(event);
+  const topic = event.topic?.trim();
+  if (!topic) return heading;
+  if (!heading || topic.includes(heading) || heading.includes(topic)) return topic;
+  return `${topic} · ${heading}`;
+}
+
 export function formatRelativeHe(iso: string) {
   const then = new Date(iso).getTime();
   const now = Date.now();
