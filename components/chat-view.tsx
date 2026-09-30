@@ -10,6 +10,7 @@ import {
   BookOpen,
   Copy,
   Ellipsis,
+  Eye,
   FileText,
   Forward,
   Hash,
@@ -108,7 +109,8 @@ export function ChatView({ channelId }: { channelId?: string }) {
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [menuMessage, setMenuMessage] = useState<Message | null>(null);
-  const [menuView, setMenuView] = useState<"actions" | "forward" | "emoji">("actions");
+  const [menuView, setMenuView] = useState<"actions" | "forward" | "emoji" | "seen">("actions");
+  const [seenMessage, setSeenMessage] = useState<Message | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -788,6 +790,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           onEdit={() => beginEdit(message)}
                           onDelete={() => void deleteFromHover(message)}
                           onForward={(member) => void forwardMessageTo(message, member)}
+                          onSeen={active.type === "group" ? () => setSeenMessage(message) : undefined}
                         />
                         <Button
                           variant="ghost"
@@ -1201,6 +1204,12 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       <Quote data-icon="inline-start" />
                       ציטוט בתשובה
                     </Button>
+                    {active?.type === "group" ? (
+                      <Button className="h-12 w-full rounded-xl" variant="outline" onClick={() => setMenuView("seen")}>
+                        <Eye data-icon="inline-start" />
+                        מי צפה
+                      </Button>
+                    ) : null}
                     <Button
                       className="h-12 w-full rounded-xl"
                       variant="outline"
@@ -1210,6 +1219,16 @@ export function ChatView({ channelId }: { channelId?: string }) {
                       העברה לצ׳אט אחר
                     </Button>
                   </div>
+                </>
+              ) : menuView === "seen" && active ? (
+                <>
+                  <h2 id="message-menu-title" className="text-base font-medium">
+                    מי צפה
+                  </h2>
+                  <SeenPanel message={menuMessage} channel={active} members={state.members} />
+                  <Button className="mt-3 h-12 w-full rounded-xl" variant="ghost" onClick={() => setMenuView("actions")}>
+                    חזרה
+                  </Button>
                 </>
               ) : (
                 <>
@@ -1291,6 +1310,16 @@ export function ChatView({ channelId }: { channelId?: string }) {
     {active ? (
       <PollDialog channelId={active.id} open={pollOpen} onOpenChange={setPollOpen} />
     ) : null}
+    <Dialog open={seenMessage !== null} onOpenChange={(open) => { if (!open) setSeenMessage(null); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>מי צפה</DialogTitle>
+        </DialogHeader>
+        {seenMessage && active?.type === "group" ? (
+          <SeenPanel message={seenMessage} channel={active} members={state.members} />
+        ) : null}
+      </DialogContent>
+    </Dialog>
     <Dialog
       open={editing !== null}
       onOpenChange={(open) => {
@@ -1316,6 +1345,84 @@ export function ChatView({ channelId }: { channelId?: string }) {
   );
 }
 
+function SeenPanel({
+  message,
+  channel,
+  members,
+}: {
+  message: Message;
+  channel: Channel;
+  members: Member[];
+}) {
+  const [reads, setReads] = useState<Record<string, string> | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/chat/seen?channelId=${encodeURIComponent(channel.id)}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("load failed"))))
+      .then((data: { reads?: Record<string, string> }) => {
+        if (!cancelled) setReads(data.reads ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [channel.id]);
+
+  if (failed) {
+    return <p className="py-6 text-center text-sm font-light text-muted-foreground">לא הצלחנו לטעון</p>;
+  }
+  if (!reads) {
+    return <p className="py-6 text-center text-sm font-light text-muted-foreground">טוען…</p>;
+  }
+
+  const others = channel.memberIds.filter((id) => id !== message.authorId);
+  const seen = others.filter((id) => {
+    const at = reads[id];
+    return !!at && at >= message.createdAt;
+  });
+  const seenMembers = seen
+    .map((id) => memberById(members, id))
+    .filter((member): member is Member => !!member);
+  const missed = others
+    .filter((id) => !seen.includes(id))
+    .map((id) => memberById(members, id)?.displayName)
+    .filter((name): name is string => !!name);
+  const title =
+    seen.length === 0
+      ? "עדיין אף אחד לא צפה"
+      : seen.length === 1
+        ? "אדם אחד צפה"
+        : `${seen.length} אנשים צפו`;
+
+  return (
+    <div className="mt-3">
+      <p className="text-[15px] font-medium">{title}</p>
+      <p className="text-[12.5px] font-light text-muted-foreground">מתוך {others.length} בחדר</p>
+      {seenMembers.length ? (
+        <ul className="mt-3 flex flex-col gap-1">
+          {seenMembers.map((member) => (
+            <li key={member.id} className="flex items-center gap-2 rounded-xl bg-[#f6f7f8] px-2.5 py-1.5">
+              <UserAvatar member={member} size="sm" />
+              <span className="text-sm">{member.displayName}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {missed.length ? (
+        <p className="mt-3 text-[12.5px] font-light leading-5 text-muted-foreground">
+          עוד לא צפו: {missed.join(", ")}
+        </p>
+      ) : others.length ? (
+        <p className="mt-3 text-[12.5px] font-light text-muted-foreground">כולם צפו</p>
+      ) : null}
+    </div>
+  );
+}
+
 const menuItemClass = "gap-2 whitespace-nowrap px-2.5 py-1.5 text-sm";
 
 function MessageMenu({
@@ -1328,6 +1435,7 @@ function MessageMenu({
   onEdit,
   onDelete,
   onForward,
+  onSeen,
 }: {
   message: Message;
   me: Member;
@@ -1338,6 +1446,7 @@ function MessageMenu({
   onEdit: () => void;
   onDelete: () => void;
   onForward: (member: Member) => void;
+  onSeen?: () => void;
 }) {
   const targets = forwardTargets(members, me, active);
   return (
@@ -1368,6 +1477,12 @@ function MessageMenu({
           <DropdownMenuItem className={menuItemClass} variant="destructive" onSelect={onDelete}>
             <Trash2 className="size-4" />
             מחיקה
+          </DropdownMenuItem>
+        ) : null}
+        {onSeen ? (
+          <DropdownMenuItem className={menuItemClass} onSelect={onSeen}>
+            <Eye className="size-4" />
+            מי צפה
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSub>

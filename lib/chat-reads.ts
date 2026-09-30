@@ -65,6 +65,33 @@ export async function loadChatReads(memberId: string): Promise<ChatReads> {
   return reads;
 }
 
+export async function loadChannelReads(channelId: string): Promise<Record<string, string>> {
+  if (isSupabaseEnabled()) {
+    const db = getServiceSupabase();
+    if (db) {
+      const { data, error } = await db
+        .from("chat_reads")
+        .select("member_id, read_at")
+        .eq("channel_id", channelId);
+      if (!error) {
+        const reads: Record<string, string> = {};
+        for (const row of data ?? []) {
+          reads[row.member_id as string] = new Date(row.read_at as string).toISOString();
+        }
+        return reads;
+      }
+      if (!missingSchema(error)) throw error;
+    }
+  }
+  const state = await readState();
+  const reads: Record<string, string> = {};
+  for (const [memberId, mine] of Object.entries(state.chatReads ?? {})) {
+    const at = mine[channelId];
+    if (at) reads[memberId] = at;
+  }
+  return reads;
+}
+
 export async function channelReadAt(memberId: string, channelId: string): Promise<string | null> {
   const cloud = await loadCloud(memberId);
   const reads = cloud ?? (await readState()).chatReads?.[memberId] ?? {};
