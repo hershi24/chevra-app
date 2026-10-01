@@ -17,6 +17,7 @@ import {
   SCOPE_NONE,
   canEditExpense,
   canEditPayment,
+  exemptMemberIds,
   expenseScopeLabel,
   expensesOpen,
   formatAgorot,
@@ -30,7 +31,15 @@ import {
 import { formatDateShortHe, gatheringLabel, memberById } from "@/lib/format";
 import { isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { BankAccount, Expense, ExpensePayment, Gathering, Member, PaymentMethod } from "@/lib/types";
+import type {
+  BankAccount,
+  Expense,
+  ExpensePayment,
+  Gathering,
+  GatheringWaiver,
+  Member,
+  PaymentMethod,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const panel = "rounded-[20px] border border-[#d5dbe3] bg-[#fbfcfd]";
@@ -171,6 +180,17 @@ export function ExpensesView() {
         eventId={scopeEventId}
       />
 
+      {scopeEventId ? (
+        <div className="mt-4">
+          <GatheringExempt
+            eventId={scopeEventId}
+            members={state.members}
+            waivers={state.expenseWaivers ?? []}
+            admin={isAdmin(me)}
+          />
+        </div>
+      ) : null}
+
       <div
         role="tablist"
         className="-mx-5 mt-7 flex gap-6 overflow-x-auto border-b border-[#e3e7ec] px-5 sm:mx-0 sm:px-0"
@@ -203,6 +223,7 @@ export function ExpensesView() {
               expenses={expenses}
               members={state.members}
               gatherings={gatherings}
+              waivers={state.expenseWaivers ?? []}
               me={me}
               showEvent={scope === SCOPE_ALL}
               defaultEventId={defaultEventId}
@@ -211,7 +232,7 @@ export function ExpensesView() {
               {[
                 `${formatAgorot(report.includedAgorot)} בחשבון`,
                 `${report.memberCount} חברים`,
-                `${formatAgorot(report.shareAgorot)} לכל אחד`,
+                report.sharesEqual ? `${formatAgorot(report.shareAgorot)} לכל אחד` : "החלקים לפי מי שמוחרג",
                 report.excludedAgorot ? `${formatAgorot(report.excludedAgorot)} מוחרג` : "",
               ]
                 .filter(Boolean)
@@ -540,10 +561,100 @@ function RowActions({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap gap-2 pe-4 ps-[3.75rem] pb-3.5">{children}</div>;
 }
 
+function GatheringExempt({
+  eventId,
+  members,
+  waivers,
+  admin,
+}: {
+  eventId: string;
+  members: Member[];
+  waivers: GatheringWaiver[];
+  admin: boolean;
+}) {
+  const { act } = useApp();
+  const [pending, setPending] = useState<string | null>(null);
+  const selected = new Set(waivers.find((item) => item.eventId === eventId)?.memberIds ?? []);
+  if (!admin && selected.size === 0) return null;
+
+  return (
+    <section className={cn(panel, "px-4 py-3.5")}>
+      <div className="text-[15px]">מי לא בחשבון של החברה</div>
+      <p className="mt-0.5 text-xs font-light text-muted-foreground">
+        מי שמסומן לא משתתף בהוצאות של החברה הזו, גם במה שיתווסף אחר כך.
+      </p>
+      <div className="mt-2.5">
+        {admin ? (
+          <MemberToggles
+            members={members}
+            selected={selected}
+            pending={pending}
+            onToggle={(memberId, exempt) => {
+              setPending(memberId);
+              void act({ type: "setGatheringExempt", eventId, memberId, exempt })
+                .catch(fail("ההחרגה נכשלה"))
+                .finally(() => setPending(null));
+            }}
+          />
+        ) : (
+          <p className="text-sm">
+            {members
+              .filter((member) => selected.has(member.id))
+              .map((member) => member.displayName)
+              .join(" · ")}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MemberToggles({
+  members,
+  selected,
+  locked,
+  pending,
+  onToggle,
+}: {
+  members: Member[];
+  selected: Set<string>;
+  locked?: Set<string>;
+  pending: string | null;
+  onToggle: (memberId: string, exempt: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {members.map((member) => {
+        const held = locked?.has(member.id) ?? false;
+        const on = held || selected.has(member.id);
+        return (
+          <button
+            key={member.id}
+            type="button"
+            disabled={held || pending !== null}
+            aria-pressed={on}
+            title={held ? "מוחרג מכל החברה" : undefined}
+            onClick={() => onToggle(member.id, !selected.has(member.id))}
+            className={cn(
+              "rounded-full border px-3 py-1 text-[12.5px] transition-colors disabled:opacity-60",
+              on
+                ? "border-[#a9782c] bg-[#f5f0e7] text-[#7d5a22]"
+                : "border-[#dfe3e8] text-foreground/75 hover:text-foreground"
+            )}
+          >
+            {member.displayName}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ExpenseList({
   expenses,
   members,
   gatherings,
+  waivers,
   me,
   showEvent,
   defaultEventId,
@@ -551,6 +662,7 @@ function ExpenseList({
   expenses: Expense[];
   members: Member[];
   gatherings: Gathering[];
+  waivers: GatheringWaiver[];
   me: Member;
   showEvent: boolean;
   defaultEventId?: string;
@@ -559,6 +671,8 @@ function ExpenseList({
   const [active, setActive] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const memberIds = members.map((member) => member.id);
 
   return (
     <div className={cn(panel, "divide-y divide-[#e9ecef] overflow-hidden")}>
@@ -583,11 +697,20 @@ function ExpenseList({
         }
         const buyer = memberById(members, expense.memberId);
         const editable = canEditExpense(me, expense);
+        const exemptNames = expense.excluded
+          ? []
+          : exemptMemberIds(expense, memberIds, waivers).map(
+              (id) => memberById(members, id)?.displayName ?? "חבר"
+            );
+        const locked = new Set(
+          expense.eventId ? (waivers.find((item) => item.eventId === expense.eventId)?.memberIds ?? []) : []
+        );
         const meta = [
           buyer?.displayName ?? "חבר",
           expense.detail.trim(),
           showEvent ? eventName(gatherings, expense.eventId) : null,
           expense.excluded ? "מוחרג מהחשבון" : null,
+          exemptNames.length ? `בלי ${exemptNames.join(", ")}` : null,
         ].filter(Boolean);
         return (
           <div key={expense.id}>
@@ -628,7 +751,7 @@ function ExpenseList({
                     }).catch(fail("העדכון נכשל"))
                   }
                 >
-                  {expense.excluded ? "להחזיר לחשבון" : "החרגה"}
+                  {expense.excluded ? "להחזיר לחשבון" : "החרגת הסכום"}
                 </Button>
                 <Button
                   variant="ghost"
@@ -641,6 +764,23 @@ function ExpenseList({
                   <Trash2 data-icon="inline-start" />
                   מחיקה
                 </Button>
+                {expense.excluded ? null : (
+                  <div className="basis-full">
+                    <div className="mb-1.5 text-xs font-light text-muted-foreground">בלי מי בהוצאה הזו</div>
+                    <MemberToggles
+                      members={members}
+                      selected={new Set(expense.exemptIds ?? [])}
+                      locked={locked}
+                      pending={pending}
+                      onToggle={(memberId, exempt) => {
+                        setPending(memberId);
+                        void act({ type: "setExpenseExempt", expenseId: expense.id, memberId, exempt })
+                          .catch(fail("ההחרגה נכשלה"))
+                          .finally(() => setPending(null));
+                      }}
+                    />
+                  </div>
+                )}
               </RowActions>
             ) : null}
           </div>
@@ -803,6 +943,7 @@ function MembersTab({
         {report.rows.map((row) => {
           const member = memberById(members, row.memberId);
           const moved = [
+            report.sharesEqual ? "" : `חלק ${formatAgorot(row.shareAgorot)}`,
             `קנה ${formatAgorot(row.spentAgorot)}`,
             row.paidAgorot ? `העביר ${formatAgorot(row.paidAgorot)}` : "",
             row.receivedAgorot ? `קיבל ${formatAgorot(row.receivedAgorot)}` : "",
@@ -829,6 +970,8 @@ function MembersTab({
                 <span className="shrink-0 rounded-full bg-[#f8e7e4] px-2.5 py-1 text-[12px] tabular-nums text-[#8d3a32]">
                   לשלם {formatAgorot(row.owesAgorot)}
                 </span>
+              ) : row.shareAgorot === 0 && report.includedAgorot > 0 && !report.sharesEqual ? (
+                <span className="shrink-0 text-xs text-muted-foreground">לא בחשבון</span>
               ) : (
                 <span className="shrink-0 text-xs text-muted-foreground">מאוזן</span>
               )}

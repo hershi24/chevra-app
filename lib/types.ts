@@ -114,8 +114,16 @@ export type Expense = {
   detail: string;
   amount: number;
   excluded: boolean;
+  /** Members who do not share this item. A gathering waiver applies on top. */
+  exemptIds?: string[];
   eventId?: string;
   createdAt: string;
+};
+
+/** Members left out of every expense tied to one gathering, including ones added later. */
+export type GatheringWaiver = {
+  eventId: string;
+  memberIds: string[];
 };
 
 export type PaymentMethod = "cash" | "transfer";
@@ -192,6 +200,7 @@ export type AppState = {
   tokens: RsvpToken[];
   settings: AppSettings;
   expenses: Expense[];
+  expenseWaivers?: GatheringWaiver[];
   payments?: ExpensePayment[];
   bankAccounts?: Record<string, BankAccount>;
   emailLog: EmailLog[];

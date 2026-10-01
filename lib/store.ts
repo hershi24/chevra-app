@@ -115,6 +115,7 @@ export async function readState(): Promise<AppState> {
     const ledger = await loadExpenseLedger();
     if (ledger) {
       state.expenses = ledger.items;
+      state.expenseWaivers = ledger.waivers;
       state.settings.showExpenses = ledger.visible;
       if (ledger.payments) state.payments = ledger.payments;
     }
@@ -213,6 +214,7 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     messages: visibleMessages,
     settings: state.settings,
     expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
+    expenseWaivers: state.settings.showExpenses === false ? [] : (state.expenseWaivers ?? []),
     payments: state.settings.showExpenses === false ? [] : (state.payments ?? []),
     bankAccounts: state.settings.showExpenses === false ? {} : (state.bankAccounts ?? {}),
     emailLog: state.emailLog,

@@ -55,7 +55,7 @@ export default async function PrintExpensesPage({
         <section className="mt-4 grid grid-cols-4 gap-2">
           {[
             ["נכנס לחשבון", money(report.totals.included)],
-            ["חלק לכל חבר", money(report.totals.share)],
+            ["חלק לכל חבר", report.totals.sharesEqual ? money(report.totals.share) : "שונה"],
             ["כבר הועבר", money(report.totals.paid)],
             ["מוחרג", money(report.totals.excluded)],
           ].map(([label, value]) => (
@@ -66,7 +66,10 @@ export default async function PrintExpensesPage({
           ))}
         </section>
         <p className="mt-1.5 text-[10.5px] text-[#6b7280]">
-          {report.totals.memberCount} חברים. הסכום מתחלק שווה בשווה; מה שכל אחד קנה ומה שהעביר יורד מהחלק שלו.
+          {report.totals.memberCount} חברים.{" "}
+          {report.totals.sharesEqual
+            ? "הסכום מתחלק שווה בשווה; מה שכל אחד קנה ומה שהעביר יורד מהחלק שלו."
+            : "יש החרגות, אז החלק לא שווה לכולם. מה שכל אחד קנה ומה שהעביר יורד מהחלק שלו."}
         </p>
 
         <h2 className="mt-5 mb-1.5 text-[14px] font-medium">סיכום לפי חבר</h2>
@@ -144,6 +147,7 @@ export default async function PrintExpensesPage({
                   <td className={td}>
                     {row.title}
                     {row.excluded ? <span className="ms-1 text-[10.5px]">(מוחרג)</span> : null}
+                    {row.exempt ? <div className="text-[10.5px] text-[#6b7280]">בלי {row.exempt}</div> : null}
                     {row.detail ? <div className="text-[10.5px] text-[#6b7280]">{row.detail}</div> : null}
                   </td>
                   <td className={td}>{row.buyer}</td>

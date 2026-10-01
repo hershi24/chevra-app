@@ -137,7 +137,10 @@ export async function GET(request: NextRequest) {
       { header: "בחשבון", key: "status", width: 10 },
       { header: "סכום", key: "amount", width: 13, money: true },
     ],
-    report.expenses.map(({ excluded, ...item }) => ({ ...item, status: excluded ? "מוחרג" : "כן" })),
+    report.expenses.map(({ excluded, exempt, ...item }) => ({
+      ...item,
+      status: excluded ? "מוחרג" : exempt ? `בלי ${exempt}` : "כן",
+    })),
     { date: "סה״כ בחשבון", amount: report.totals.included }
   );
 

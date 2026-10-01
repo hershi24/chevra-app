@@ -12,6 +12,7 @@ import {
   canEditExpense,
   canEditPayment,
   expenseNoticeText,
+  expensePayers,
   expenseScopeLabel,
   isPaymentMethod,
   expensesOpen,
@@ -64,6 +65,7 @@ async function mailExpenseNotice(
       bankAccounts: state.bankAccounts ?? {},
       origin,
       scopeLabel,
+      waivers: state.expenseWaivers,
     });
     return [{ member, html }];
   });
@@ -635,6 +637,48 @@ function applyAction(
       expense.excluded = body.excluded;
       return;
     }
+    case "setExpenseExempt": {
+      assertExpensesOpen(s);
+      const expense = findExpense(s, body.expenseId);
+      if (!canEditExpense(me, expense)) throw new Error("forbidden");
+      if (!s.members.some((item) => item.id === body.memberId)) throw new Error("החבר לא נמצא");
+      const ids = new Set(expense.exemptIds ?? []);
+      if (body.exempt) ids.add(body.memberId);
+      else ids.delete(body.memberId);
+      const next = [...ids];
+      const payers = expensePayers(
+        { ...expense, exemptIds: next },
+        s.members.map((item) => item.id),
+        s.expenseWaivers ?? []
+      );
+      if (!payers.length) throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
+      if (next.length) expense.exemptIds = next;
+      else delete expense.exemptIds;
+      return;
+    }
+    case "setGatheringExempt": {
+      assertExpensesOpen(s);
+      if (!isAdmin(me)) throw new Error("forbidden");
+      if (!s.gatherings.some((item) => item.id === body.eventId)) throw new Error("החברה לא נמצאה");
+      if (!s.members.some((item) => item.id === body.memberId)) throw new Error("החבר לא נמצא");
+      const memberIds = s.members.map((item) => item.id);
+      const current = s.expenseWaivers ?? [];
+      const previous = current.find((item) => item.eventId === body.eventId)?.memberIds ?? [];
+      const ids = new Set(previous);
+      if (body.exempt) ids.add(body.memberId);
+      else ids.delete(body.memberId);
+      if (ids.size >= memberIds.length) throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
+      const next = current.filter((item) => item.eventId !== body.eventId);
+      if (ids.size) next.push({ eventId: body.eventId, memberIds: [...ids] });
+      for (const expense of s.expenses ?? []) {
+        if (expense.eventId !== body.eventId || expense.excluded) continue;
+        if (!expensePayers(expense, memberIds, next).length) {
+          throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
+        }
+      }
+      s.expenseWaivers = next;
+      return;
+    }
     case "deleteExpense": {
       assertExpensesOpen(s);
       const expense = findExpense(s, body.expenseId);
@@ -663,7 +707,11 @@ function applyAction(
       let repeats = 0;
       for (const row of payers) {
         const channel = ensureDirectChannel(s, me.id, row.memberId);
-        const text = expenseNoticeText(s.members, expenses, row, { scopeLabel, transfers });
+        const text = expenseNoticeText(s.members, expenses, row, {
+          scopeLabel,
+          transfers,
+          waivers: s.expenseWaivers,
+        });
         const repeat = s.messages.some(
           (item) =>
             item.channelId === channel.id &&
