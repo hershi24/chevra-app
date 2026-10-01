@@ -12,6 +12,7 @@ import {
   Settings,
 } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-provider";
+import type { PublicState } from "@/lib/types";
 import { PasswordNotice } from "@/components/password-notice";
 import { BackgroundLayer } from "@/components/background-layer";
 import { UserAvatar } from "@/components/user-avatar";
@@ -28,9 +29,15 @@ const NAV = [
   { href: "/settings", label: "הגדרות", short: "הגדרות", icon: Settings },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  initial,
+}: {
+  children: React.ReactNode;
+  initial: PublicState;
+}) {
   return (
-    <AppProvider>
+    <AppProvider initial={initial}>
       <ShellFrame>{children}</ShellFrame>
     </AppProvider>
   );

@@ -152,7 +152,7 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
       if (error) throw error;
     }
     if (!prev || !sameRsvps(prev.rsvps, event.rsvps)) {
-      await replaceRsvps(event);
+      await replaceRsvps(event, prev?.rsvps);
     }
     if (!prev || !sameMedia(prev.media, event.media)) {
       await replaceMedia(prev?.media ?? [], event);
@@ -243,18 +243,23 @@ async function syncLooseGallery(before: EventMedia[], after: EventMedia[]) {
   }
 }
 
-async function replaceRsvps(event: Gathering) {
+async function replaceRsvps(event: Gathering, previous: Gathering["rsvps"] = {}) {
   const db = getServiceSupabase();
   if (!db) return;
-  const { error: clearError } = await db.from("rsvps").delete().eq("gathering_id", event.id);
-  if (clearError) throw clearError;
-  const rows = Object.entries(event.rsvps).map(([memberId, status]) => ({
-    gathering_id: event.id,
-    member_id: memberId,
-    status,
-  }));
-  if (!rows.length) return;
-  const { error } = await db.from("rsvps").upsert(rows);
+  const rows = Object.entries(event.rsvps)
+    .filter(([memberId, status]) => previous[memberId] !== status)
+    .map(([memberId, status]) => ({
+      gathering_id: event.id,
+      member_id: memberId,
+      status,
+    }));
+  if (rows.length) {
+    const { error } = await db.from("rsvps").upsert(rows);
+    if (error) throw error;
+  }
+  const removed = Object.keys(previous).filter((memberId) => event.rsvps[memberId] === undefined);
+  if (!removed.length) return;
+  const { error } = await db.from("rsvps").delete().eq("gathering_id", event.id).in("member_id", removed);
   if (error) throw error;
 }
 
