@@ -22,7 +22,7 @@ import {
   type ReactionRow,
 } from "@/lib/chat-message";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-import type { Member, Message, PublicState } from "@/lib/types";
+import type { Member, Message, PublicState, RsvpStatus } from "@/lib/types";
 
 type AppContextValue = {
   state: PublicState | null;
@@ -37,15 +37,59 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+type PendingRsvp = {
+  eventId: string;
+  memberId: string;
+  status: RsvpStatus;
+  ticket: number;
+  revision: number;
+};
+
+function withPendingRsvps(
+  data: PublicState,
+  pending: Map<string, PendingRsvp>,
+  ticket: number
+): PublicState {
+  if (pending.size === 0) return data;
+  let changed = false;
+  const gatherings = data.gatherings.map((item) => {
+    const wait = pending.get(item.id);
+    if (!wait || wait.ticket !== ticket) return item;
+    if (data.revision > wait.revision && item.rsvps[wait.memberId] === wait.status) {
+      pending.delete(item.id);
+      return item;
+    }
+    if (item.rsvps[wait.memberId] === wait.status) return item;
+    changed = true;
+    return { ...item, rsvps: { ...item.rsvps, [wait.memberId]: wait.status } };
+  });
+  return changed ? { ...data, gatherings } : data;
+}
+
+export function AppProvider({
+  children,
+  initial = null,
+}: {
+  children: React.ReactNode;
+  initial?: PublicState | null;
+}) {
   const router = useRouter();
-  const [state, setState] = useState<PublicState | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<PublicState | null>(initial);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<string[]>([]);
   const pendingIds = useRef(new Set<string>());
+  const stateRef = useRef(state);
+  const rsvpTicket = useRef(0);
+  const pendingRsvps = useRef(new Map<string, PendingRsvp>());
+  const seenRevision = useRef(initial?.revision ?? 0);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const applyServerState = useCallback((data: PublicState, prev: PublicState | null) => {
+    if (prev && data.revision < seenRevision.current) return prev;
+    if (data.revision >= seenRevision.current) seenRevision.current = data.revision;
     const serverIds = new Set(data.messages.map((message) => message.id));
     for (const id of pendingIds.current) {
       if (serverIds.has(id)) pendingIds.current.delete(id);
@@ -53,7 +97,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const extras = (prev?.messages ?? []).filter(
       (message) => pendingIds.current.has(message.id) && !serverIds.has(message.id)
     );
-    return extras.length ? { ...data, messages: [...data.messages, ...extras] } : data;
+    const merged = extras.length ? { ...data, messages: [...data.messages, ...extras] } : data;
+    return withPendingRsvps(merged, pendingRsvps.current, rsvpTicket.current);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -72,6 +117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [router, applyServerState]);
 
   useEffect(() => {
+    if (initial) return;
     let cancelled = false;
     fetch("/api/state", { cache: "no-store" })
       .then(async (res) => {
@@ -93,7 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, initial]);
 
   useEffect(() => {
     const es = new EventSource("/api/stream");
@@ -107,7 +153,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
         if ((data.type === "presence" || data.type === "hello") && Array.isArray(data.ids)) {
           setOnlineIds(data.ids);
-          if (data.type === "presence") return;
+          return;
         }
         if (data.type === "typing" || data.type === "seen") {
           window.dispatchEvent(new CustomEvent(`chevra-${data.type}`, { detail: data }));
@@ -191,6 +237,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const act = useCallback(async (body: ActionBody) => {
     let staged: Message | null = null;
     let reaction: { messageId: string; emoji: string } | null = null;
+    let undoRsvp: { eventId: string; memberId: string; status?: RsvpStatus } | null = null;
+    let ticket = 0;
     if (body.type === "sendMessage") {
       const id = body.id && body.id.length > 0 ? body.id : crypto.randomUUID();
       body = { ...body, id };
@@ -221,6 +269,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           messages: toggleReaction(prev.messages, messageId, emoji, prev.me.id),
         };
       });
+    } else if (body.type === "rsvp") {
+      const current = stateRef.current;
+      const memberId = current?.me.id;
+      if (current && memberId) {
+        ticket = ++rsvpTicket.current;
+        const eventId = body.eventId;
+        const status = body.status;
+        undoRsvp = {
+          eventId,
+          memberId,
+          status: current.gatherings.find((item) => item.id === eventId)?.rsvps[memberId],
+        };
+        pendingRsvps.current.set(eventId, {
+          eventId,
+          memberId,
+          status,
+          ticket,
+          revision: current.revision,
+        });
+        setState((prev) =>
+          prev
+            ? {
+                ...prev,
+                gatherings: prev.gatherings.map((item) =>
+                  item.id === eventId ? { ...item, rsvps: { ...item.rsvps, [memberId]: status } } : item
+                ),
+              }
+            : prev
+        );
+      }
     }
     try {
       const res = await fetch("/api/actions", {
@@ -230,7 +308,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       const data = (await res.json()) as PublicState & { error?: string };
       if (!res.ok) throw new Error(data.error || "הפעולה נכשלה");
-      setState((prev) => applyServerState(data, prev));
+      if (body.type !== "rsvp" || ticket === rsvpTicket.current) {
+        setState((prev) => applyServerState(data, prev));
+      }
       return data;
     } catch (error) {
       if (staged) {
@@ -245,6 +325,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return {
             ...prev,
             messages: toggleReaction(prev.messages, undo.messageId, undo.emoji, prev.me.id),
+          };
+        });
+      } else if (undoRsvp && ticket === rsvpTicket.current) {
+        const undo = undoRsvp;
+        pendingRsvps.current.delete(undo.eventId);
+        setState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            gatherings: prev.gatherings.map((item) => {
+              if (item.id !== undo.eventId) return item;
+              const rsvps = { ...item.rsvps };
+              if (undo.status === undefined) delete rsvps[undo.memberId];
+              else rsvps[undo.memberId] = undo.status;
+              return { ...item, rsvps };
+            }),
           };
         });
       }

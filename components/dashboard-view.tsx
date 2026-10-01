@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   BookOpen,
   Check,
@@ -164,10 +163,10 @@ function Dashboard({
   };
 
   const onRsvp = async (status: RsvpStatus) => {
-    if (!event) return;
+    if (!event || (event.rsvps[me.id] ?? "pending") === status) return;
     try {
       await act({ type: "rsvp", eventId: event.id, status });
-      toast.success("ההגעה עודכנה");
+      toast.success("מצליח");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "שגיאה");
     }
@@ -434,12 +433,7 @@ function HeroEvent({
   ].filter((d): d is { icon: LucideIcon; text: string } => Boolean(d));
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
-      className={cn(CARD, "grid min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}
-    >
+    <section className={cn(CARD, "grid min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}>
       <div className="relative min-w-0 px-5 py-6 md:px-8 md:py-8">
         {can(me, "editEvent") ? (
           <div className="absolute end-3 top-3 md:end-5 md:top-5">
@@ -552,7 +546,7 @@ function HeroEvent({
           </div>
         ) : null}
       </aside>
-    </motion.section>
+    </section>
   );
 }
 
@@ -597,7 +591,7 @@ function RsvpButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-normal transition sm:flex-none",
+        "inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-normal sm:flex-none",
         !active && "text-foreground/65 hover:text-foreground",
         active && tone === "yes" && "bg-[#3d8f62] text-white",
         active && tone === "maybe" && "bg-white text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]",

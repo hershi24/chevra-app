@@ -28,8 +28,12 @@ const FILE = process.env.VERCEL
   ? path.join("/tmp", "meine-chevra-store.json")
   : path.join(process.cwd(), "data", "store.json");
 
+const CLOUD_FRESH_MS = 10_000;
+
 const g = globalThis as unknown as {
   __chevraCache?: AppState;
+  __chevraCloudAt?: number;
+  __chevraCloudLoad?: Promise<AppState>;
   __chevraWrite?: Promise<void>;
 };
 
@@ -54,18 +58,37 @@ async function loadJson(): Promise<AppState> {
   }
 }
 
+function markCloudFresh(state: AppState) {
+  g.__chevraCache = state;
+  g.__chevraCloudAt = Date.now();
+}
+
 export async function readState(): Promise<AppState> {
+  const age = g.__chevraCloudAt ? Date.now() - g.__chevraCloudAt : Infinity;
+  if (g.__chevraCache && age < CLOUD_FRESH_MS) return g.__chevraCache;
+
   const json = await loadJson();
   if (!json.gallery) json.gallery = [];
   if (ensureMemberSecrets(json.members) || ensureExpenses(json)) await persist(json);
   if (!isSupabaseEnabled()) return json;
 
-  const state = structuredClone(json);
+  g.__chevraCloudLoad ??= mergeFromCloud(structuredClone(g.__chevraCache ?? json)).finally(() => {
+    g.__chevraCloudLoad = undefined;
+  });
+  return g.__chevraCloudLoad;
+}
+
+async function mergeFromCloud(state: AppState): Promise<AppState> {
   try {
     await bootstrapChatIfEmpty(state);
-    const [chat, members] = await Promise.all([
+    const [chat, members, cloud, ledger, accounts, emailPrefs, cloudTokens] = await Promise.all([
       loadChatFromSupabase(),
       loadMembersFromSupabase(),
+      loadGatheringsFromSupabase(),
+      loadExpenseLedger(),
+      loadBankAccounts(),
+      loadChatEmailPrefs(),
+      loadTokensFromSupabase(),
     ]);
     if (members?.length) {
       const local = new Map(state.members.map((member) => [member.id, member]));
@@ -88,7 +111,6 @@ export async function readState(): Promise<AppState> {
       state.messages = chat.messages;
     }
     if (!state.gallery) state.gallery = [];
-    const cloud = await loadGatheringsFromSupabase();
     if (cloud) {
       state.gallery = cloud.gallery;
       if (cloud.gatherings.length) {
@@ -101,7 +123,6 @@ export async function readState(): Promise<AppState> {
           await syncGatheringsDiff({ ...state, gatherings: [] }, state);
         }
       }
-      const cloudTokens = await loadTokensFromSupabase();
       if (cloudTokens) {
         const known = new Set(cloudTokens.map((row) => row.token));
         const live = new Set(state.gatherings.map((event) => event.id));
@@ -112,17 +133,15 @@ export async function readState(): Promise<AppState> {
         }
       }
     }
-    const ledger = await loadExpenseLedger();
     if (ledger) {
       state.expenses = ledger.items;
       state.expenseWaivers = ledger.waivers;
       state.settings.showExpenses = ledger.visible;
       if (ledger.payments) state.payments = ledger.payments;
     }
-    const accounts = await loadBankAccounts();
     if (accounts) state.bankAccounts = accounts;
-    const emailPrefs = await loadChatEmailPrefs();
     if (emailPrefs) state.chatEmailPrefs = emailPrefs;
+    markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
   }
@@ -136,7 +155,7 @@ export async function persistQuietly(
     const current = structuredClone(await readState());
     const before = structuredClone(current);
     if (!mutator(current)) return;
-    g.__chevraCache = current;
+    markCloudFresh(current);
     await persist(current);
     if (isSupabaseEnabled()) {
       try {
@@ -166,7 +185,7 @@ export async function updateState(
     const before = structuredClone(current);
     mutator(current);
     current.revision += 1;
-    g.__chevraCache = current;
+    markCloudFresh(current);
     await persist(current);
     if (isSupabaseEnabled()) {
       try {
