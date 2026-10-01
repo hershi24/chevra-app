@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Mic, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, MapPin, Mic, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EventDialog } from "@/components/event-dialog";
 import { UserAvatar } from "@/components/user-avatar";
@@ -11,12 +11,11 @@ import {
   formatTimeHe,
   gatheringLabel,
   hebrewDateParts,
-  journalHeading,
   memberById,
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
-import type { EventMedia, Gathering, Member } from "@/lib/types";
+import type { Gathering, Member } from "@/lib/types";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,17 +27,25 @@ function images(event: Gathering) {
   return [...pics].sort((a, b) => Number(a.url.startsWith("/")) - Number(b.url.startsWith("/")));
 }
 
-function bandCovers(gatherings: Gathering[]) {
-  const ordered = [...gatherings].sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
-  const remote: EventMedia[] = [];
-  const local: EventMedia[] = [];
-  for (const event of ordered) {
-    const pics = images(event);
-    const photo = pics.find((item) => item.url.startsWith("http")) ?? pics[0];
-    if (!photo) continue;
-    (photo.url.startsWith("http") ? remote : local).push(photo);
-  }
-  return (remote.length ? remote : local).slice(0, 4);
+function coverImage(event: Gathering) {
+  const pics = images(event);
+  return pics.find((item) => item.url.startsWith("http")) ?? pics[0] ?? null;
+}
+
+function storyCopy(event: Gathering, upcoming: boolean) {
+  const title = event.title?.trim() ?? "";
+  const topic = event.topic?.trim() ?? "";
+  const extra = (upcoming ? event.notes : event.summary)?.trim() ?? "";
+  const heading = title || topic || extra;
+  const seen = new Set<string>();
+  if (heading) seen.add(heading);
+  const lines = [topic, extra].filter((line) => {
+    if (!line || seen.has(line)) return false;
+    if (heading && (heading.includes(line) || line.includes(heading))) return false;
+    seen.add(line);
+    return true;
+  });
+  return { heading, body: lines.join(" ") };
 }
 
 function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" }) {
@@ -81,7 +88,7 @@ export function JournalView() {
     .filter((g) => g.status !== "upcoming")
     .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
   const next = upcoming[0];
-  const bandImages = bandCovers(state.gatherings);
+  const later = next ? upcoming.slice(1) : upcoming;
   const trips = state.gatherings.filter((g) => gatheringLabel(g).includes("טיול")).length;
   const photoCount = state.gatherings.reduce((sum, g) => sum + images(g).length, 0);
   const count = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
@@ -138,72 +145,33 @@ export function JournalView() {
   return (
     <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:px-8 md:pt-10 md:pb-16">
       <div className="mx-auto max-w-6xl">
-      <section className="relative overflow-hidden rounded-[26px] md:h-[190px]">
-        {bandImages.length ? (
-          <div
-            className="grid h-[132px] md:absolute md:inset-y-0 md:left-0 md:h-full md:w-[68%]"
-            style={{ gridTemplateColumns: `repeat(${bandImages.length}, minmax(0, 1fr))` }}
-          >
-            {bandImages.map((image) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={image.id} src={image.url} alt="" className="h-full w-full object-cover" />
-            ))}
-          </div>
-        ) : null}
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[132px] md:hidden"
-          style={{
-            background:
-              "linear-gradient(to top, #faf8f4 0%, rgba(250,248,244,0) 72%)",
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-0 hidden md:block"
-          style={{
-            background:
-              "linear-gradient(to left, #faf8f4 0%, rgba(250,248,244,.94) 36%, rgba(250,248,244,0) 74%)",
-          }}
-        />
-        <div className="relative -mt-8 flex flex-col justify-center md:absolute md:inset-y-0 md:right-0 md:mt-0 md:max-w-[58%] md:px-[34px]">
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-[1.75rem] font-medium tracking-tight md:text-[32px]">יומן החבורה</h1>
-          <p className="mt-1.5 text-[14px] font-light text-[#4b5563]">{stats.join(" · ")}</p>
-          {next ? (
-            <div className="mt-3.5 flex flex-wrap items-center gap-2.5 text-[13px]">
-              <Link
-                href={`/journal/${next.id}`}
-                className="max-w-full truncate rounded-full bg-white px-3 py-1.5 font-light text-[#1f2328] shadow-[0_1px_2px_rgba(15,23,42,.05)]"
-              >
-                הבאה: {weekday.format(new Date(next.startsAt)).replace("יום ", "")}{" "}
-                {formatDayMonth(next.startsAt)} · {formatTimeHe(next.startsAt)} ·{" "}
-                {splitGatheringTitle(next).heading}
-                {hostName ? ` אצל ${hostName}` : ""}
-              </Link>
-              {can(me, "rsvp") ? (
-                <button
-                  type="button"
-                  disabled={rsvping || next.rsvps[me.id] === "yes"}
-                  onClick={() => void comeTo(next)}
-                  className="inline-flex items-center gap-1 rounded-full bg-[#b8862f] px-3.5 py-1.5 text-[13px] text-white disabled:opacity-100"
-                >
-                  {next.rsvps[me.id] === "yes" ? <Check className="size-3.5" /> : null}
-                  אני מגיע
-                </button>
-              ) : null}
-            </div>
+          {stats.length ? (
+            <p className="mt-1 text-[14px] font-light text-[#4b5563]">{stats.join(" · ")}</p>
           ) : null}
         </div>
-      </section>
-      {can(me, "createEvent") ? (
-        <div className="mt-4">
+        {can(me, "createEvent") ? (
           <EventDialog
             trigger={
-              <button type="button" className="text-[13px] font-light text-[#8a5f1c]">
+              <button type="button" className="shrink-0 pt-2 text-[13px] font-light text-[#8a5f1c]">
                 <Plus className="me-1 inline size-3.5" />
                 חברה חדשה
               </button>
             }
           />
-        </div>
+        ) : null}
+      </header>
+      {next ? (
+        <NextStory
+          event={next}
+          members={state.members}
+          me={me}
+          hostName={hostName ?? null}
+          rsvping={rsvping}
+          onRsvp={() => void comeTo(next)}
+        />
       ) : null}
 
       <div className="relative mt-7 md:pr-[110px]">
@@ -214,10 +182,10 @@ export function JournalView() {
             {group.items.map(entry)}
           </div>
         ))}
-        {upcoming.length ? (
+        {later.length ? (
           <>
             <MonthLabel>בקרוב</MonthLabel>
-            {upcoming.map(entry)}
+            {later.map(entry)}
           </>
         ) : null}
         {state.gatherings.length === 0 ? (
@@ -260,6 +228,82 @@ export function JournalView() {
   );
 }
 
+function NextStory({
+  event,
+  members,
+  me,
+  hostName,
+  rsvping,
+  onRsvp,
+}: {
+  event: Gathering;
+  members: Member[];
+  me: Member;
+  hostName: string | null;
+  rsvping: boolean;
+  onRsvp: () => void;
+}) {
+  const photo = coverImage(event);
+  const { heading, body } = storyCopy(event, true);
+  const { day, month } = hebrewDateParts(event.startsAt);
+  const dayName = weekday.format(new Date(event.startsAt)).replace("יום ", "");
+  const coming = members.filter((member) => event.rsvps[member.id] === "yes");
+  const arriving = event.rsvps[me.id] === "yes";
+  const location = event.location?.trim();
+
+  return (
+    <article className="mt-5 overflow-hidden rounded-[22px] bg-white shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_22px_rgba(15,23,42,.04)] md:mt-6 md:grid md:grid-cols-[1.15fr_1fr]">
+      {photo ? (
+        <Link href={`/journal/${event.id}`} className="block md:order-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photo.url} alt="" className="h-48 w-full object-cover md:h-full md:min-h-[260px]" />
+        </Link>
+      ) : null}
+      <div className="flex flex-col justify-center px-4 py-4 md:order-1 md:px-6 md:py-6">
+        <p className="text-[12px] font-light text-[#8a5f1c]">
+          {day} ב{month} · {dayName} · {formatTimeHe(event.startsAt)}
+        </p>
+        <h2 className="mt-1.5 text-[1.35rem] leading-snug font-medium md:text-[1.7rem]">
+          <Link href={`/journal/${event.id}`}>{heading}</Link>
+        </h2>
+        {location ? (
+          <p className="mt-2 flex items-center gap-1.5 text-[13px] font-light text-[#4b5563]">
+            <MapPin className="size-3.5 shrink-0 text-[#b8862f]" aria-hidden />
+            <span className="truncate">{location}</span>
+          </p>
+        ) : null}
+        {hostName ? <div className="mt-2.5"><Chip>אצל {hostName}</Chip></div> : null}
+        {body ? (
+          <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
+        ) : null}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2 text-[12px] font-light text-muted-foreground">
+            {coming.length ? (
+              <span className="flex -space-x-1.5">
+                {coming.slice(0, 5).map((member) => (
+                  <UserAvatar key={member.id} member={member} size="sm" className="ring-2 ring-white" />
+                ))}
+              </span>
+            ) : null}
+            <span>{coming.length ? `${coming.length} מגיעים` : "עדיין אין מגיעים"}</span>
+          </span>
+          {can(me, "rsvp") ? (
+            <button
+              type="button"
+              disabled={rsvping || arriving}
+              onClick={onRsvp}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#b8862f] px-3.5 py-1.5 text-[13px] text-white disabled:opacity-100"
+            >
+              {arriving ? <Check className="size-3.5" /> : null}
+              אני מגיע
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function MonthLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative mt-1.5 mb-3 text-[13px] font-medium text-[#8a5f1c]">
@@ -283,16 +327,16 @@ function JournalEntry({
   onDelete: () => void;
 }) {
   const href = `/journal/${event.id}`;
-  const { kind } = splitGatheringTitle(event);
-  const heading = journalHeading(event);
-  const { day, month } = hebrewDateParts(event.startsAt);
   const isUpcoming = event.status === "upcoming";
+  const { kind } = splitGatheringTitle(event);
+  const { heading, body } = storyCopy(event, isUpcoming);
+  const { day, month } = hebrewDateParts(event.startsAt);
   const host = memberById(members, event.hostId);
   const lecturer = memberById(members, event.lecturerId);
   const kibud = memberById(members, event.kibudId);
   const yes = members.filter((m) => event.rsvps[m.id] === "yes");
   const pics = images(event);
-  const text = isUpcoming ? event.topic || event.notes : event.summary || event.topic;
+  const text = body;
   const facts = [
     yes.length
       ? isUpcoming
