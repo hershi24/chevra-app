@@ -14,8 +14,8 @@ import {
   muted,
   paragraph,
 } from "./email-shell";
-import { formatAgorot, formatShekels, type SettlementRow, type Transfer } from "./expenses";
-import type { BankAccount, Expense, Member } from "./types";
+import { expensePayers, formatAgorot, formatShekels, type SettlementRow, type Transfer } from "./expenses";
+import type { BankAccount, Expense, GatheringWaiver, Member } from "./types";
 
 export function expenseNoticeHtml(opts: {
   member: Member;
@@ -26,6 +26,7 @@ export function expenseNoticeHtml(opts: {
   bankAccounts: Record<string, BankAccount>;
   origin: string;
   scopeLabel?: string;
+  waivers?: GatheringWaiver[];
 }) {
   const name = (id: string) => opts.members.find((item) => item.id === id)?.displayName ?? "חבר";
   const mine = opts.transfers.filter((item) => item.fromId === opts.row.memberId);
@@ -49,13 +50,17 @@ export function expenseNoticeHtml(opts: {
     })
     .join("");
 
+  const memberIds = opts.members.map((member) => member.id);
   const itemRows = opts.expenses
     .filter((item) => opts.members.some((member) => member.id === item.memberId))
     .map((item) => {
       const detail = item.detail.trim() ? ` · ${escapeHtml(item.detail.trim())}` : "";
+      const payers = expensePayers(item, memberIds, opts.waivers ?? []);
+      const skipped = !item.excluded && payers.length > 0 && !payers.includes(opts.row.memberId);
       const style = item.excluded ? `color:${faint};text-decoration:line-through;` : `color:${ink};`;
+      const note = skipped ? ` · לא בחלק שלך` : "";
       return `<tr>
-        <td style="padding:7px 0;border-top:1px solid ${line};font-size:14px;${style}${A}">${escapeHtml(item.title)}<span style="color:${muted};font-size:12px;"> · ${escapeHtml(name(item.memberId))}${detail}</span></td>
+        <td style="padding:7px 0;border-top:1px solid ${line};font-size:14px;${style}${A}">${escapeHtml(item.title)}<span style="color:${muted};font-size:12px;"> · ${escapeHtml(name(item.memberId))}${detail}${note}</span></td>
         <td style="padding:7px 0;border-top:1px solid ${line};font-size:14px;text-align:left;white-space:nowrap;${style}">${formatShekels(item.amount)}</td>
       </tr>`;
     })

@@ -84,6 +84,8 @@ export type ActionBody =
       };
     }
   | { type: "setExpenseExcluded"; expenseId: string; excluded: boolean }
+  | { type: "setExpenseExempt"; expenseId: string; memberId: string; exempt: boolean }
+  | { type: "setGatheringExempt"; eventId: string; memberId: string; exempt: boolean }
   | { type: "deleteExpense"; expenseId: string }
   | { type: "setExpensesVisible"; visible: boolean }
   | { type: "sendExpenseNotice"; memberId?: string; scope?: string }

@@ -2,6 +2,7 @@ import {
   SCOPE_ALL,
   SCOPE_NONE,
   agorot,
+  exemptMemberIds,
   expenseScopeLabel,
   paymentMethodLabel,
   scopedSettlement,
@@ -27,6 +28,8 @@ export function buildExpenseReport(state: AppState, scope: string) {
   };
   const shekels = (value: number) => value / 100;
   const { expenses, payments, report, transfers } = scopedSettlement(state, scope);
+  const memberIds = state.members.map((member) => member.id);
+  const waivers = state.expenseWaivers ?? [];
 
   return {
     groupName: state.settings.groupName || "מיין חברה",
@@ -36,6 +39,7 @@ export function buildExpenseReport(state: AppState, scope: string) {
       included: shekels(report.includedAgorot),
       excluded: shekels(report.excludedAgorot),
       share: shekels(report.shareAgorot),
+      sharesEqual: report.sharesEqual,
       paid: shekels(report.paymentsAgorot),
       memberCount: report.memberCount,
       remainderAgorot: report.remainderAgorot,
@@ -59,6 +63,11 @@ export function buildExpenseReport(state: AppState, scope: string) {
         event: eventName(item.eventId),
         amount: shekels(agorot(item.amount)),
         excluded: item.excluded,
+        exempt: item.excluded
+          ? ""
+          : exemptMemberIds(item, memberIds, waivers)
+              .map((id) => name(id))
+              .join(", "),
       })),
     payments: [...payments]
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))

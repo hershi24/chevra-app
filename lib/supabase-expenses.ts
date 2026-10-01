@@ -1,6 +1,6 @@
-import { normalizeBankAccount, normalizeExpenses, normalizePayments } from "./expenses";
+import { normalizeBankAccount, normalizePayments, packLedgerItems, splitLedgerItems } from "./expenses";
 import { getServiceSupabase, isSupabaseEnabled } from "./supabase";
-import type { AppState, BankAccount, Expense, ExpensePayment } from "./types";
+import type { AppState, BankAccount, Expense, ExpensePayment, GatheringWaiver } from "./types";
 
 type DbError = { code?: string; message?: string } | null;
 
@@ -19,6 +19,7 @@ function missingPaymentsColumn(error: DbError) {
 export async function loadExpenseLedger(): Promise<{
   visible: boolean;
   items: Expense[];
+  waivers: GatheringWaiver[];
   payments: ExpensePayment[] | null;
 } | null> {
   if (!isSupabaseEnabled()) return null;
@@ -39,9 +40,11 @@ export async function loadExpenseLedger(): Promise<{
     throw error;
   }
   if (!data) return null;
+  const ledger = splitLedgerItems(data.items);
   return {
     visible: data.visible !== false,
-    items: normalizeExpenses(data.items),
+    items: ledger.expenses,
+    waivers: ledger.waivers,
     payments: withPayments ? normalizePayments(data.payments) : null,
   };
 }
@@ -50,7 +53,9 @@ export async function syncExpenseLedger(before: AppState, after: AppState) {
   if (!isSupabaseEnabled()) return;
   const beforeVisible = before.settings.showExpenses !== false;
   const afterVisible = after.settings.showExpenses !== false;
-  const sameItems = JSON.stringify(before.expenses ?? []) === JSON.stringify(after.expenses ?? []);
+  const sameItems =
+    JSON.stringify(packLedgerItems(before.expenses ?? [], before.expenseWaivers ?? [])) ===
+    JSON.stringify(packLedgerItems(after.expenses ?? [], after.expenseWaivers ?? []));
   const samePayments = JSON.stringify(before.payments ?? []) === JSON.stringify(after.payments ?? []);
   if (beforeVisible === afterVisible && sameItems && samePayments) return;
   const db = getServiceSupabase();
@@ -58,7 +63,7 @@ export async function syncExpenseLedger(before: AppState, after: AppState) {
   const row = {
     id: 1,
     visible: afterVisible,
-    items: after.expenses ?? [],
+    items: packLedgerItems(after.expenses ?? [], after.expenseWaivers ?? []),
     payments: after.payments ?? [],
   };
   let { error } = await db.from("expense_ledger").upsert(row);

@@ -1,4 +1,12 @@
-import type { AppState, BankAccount, Expense, ExpensePayment, Member, PaymentMethod } from "./types";
+import type {
+  AppState,
+  BankAccount,
+  Expense,
+  ExpensePayment,
+  GatheringWaiver,
+  Member,
+  PaymentMethod,
+} from "./types";
 import { formatDateShortHe, gatheringLabel } from "./format";
 import { isAdmin } from "./permissions";
 
@@ -52,7 +60,72 @@ export function ensureExpenses(state: AppState) {
     state.settings.showExpenses = true;
     changed = true;
   }
+  if (!Array.isArray(state.expenseWaivers)) {
+    state.expenseWaivers = [];
+    changed = true;
+  }
   return changed;
+}
+
+export function normalizeExemptIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const id of value) {
+    if (typeof id !== "string") continue;
+    const clean = id.trim().slice(0, 80);
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    ids.push(clean);
+    if (ids.length >= 100) break;
+  }
+  return ids;
+}
+
+export function normalizeWaivers(value: unknown): GatheringWaiver[] {
+  if (!Array.isArray(value)) return [];
+  const waivers: GatheringWaiver[] = [];
+  const seen = new Set<string>();
+  for (const row of value) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as Partial<GatheringWaiver>;
+    if (typeof item.eventId !== "string" || !item.eventId.trim() || seen.has(item.eventId)) continue;
+    const memberIds = normalizeExemptIds(item.memberIds);
+    if (!memberIds.length) continue;
+    seen.add(item.eventId);
+    waivers.push({ eventId: item.eventId.slice(0, 80), memberIds });
+  }
+  return waivers;
+}
+
+const WAIVER_KIND = "waiver";
+
+/** Waiver tags ride inside the ledger items array, so no new database column is required. */
+export function packLedgerItems(expenses: Expense[], waivers: GatheringWaiver[]) {
+  const tags = normalizeWaivers(waivers).map((waiver) => ({
+    kind: WAIVER_KIND,
+    eventId: waiver.eventId,
+    memberIds: waiver.memberIds,
+  }));
+  return [...expenses, ...tags];
+}
+
+export function splitLedgerItems(value: unknown): { expenses: Expense[]; waivers: GatheringWaiver[] } {
+  const waivers: GatheringWaiver[] = [];
+  if (Array.isArray(value)) {
+    for (const row of value) {
+      if (!row || typeof row !== "object") continue;
+      const item = row as { kind?: unknown; eventId?: unknown; memberIds?: unknown };
+      if (item.kind !== WAIVER_KIND) continue;
+      waivers.push({ eventId: String(item.eventId ?? ""), memberIds: normalizeExemptIds(item.memberIds) });
+    }
+  }
+  return { expenses: normalizeExpenses(value), waivers: normalizeWaivers(waivers) };
+}
+
+function exemptField(value: unknown): { exemptIds: string[] } | Record<string, never> {
+  const exemptIds = normalizeExemptIds(value);
+  return exemptIds.length ? { exemptIds } : {};
 }
 
 export function normalizeExpenses(value: unknown): Expense[] {
@@ -72,6 +145,7 @@ export function normalizeExpenses(value: unknown): Expense[] {
       detail: String(item.detail ?? "").slice(0, 400),
       amount,
       excluded: Boolean(item.excluded),
+      ...exemptField(item.exemptIds),
       ...(typeof item.eventId === "string" && item.eventId ? { eventId: item.eventId } : {}),
       createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
     });
@@ -183,18 +257,40 @@ export type Settlement = {
   includedAgorot: number;
   excludedAgorot: number;
   memberCount: number;
+  /** Floor share when everyone splits the same way. Zero once exemptions make the shares differ. */
   shareAgorot: number;
   remainderAgorot: number;
+  /** False once a member is left out of an item or a gathering, so there is no single "לכל אחד". */
+  sharesEqual: boolean;
   paymentsAgorot: number;
   rows: SettlementRow[];
 };
+
+/** Members left out of one expense: the item list plus a gathering-wide waiver. */
+export function exemptMemberIds(expense: Expense, memberIds: string[], waivers: GatheringWaiver[]) {
+  const known = new Set(memberIds);
+  const ids = new Set<string>();
+  for (const id of expense.exemptIds ?? []) if (known.has(id)) ids.add(id);
+  if (expense.eventId) {
+    const waiver = waivers.find((item) => item.eventId === expense.eventId);
+    for (const id of waiver?.memberIds ?? []) if (known.has(id)) ids.add(id);
+  }
+  return memberIds.filter((id) => ids.has(id));
+}
+
+/** Who shares this expense. Empty means every named member was left out. */
+export function expensePayers(expense: Expense, memberIds: string[], waivers: GatheringWaiver[]) {
+  const exempt = new Set(exemptMemberIds(expense, memberIds, waivers));
+  return memberIds.filter((id) => !exempt.has(id));
+}
 
 export type Transfer = { fromId: string; toId: string; amountAgorot: number };
 
 export function settlement(
   expenses: Expense[],
   memberIds: string[],
-  payments: ExpensePayment[] = []
+  payments: ExpensePayment[] = [],
+  waivers: GatheringWaiver[] = []
 ): Settlement {
   const members = new Set(memberIds);
   const visible = expenses.filter((item) => members.has(item.memberId));
@@ -205,16 +301,42 @@ export function settlement(
     .filter((item) => item.excluded)
     .reduce((sum, item) => sum + agorot(item.amount), 0);
   const memberCount = memberIds.length;
-  const shareAgorot = memberCount ? Math.floor(includedAgorot / memberCount) : 0;
-  const remainderAgorot = memberCount ? includedAgorot % memberCount : 0;
-  const order = [...memberIds].sort();
+  const groups = new Map<string, { payers: string[]; total: number }>();
   const spent = new Map<string, number>();
-  const paid = new Map<string, number>();
-  const received = new Map<string, number>();
   for (const item of visible) {
     if (item.excluded) continue;
     spent.set(item.memberId, (spent.get(item.memberId) ?? 0) + agorot(item.amount));
+    const named = expensePayers(item, memberIds, waivers);
+    const payers = named.length ? named : memberIds;
+    const key = [...payers].sort().join("\0");
+    const group = groups.get(key) ?? { payers, total: 0 };
+    group.total += agorot(item.amount);
+    groups.set(key, group);
   }
+  const sharesEqual =
+    groups.size === 0 || (groups.size === 1 && [...groups.values()][0].payers.length === memberIds.length);
+  const shareAgorot = sharesEqual && memberCount ? Math.floor(includedAgorot / memberCount) : 0;
+  const remainderAgorot = sharesEqual && memberCount ? includedAgorot % memberCount : 0;
+  const share = new Map<string, number>();
+  if (sharesEqual) {
+    const order = [...memberIds].sort();
+    for (const memberId of memberIds) {
+      share.set(memberId, shareAgorot + (order.indexOf(memberId) < remainderAgorot ? 1 : 0));
+    }
+  } else {
+    for (const group of groups.values()) {
+      const count = group.payers.length;
+      if (!count) continue;
+      const base = Math.floor(group.total / count);
+      const extra = group.total % count;
+      const order = [...group.payers].sort();
+      for (const memberId of group.payers) {
+        share.set(memberId, (share.get(memberId) ?? 0) + base + (order.indexOf(memberId) < extra ? 1 : 0));
+      }
+    }
+  }
+  const paid = new Map<string, number>();
+  const received = new Map<string, number>();
   let paymentsAgorot = 0;
   for (const item of payments) {
     if (!members.has(item.fromId) || !members.has(item.toId)) continue;
@@ -224,22 +346,31 @@ export function settlement(
     received.set(item.toId, (received.get(item.toId) ?? 0) + value);
   }
   const rows = memberIds.map((memberId) => {
-    const share = shareAgorot + (order.indexOf(memberId) < remainderAgorot ? 1 : 0);
+    const part = share.get(memberId) ?? 0;
     const spentAgorot = spent.get(memberId) ?? 0;
     const paidAgorot = paid.get(memberId) ?? 0;
     const receivedAgorot = received.get(memberId) ?? 0;
-    const balanceAgorot = spentAgorot - share + paidAgorot - receivedAgorot;
+    const balanceAgorot = spentAgorot - part + paidAgorot - receivedAgorot;
     return {
       memberId,
       spentAgorot,
-      shareAgorot: share,
+      shareAgorot: part,
       paidAgorot,
       receivedAgorot,
       balanceAgorot,
       owesAgorot: balanceAgorot < 0 ? -balanceAgorot : 0,
     };
   });
-  return { includedAgorot, excludedAgorot, memberCount, shareAgorot, remainderAgorot, paymentsAgorot, rows };
+  return {
+    includedAgorot,
+    excludedAgorot,
+    memberCount,
+    shareAgorot,
+    remainderAgorot,
+    sharesEqual,
+    paymentsAgorot,
+    rows,
+  };
 }
 
 /** Greedy matching of debtors to creditors; few transfers, each closes one side. */
@@ -267,15 +398,20 @@ export function transfers(report: Settlement): Transfer[] {
 }
 
 export function scopedSettlement(
-  state: Pick<AppState, "expenses" | "payments" | "members">,
+  state: Pick<AppState, "expenses" | "payments" | "members" | "expenseWaivers">,
   scope: ExpenseScope
 ) {
   const expenses = (state.expenses ?? []).filter((item) => inScope(item, scope));
   const payments = (state.payments ?? []).filter((item) => inScope(item, scope));
+  const waivers =
+    scope === SCOPE_ALL || scope === SCOPE_NONE
+      ? (state.expenseWaivers ?? [])
+      : (state.expenseWaivers ?? []).filter((item) => item.eventId === scope);
   const report = settlement(
     expenses,
     state.members.map((member) => member.id),
-    payments
+    payments,
+    waivers
   );
   return { expenses, payments, report, transfers: transfers(report) };
 }
@@ -284,9 +420,11 @@ export function expenseNoticeText(
   members: Member[],
   expenses: Expense[],
   row: SettlementRow,
-  options: { scopeLabel?: string; transfers?: Transfer[] } = {}
+  options: { scopeLabel?: string; transfers?: Transfer[]; waivers?: GatheringWaiver[] } = {}
 ) {
   const name = (id: string) => members.find((member) => member.id === id)?.displayName ?? "חבר";
+  const memberIds = members.map((member) => member.id);
+  const waivers = options.waivers ?? [];
   const lines = expenses
     .filter((item) => members.some((member) => member.id === item.memberId))
     .map((item) => {
@@ -294,6 +432,10 @@ export function expenseNoticeText(
       const who = name(item.memberId);
       const detail = item.detail.trim() ? ` (${item.detail.trim()})` : "";
       if (item.excluded) return `לא נכלל: ${item.title} — ${who} — ${money}${detail}`;
+      const payers = expensePayers(item, memberIds, waivers);
+      if (payers.length && !payers.includes(row.memberId)) {
+        return `לא בחלק שלך: ${item.title} — ${who} — ${money}${detail}`;
+      }
       return `${item.title} — ${who} — ${money}${detail}`;
     });
   const mine = (options.transfers ?? []).filter((item) => item.fromId === row.memberId);
