@@ -85,7 +85,9 @@ export type ActionBody =
     }
   | { type: "setExpenseExcluded"; expenseId: string; excluded: boolean }
   | { type: "setExpenseExempt"; expenseId: string; memberId: string; exempt: boolean }
+  | { type: "setExpenseExemptIds"; expenseId: string; memberIds: string[] }
   | { type: "setGatheringExempt"; eventId: string; memberId: string; exempt: boolean }
+  | { type: "setGatheringExemptIds"; eventId: string; memberIds: string[] }
   | { type: "deleteExpense"; expenseId: string }
   | { type: "setExpensesVisible"; visible: boolean }
   | { type: "sendExpenseNotice"; memberId?: string; scope?: string }

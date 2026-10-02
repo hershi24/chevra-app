@@ -180,13 +180,15 @@ export function ExpensesView() {
         eventId={scopeEventId}
       />
 
-      {scopeEventId ? (
+      {gatherings.length ? (
         <div className="mt-4">
           <GatheringExempt
-            eventId={scopeEventId}
+            key={scopeEventId ?? "all"}
+            gatherings={gatherings}
             members={state.members}
             waivers={state.expenseWaivers ?? []}
             admin={isAdmin(me)}
+            initialEventId={scopeEventId}
           />
         </div>
       ) : null}
@@ -232,7 +234,8 @@ export function ExpensesView() {
               {[
                 `${formatAgorot(report.includedAgorot)} בחשבון`,
                 `${report.memberCount} חברים`,
-                report.sharesEqual ? `${formatAgorot(report.shareAgorot)} לכל אחד` : "החלקים לפי מי שמוחרג",
+                report.sharesEqual ? `${formatAgorot(report.shareAgorot)} לכל אחד` : "מי שמוחרג לא משלם, והשאר כמו קודם",
+                report.waivedAgorot ? `${formatAgorot(report.waivedAgorot)} ירד בהחרגה` : "",
                 report.excludedAgorot ? `${formatAgorot(report.excludedAgorot)} מוחרג` : "",
               ]
                 .filter(Boolean)
@@ -562,40 +565,73 @@ function RowActions({ children }: { children: React.ReactNode }) {
 }
 
 function GatheringExempt({
-  eventId,
+  gatherings,
   members,
   waivers,
   admin,
+  initialEventId,
 }: {
-  eventId: string;
+  gatherings: Gathering[];
   members: Member[];
   waivers: GatheringWaiver[];
   admin: boolean;
+  initialEventId?: string;
 }) {
   const { act } = useApp();
+  const [eventId, setEventId] = useState(initialEventId || gatherings[0]?.id || "");
   const [pending, setPending] = useState<string | null>(null);
   const selected = new Set(waivers.find((item) => item.eventId === eventId)?.memberIds ?? []);
+  const everyone = members.length > 0 && members.every((member) => selected.has(member.id));
   if (!admin && selected.size === 0) return null;
 
   return (
     <section className={cn(panel, "px-4 py-3.5")}>
-      <div className="text-[15px]">מי לא בחשבון של החברה</div>
+      <div className="text-[15px]">החרגה מחברה שלמה</div>
       <p className="mt-0.5 text-xs font-light text-muted-foreground">
-        מי שמסומן לא משתתף בהוצאות של החברה הזו, גם במה שיתווסף אחר כך.
+        מי שמסומן לא משלם את החלק שלו על ההוצאות של החברה, גם על מה שיתווסף אחר כך. השאר משלמים כמו קודם.
       </p>
+      <label className="mt-3 grid gap-1 text-xs font-light text-muted-foreground">
+        איזו חברה
+        <select value={eventId} onChange={(event) => setEventId(event.target.value)} className={selectClass}>
+          {gatherings.map((event) => (
+            <option key={event.id} value={event.id}>
+              {gatheringLabel(event)} · {formatDateShortHe(event.startsAt)}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="mt-2.5">
         {admin ? (
-          <MemberToggles
-            members={members}
-            selected={selected}
-            pending={pending}
-            onToggle={(memberId, exempt) => {
-              setPending(memberId);
-              void act({ type: "setGatheringExempt", eventId, memberId, exempt })
-                .catch(fail("ההחרגה נכשלה"))
-                .finally(() => setPending(null));
-            }}
-          />
+          <>
+            <MemberToggles
+              members={members}
+              selected={selected}
+              pending={pending}
+              onToggle={(memberId, exempt) => {
+                setPending(memberId);
+                void act({ type: "setGatheringExempt", eventId, memberId, exempt })
+                  .catch(fail("ההחרגה נכשלה"))
+                  .finally(() => setPending(null));
+              }}
+            />
+            <button
+              type="button"
+              disabled={pending !== null}
+              onClick={() => {
+                setPending("*");
+                void act({
+                  type: "setGatheringExemptIds",
+                  eventId,
+                  memberIds: everyone ? [] : members.map((member) => member.id),
+                })
+                  .catch(fail("ההחרגה נכשלה"))
+                  .finally(() => setPending(null));
+              }}
+              className="mt-2 text-[13px] text-[#a9782c] hover:underline disabled:opacity-60"
+            >
+              {everyone ? "החזר את כולם" : "החרג את כולם"}
+            </button>
+          </>
         ) : (
           <p className="text-sm">
             {members
@@ -766,7 +802,10 @@ function ExpenseList({
                 </Button>
                 {expense.excluded ? null : (
                   <div className="basis-full">
-                    <div className="mb-1.5 text-xs font-light text-muted-foreground">בלי מי בהוצאה הזו</div>
+                    <div className="text-[13px]">החרג חבר</div>
+                    <p className="mb-1.5 text-xs font-light text-muted-foreground">
+                      מי שמסומן לא משלם על ההוצאה הזו. השאר משלמים את אותו חלק.
+                    </p>
                     <MemberToggles
                       members={members}
                       selected={new Set(expense.exemptIds ?? [])}
@@ -779,6 +818,26 @@ function ExpenseList({
                           .finally(() => setPending(null));
                       }}
                     />
+                    <button
+                      type="button"
+                      disabled={pending !== null}
+                      onClick={() => {
+                        const all = members.every((member) => (expense.exemptIds ?? []).includes(member.id));
+                        setPending("*");
+                        void act({
+                          type: "setExpenseExemptIds",
+                          expenseId: expense.id,
+                          memberIds: all ? [] : members.map((member) => member.id),
+                        })
+                          .catch(fail("ההחרגה נכשלה"))
+                          .finally(() => setPending(null));
+                      }}
+                      className="mt-2 text-[13px] text-[#a9782c] hover:underline disabled:opacity-60"
+                    >
+                      {members.every((member) => (expense.exemptIds ?? []).includes(member.id))
+                        ? "החזר את כולם"
+                        : "החרג את כולם"}
+                    </button>
                   </div>
                 )}
               </RowActions>
@@ -945,6 +1004,7 @@ function MembersTab({
           const moved = [
             report.sharesEqual ? "" : `חלק ${formatAgorot(row.shareAgorot)}`,
             `קנה ${formatAgorot(row.spentAgorot)}`,
+            row.absorbedAgorot ? `החרגה ${formatAgorot(row.absorbedAgorot)}` : "",
             row.paidAgorot ? `העביר ${formatAgorot(row.paidAgorot)}` : "",
             row.receivedAgorot ? `קיבל ${formatAgorot(row.receivedAgorot)}` : "",
           ].filter(Boolean);
