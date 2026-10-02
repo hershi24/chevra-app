@@ -140,7 +140,6 @@ export function JournalDetail({
     event.media.find((m) => m.type === "image");
   const audios = event.media.filter((m) => m.type === "audio");
   const coming = state.members.filter((m) => event.rsvps[m.id] === "yes");
-  const attended = state.members.filter((member) => (event.attendedIds ?? []).includes(member.id));
   const mine = event.rsvps[me.id] ?? "pending";
   const photographers = [
     ...new Set(event.media.map((m) => memberById(state.members, m.uploadedBy)?.displayName).filter(Boolean)),
@@ -311,8 +310,7 @@ export function JournalDetail({
           {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
             {event.location ? <span>{event.location}</span> : null}
-            {held && attended.length ? <span>{attended.length} השתתפו</span> : null}
-            {!held && coming.length ? <span>{coming.length} מגיעים</span> : null}
+            {coming.length ? <span>{coming.length} {held ? "השתתפו" : "מגיעים"}</span> : null}
             {visual.length ? <span>{visual.length} תמונות וסרטונים</span> : null}
             {event.status === "cancelled" ? <span>בוטלה</span> : null}
           </div>
@@ -565,10 +563,10 @@ export function JournalDetail({
           <h3 className="mb-3 text-[15px] font-medium">מי השתתף</h3>
           {isAdmin(me) ? (
             <div className="mb-4">
-              <p className="text-[13px] font-light text-muted-foreground">רק המנהל מסמן מי היה בחברה</p>
+              <p className="text-[13px] font-light text-muted-foreground">מי שאישר הגעה מסומן. רק המנהל יכול לשנות.</p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
                 {state.members.map((member) => {
-                  const on = (event.attendedIds ?? []).includes(member.id);
+                  const on = event.rsvps[member.id] === "yes";
                   return (
                     <button
                       key={member.id}
@@ -586,17 +584,17 @@ export function JournalDetail({
               </div>
             </div>
           ) : null}
-          {attended.length ? (
+          {coming.length ? (
             <span className="inline-flex -space-x-2.5">
-              {attended.map((m) => (
+              {coming.map((m) => (
                 <UserAvatar key={m.id} member={m} size="lg" className="ring-[3px] ring-background" />
               ))}
             </span>
           ) : null}
           <p className="mt-3 text-[15px] leading-7 font-light text-[#1f2328]">
-            {attended.length
-              ? `השתתפו: ${attended.map((member) => member.displayName).join(", ")}`
-              : "עדיין לא סומן מי השתתף"}
+            {coming.length
+              ? `השתתפו: ${coming.map((member) => member.displayName).join(", ")}`
+              : "אף אחד לא אישר הגעה"}
           </p>
         </div>
       ) : isUpcoming && coming.length ? (

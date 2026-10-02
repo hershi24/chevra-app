@@ -337,8 +337,6 @@ function JournalEntry({
   const lecturer = memberById(members, event.lecturerId);
   const kibud = memberById(members, event.kibudId);
   const yes = members.filter((m) => event.rsvps[m.id] === "yes");
-  const attended = members.filter((member) => (event.attendedIds ?? []).includes(member.id));
-  const faces = held ? attended : yes;
   const pics = images(event);
   const text = body;
   const facts = [
@@ -395,15 +393,15 @@ function JournalEntry({
         )}
         {held ? (
           <p className="mb-3 text-[13.5px] leading-6 font-light text-[#1f2328]">
-            {attended.length
-              ? `השתתפו: ${attended.map((member) => member.displayName).join(", ")}`
-              : "עדיין לא סומן מי השתתף"}
+            {yes.length
+              ? `השתתפו: ${yes.map((member) => member.displayName).join(", ")}`
+              : "אף אחד לא אישר הגעה"}
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2.5 text-[12px] font-light text-muted-foreground">
-          {faces.length ? (
+          {yes.length ? (
             <span className="flex -space-x-1.5">
-              {faces.slice(0, 5).map((m) => (
+              {yes.slice(0, 5).map((m) => (
                 <UserAvatar key={m.id} member={m} size="sm" className="ring-2 ring-white" />
               ))}
             </span>
