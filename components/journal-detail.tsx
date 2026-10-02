@@ -140,6 +140,7 @@ export function JournalDetail({
     event.media.find((m) => m.type === "image");
   const audios = event.media.filter((m) => m.type === "audio");
   const coming = state.members.filter((m) => event.rsvps[m.id] === "yes");
+  const attended = state.members.filter((member) => (event.attendedIds ?? []).includes(member.id));
   const mine = event.rsvps[me.id] ?? "pending";
   const photographers = [
     ...new Set(event.media.map((m) => memberById(state.members, m.uploadedBy)?.displayName).filter(Boolean)),
@@ -217,6 +218,14 @@ export function JournalDetail({
       await act({ type: "saveSummary", eventId: gathering.id, summary: currentSummary });
       toast.success("הסיכום נשמר");
       setEditingSummary(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "השמירה נכשלה");
+    }
+  }
+
+  async function markAttendance(memberId: string, attended: boolean) {
+    try {
+      await act({ type: "setAttendance", eventId: gathering.id, memberId, attended });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "השמירה נכשלה");
     }
@@ -302,7 +311,8 @@ export function JournalDetail({
           {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
             {event.location ? <span>{event.location}</span> : null}
-            {coming.length ? <span>{coming.length} {isUpcoming ? "מגיעים" : "השתתפו"}</span> : null}
+            {held && attended.length ? <span>{attended.length} השתתפו</span> : null}
+            {!held && coming.length ? <span>{coming.length} מגיעים</span> : null}
             {visual.length ? <span>{visual.length} תמונות וסרטונים</span> : null}
             {event.status === "cancelled" ? <span>בוטלה</span> : null}
           </div>
@@ -553,17 +563,40 @@ export function JournalDetail({
       {held ? (
         <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">מי השתתף</h3>
-          {coming.length ? (
+          {isAdmin(me) ? (
+            <div className="mb-4">
+              <p className="text-[13px] font-light text-muted-foreground">רק המנהל מסמן מי היה בחברה</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {state.members.map((member) => {
+                  const on = (event.attendedIds ?? []).includes(member.id);
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => void markAttendance(member.id, !on)}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-[13px]",
+                        on ? "bg-[#b8862f] text-white" : "bg-white text-[#1f2328] ring-1 ring-[#e6dcc8]"
+                      )}
+                    >
+                      {member.displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          {attended.length ? (
             <span className="inline-flex -space-x-2.5">
-              {coming.map((m) => (
+              {attended.map((m) => (
                 <UserAvatar key={m.id} member={m} size="lg" className="ring-[3px] ring-background" />
               ))}
             </span>
           ) : null}
           <p className="mt-3 text-[15px] leading-7 font-light text-[#1f2328]">
-            {coming.length
-              ? `השתתפו: ${coming.map((member) => member.displayName).join(", ")}`
-              : "לא סומנו משתתפים"}
+            {attended.length
+              ? `השתתפו: ${attended.map((member) => member.displayName).join(", ")}`
+              : "עדיין לא סומן מי השתתף"}
           </p>
         </div>
       ) : isUpcoming && coming.length ? (
@@ -577,7 +610,7 @@ export function JournalDetail({
         </div>
       ) : null}
 
-      {can(me, "viewRsvps") ? (
+      {!held && can(me, "viewRsvps") ? (
         <div className="mx-auto mt-9 max-w-[720px] px-5 md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">אישורי הגעה</h3>
           <div className="grid gap-2 sm:grid-cols-2">
