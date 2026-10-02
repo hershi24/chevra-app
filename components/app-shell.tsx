@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -47,6 +48,41 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   const { me, state, loading, error, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest("a");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      if (typeof document.startViewTransition !== "function") return;
+      event.preventDefault();
+      const before = document.querySelector("main")?.innerText ?? "";
+      document.startViewTransition(async () => {
+        router.push(`${url.pathname}${url.search}${url.hash}`);
+        const begun = performance.now();
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            const now = document.querySelector("main")?.innerText ?? "";
+            if ((now && now !== before) || performance.now() - begun > 1200) {
+              setTimeout(resolve, 0);
+              return;
+            }
+            setTimeout(check, 16);
+          };
+          check();
+        });
+      });
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [router]);
+
   const isChat = pathname.startsWith("/chat");
   const isDashboard = pathname === "/";
   const nav =
@@ -137,12 +173,12 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         className={cn(
           isChat
             ? cn(
-                "flex min-h-0 flex-1 flex-col overflow-hidden md:pb-0",
+                "page-stage flex min-h-0 flex-1 flex-col overflow-hidden md:pb-0",
                 nav.some((item) => item.href === "/expenses")
                   ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))]"
                   : "pb-[calc(4rem+env(safe-area-inset-bottom))]"
               )
-            : "px-5 py-6 pb-28 md:px-8 md:py-10 md:pb-16"
+            : "page-stage px-5 py-6 pb-28 md:px-8 md:py-10 md:pb-16"
         )}
       >
         {children}
