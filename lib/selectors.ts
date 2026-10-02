@@ -1,6 +1,12 @@
 import type { AppState, EventMedia, Gathering } from "./types";
 import { gatheringLabel } from "./format";
 
+export function gatheringHeld(event: { status: string; startsAt: string }, now = Date.now()) {
+  if (event.status === "cancelled") return false;
+  if (event.status === "past") return true;
+  return new Date(event.startsAt).getTime() < now;
+}
+
 export function upcomingGathering(state: AppState | { gatherings: Gathering[] }) {
   const now = Date.now();
   return (

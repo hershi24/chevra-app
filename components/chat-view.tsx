@@ -686,7 +686,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                     )}
                     <div
                       className={cn(
-                        "flex min-w-0 max-w-[min(85%,42rem)] flex-col",
+                        "flex min-w-0 max-w-[12.5rem] flex-col md:max-w-[17rem]",
                         mine ? "items-end" : "items-start"
                       )}
                     >
@@ -749,7 +749,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                           </div>
                         ) : null}
                         <div className={message.quote ? "px-2.5 pt-1" : undefined}>
-                        {message.text ? <p className="whitespace-pre-wrap">{highlightMentions(
+                        {message.text ? <p className="whitespace-pre-wrap break-words">{highlightMentions(
                               message.text,
                               searchMark?.messageId === message.id ? searchMark.q : undefined
                             )}</p> : null}

@@ -32,7 +32,7 @@ import {
   rsvpLabel,
 } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import { dmName, galleryItems, upcomingGathering } from "@/lib/selectors";
+import { dmName, galleryItems, gatheringHeld, upcomingGathering } from "@/lib/selectors";
 import type { Gathering, Member, Message, PublicState, RsvpStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -413,6 +413,7 @@ function HeroEvent({
   const host = memberById(members, event.hostId);
   const kibud = memberById(members, event.kibudId);
   const lecturer = memberById(members, event.lecturerId);
+  const held = gatheringHeld(event);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
   const maybe = members.filter((m) => event.rsvps[m.id] === "maybe");
@@ -478,22 +479,29 @@ function HeroEvent({
 
         <div className="mt-6 flex flex-col gap-5 border-t border-[#eceef1] pt-5 sm:flex-row sm:items-center sm:justify-between">
           <Countdown iso={event.startsAt} />
-          <div
-            role="group"
-            aria-label="אישור הגעה"
-            className="flex rounded-full bg-[#eef0f3] p-1"
-          >
-            <RsvpButton active={mine === "yes"} tone="yes" onClick={() => void onRsvp("yes")}>
-              {mine === "yes" ? <Check className="size-3.5" aria-hidden /> : null}
-              מגיע
-            </RsvpButton>
-            <RsvpButton active={mine === "maybe"} tone="maybe" onClick={() => void onRsvp("maybe")}>
-              אולי
-            </RsvpButton>
-            <RsvpButton active={mine === "no"} tone="no" onClick={() => void onRsvp("no")}>
-              לא אוכל
-            </RsvpButton>
-          </div>
+          {held ? (
+            <p className="max-w-sm text-[13px] font-light leading-6 text-foreground/75">
+              התקיימה
+              {coming.length ? ` · השתתפו: ${coming.map((member) => member.displayName).join(", ")}` : ""}
+            </p>
+          ) : (
+            <div
+              role="group"
+              aria-label="אישור הגעה"
+              className="flex rounded-full bg-[#eef0f3] p-1"
+            >
+              <RsvpButton active={mine === "yes"} tone="yes" onClick={() => void onRsvp("yes")}>
+                {mine === "yes" ? <Check className="size-3.5" aria-hidden /> : null}
+                מגיע
+              </RsvpButton>
+              <RsvpButton active={mine === "maybe"} tone="maybe" onClick={() => void onRsvp("maybe")}>
+                אולי
+              </RsvpButton>
+              <RsvpButton active={mine === "no"} tone="no" onClick={() => void onRsvp("no")}>
+                לא אוכל
+              </RsvpButton>
+            </div>
+          )}
         </div>
       </div>
 
@@ -503,7 +511,7 @@ function HeroEvent({
             <Ring value={coming.length} total={members.length} />
             <div>
               <div className="text-[15px] leading-tight">
-                {coming.length} מגיעים
+                {coming.length} {held ? "השתתפו" : "מגיעים"}
                 <span className="text-[12px] font-light text-muted-foreground"> מתוך {members.length}</span>
               </div>
               <div className="mt-0.5 text-[12px] font-light text-muted-foreground">

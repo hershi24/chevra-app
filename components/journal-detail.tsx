@@ -22,6 +22,7 @@ import {
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
+import { gatheringHeld } from "@/lib/selectors";
 import type { EventMedia, Gathering, Member, RsvpStatus } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
@@ -132,13 +133,13 @@ export function JournalDetail({
   const currentSummary = summary ?? event.summary ?? "";
   const { kind } = splitGatheringTitle(event);
   const heading = journalHeading(event);
-  const isUpcoming = event.status === "upcoming";
+  const held = gatheringHeld(event);
+  const isUpcoming = event.status === "upcoming" && !held;
   const cover =
     event.media.find((m) => m.type === "image" && m.url.startsWith("http")) ??
     event.media.find((m) => m.type === "image");
   const audios = event.media.filter((m) => m.type === "audio");
   const coming = state.members.filter((m) => event.rsvps[m.id] === "yes");
-  const absent = state.members.filter((m) => event.rsvps[m.id] !== "yes");
   const mine = event.rsvps[me.id] ?? "pending";
   const photographers = [
     ...new Set(event.media.map((m) => memberById(state.members, m.uploadedBy)?.displayName).filter(Boolean)),
@@ -298,6 +299,7 @@ export function JournalDetail({
               .join(" · ")}
           </div>
           <h1 className="mt-2 text-[1.9rem] leading-tight font-medium md:text-[40px]">{heading}</h1>
+          {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
             {event.location ? <span>{event.location}</span> : null}
             {coming.length ? <span>{coming.length} {isUpcoming ? "מגיעים" : "השתתפו"}</span> : null}
@@ -548,20 +550,21 @@ export function JournalDetail({
         </div>
       </div>
 
-      {!isUpcoming && coming.length ? (
+      {held ? (
         <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
-          <h3 className="mb-3 text-[15px] font-medium">מי היה שם</h3>
-          <span className="inline-flex -space-x-2.5">
-            {coming.map((m) => (
-              <UserAvatar key={m.id} member={m} size="lg" className="ring-[3px] ring-background" />
-            ))}
-          </span>
-          <div className="mt-2 text-[12.5px] font-light text-muted-foreground">
-            {coming.length} מתוך {state.members.length} החברים
-            {absent.length && absent.length <= 2
-              ? ` · ${absent.map((m) => m.displayName.split(" ")[0]).join(" ו")} לא ${absent.length > 1 ? "הגיעו" : "הגיע"}`
-              : ""}
-          </div>
+          <h3 className="mb-3 text-[15px] font-medium">מי השתתף</h3>
+          {coming.length ? (
+            <span className="inline-flex -space-x-2.5">
+              {coming.map((m) => (
+                <UserAvatar key={m.id} member={m} size="lg" className="ring-[3px] ring-background" />
+              ))}
+            </span>
+          ) : null}
+          <p className="mt-3 text-[15px] leading-7 font-light text-[#1f2328]">
+            {coming.length
+              ? `השתתפו: ${coming.map((member) => member.displayName).join(", ")}`
+              : "לא סומנו משתתפים"}
+          </p>
         </div>
       ) : isUpcoming && coming.length ? (
         <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
