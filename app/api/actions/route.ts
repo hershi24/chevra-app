@@ -205,10 +205,7 @@ function applyAction(
       if (!event) throw new Error("החברה לא נמצאה");
       if (!gatheringHeld(event)) throw new Error("החברה עוד לא התקיימה");
       if (!s.members.some((member) => member.id === body.memberId)) throw new Error("החבר לא נמצא");
-      const ids = new Set(event.attendedIds ?? []);
-      if (body.attended) ids.add(body.memberId);
-      else ids.delete(body.memberId);
-      event.attendedIds = [...ids];
+      event.rsvps[body.memberId] = body.attended ? "yes" : "no";
       return;
     }
     case "createEvent": {
