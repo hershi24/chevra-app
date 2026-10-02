@@ -38,6 +38,7 @@ create table public.gatherings (
   summary text,
   audio_url text,
   status public.gathering_status not null default 'upcoming',
+  attended_ids text[] not null default '{}',
   created_at timestamptz not null default now()
 );
 

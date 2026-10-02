@@ -199,6 +199,18 @@ function applyAction(
       event.rsvps[me.id] = body.status;
       return;
     }
+    case "setAttendance": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const event = s.gatherings.find((g) => g.id === body.eventId);
+      if (!event) throw new Error("החברה לא נמצאה");
+      if (!gatheringHeld(event)) throw new Error("החברה עוד לא התקיימה");
+      if (!s.members.some((member) => member.id === body.memberId)) throw new Error("החבר לא נמצא");
+      const ids = new Set(event.attendedIds ?? []);
+      if (body.attended) ids.add(body.memberId);
+      else ids.delete(body.memberId);
+      event.attendedIds = [...ids];
+      return;
+    }
     case "createEvent": {
       if (!can(me, "createEvent")) throw new Error("forbidden");
       const rsvps: Gathering["rsvps"] = {};

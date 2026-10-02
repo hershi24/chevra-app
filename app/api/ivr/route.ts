@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { gatheringHeld } from "@/lib/selectors";
 import { updateState, upcomingGathering } from "@/lib/store";
 import type { RsvpStatus } from "@/lib/types";
 
@@ -55,7 +56,9 @@ export async function POST(request: Request) {
       : upcomingGathering(s);
     eventId = event?.id;
 
-    if (member && event && (digits === "1" || digits === "2")) {
+    if (member && event && gatheringHeld(event)) {
+      result = "already_held";
+    } else if (member && event && (digits === "1" || digits === "2")) {
       const status: RsvpStatus = digits === "1" ? "yes" : "no";
       event.rsvps[member.id] = status;
       result = status === "yes" ? "rsvp_yes" : "rsvp_no";

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatDateTimeHe, gatheringLabel } from "@/lib/format";
+import { gatheringHeld } from "@/lib/selectors";
 import type { Gathering, Member, RsvpStatus } from "@/lib/types";
 
 export function RsvpView({
@@ -79,15 +80,19 @@ export function RsvpView({
               הסטטוס שלך:{" "}
               {result === "yes" ? "מגיע" : result === "no" ? "לא מגיע" : result === "maybe" ? "אולי" : "טרם השיב"}
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void pick("yes")}>מאשר הגעה</Button>
-              <Button variant="outline" onClick={() => void pick("maybe")}>
-                אולי
-              </Button>
-              <Button variant="outline" onClick={() => void pick("no")}>
-                לא אוכל להגיע
-              </Button>
-            </div>
+            {gatheringHeld(event) ? (
+              <p className="rounded-xl bg-secondary px-3 py-2 text-sm">החברה כבר התקיימה.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void pick("yes")}>מאשר הגעה</Button>
+                <Button variant="outline" onClick={() => void pick("maybe")}>
+                  אולי
+                </Button>
+                <Button variant="outline" onClick={() => void pick("no")}>
+                  לא אוכל להגיע
+                </Button>
+              </div>
+            )}
             <Link href="/login" className="block text-sm text-primary underline">
               כניסה לאפליקציה
             </Link>

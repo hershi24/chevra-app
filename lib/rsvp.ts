@@ -1,4 +1,5 @@
 import { publicMember } from "./password";
+import { gatheringHeld } from "./selectors";
 import { readSignedToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
 import type { Gathering, Member, RsvpStatus } from "./types";
@@ -34,10 +35,14 @@ export async function applyRsvp(token: string, choice: RsvpStatus): Promise<Rsvp
     if (!row) throw new Error("missing");
     const event = state.gatherings.find((item) => item.id === row.eventId);
     if (!event) throw new Error("missing-event");
+    if (gatheringHeld(event)) throw new Error("held");
     event.rsvps[row.memberId] = choice;
   }).catch((error: unknown) => {
     if (error instanceof Error && (error.message === "missing" || error.message === "missing-event")) {
       return null;
+    }
+    if (error instanceof Error && error.message === "held") {
+      throw new Error("החברה כבר התקיימה");
     }
     throw error;
   });
