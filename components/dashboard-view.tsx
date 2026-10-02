@@ -416,6 +416,7 @@ function HeroEvent({
   const held = gatheringHeld(event);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
+  const attended = members.filter((member) => (event.attendedIds ?? []).includes(member.id));
   const maybe = members.filter((m) => event.rsvps[m.id] === "maybe");
   const pending = members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending");
   const showList = can(me, "viewRsvps");
@@ -482,7 +483,9 @@ function HeroEvent({
           {held ? (
             <p className="max-w-sm text-[13px] font-light leading-6 text-foreground/75">
               התקיימה
-              {coming.length ? ` · השתתפו: ${coming.map((member) => member.displayName).join(", ")}` : ""}
+              {attended.length
+                ? ` · השתתפו: ${attended.map((member) => member.displayName).join(", ")}`
+                : " · עדיין לא סומן מי השתתף"}
             </p>
           ) : (
             <div
@@ -508,26 +511,28 @@ function HeroEvent({
       <aside className="flex min-w-0 flex-col justify-center border-t border-[#eceef1] px-5 py-5 md:border-s md:border-t-0 md:px-6 md:py-8">
         <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-4">
           <div className="flex items-center gap-3">
-            <Ring value={coming.length} total={members.length} />
+            <Ring value={(held ? attended : coming).length} total={members.length} />
             <div>
               <div className="text-[15px] leading-tight">
-                {coming.length} {held ? "השתתפו" : "מגיעים"}
+                {(held ? attended : coming).length} {held ? "השתתפו" : "מגיעים"}
                 <span className="text-[12px] font-light text-muted-foreground"> מתוך {members.length}</span>
               </div>
-              <div className="mt-0.5 text-[12px] font-light text-muted-foreground">
-                {maybe.length} אולי · {pending.length} לא ענו
-              </div>
+              {held ? null : (
+                <div className="mt-0.5 text-[12px] font-light text-muted-foreground">
+                  {maybe.length} אולי · {pending.length} לא ענו
+                </div>
+              )}
             </div>
           </div>
-          {coming.length ? (
+          {(held ? attended : coming).length ? (
             <div className="ms-auto flex -space-x-2 space-x-reverse md:ms-0">
-              {coming.slice(0, 6).map((member) => (
+              {(held ? attended : coming).slice(0, 6).map((member) => (
                 <UserAvatar key={member.id} member={member} size="sm" className="ring-2 ring-[#fbfcfd]" />
               ))}
             </div>
           ) : null}
         </div>
-        {showList ? (
+        {showList && !held ? (
           <div className="mt-4">
             <button
               type="button"

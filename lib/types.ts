@@ -40,6 +40,7 @@ export type Gathering = {
   audioUrl?: string;
   status: "upcoming" | "past" | "cancelled";
   rsvps: Record<string, RsvpStatus>;
+  attendedIds?: string[];
   media: EventMedia[];
 };
 

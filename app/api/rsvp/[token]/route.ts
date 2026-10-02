@@ -10,7 +10,7 @@ export async function GET(
   const { token } = await context.params;
   const choice = new URL(request.url).searchParams.get("c");
   if (choice === "yes" || choice === "no" || choice === "maybe") {
-    return respond(await applyRsvp(token, choice));
+    return answer(applyRsvp(token, choice));
   }
   return respond(await readRsvp(token));
 }
@@ -24,7 +24,19 @@ export async function POST(
   if (body.choice !== "yes" && body.choice !== "no" && body.choice !== "maybe") {
     return NextResponse.json({ error: "בחירה לא תקינה" }, { status: 400 });
   }
-  return respond(await applyRsvp(token, body.choice));
+  return answer(applyRsvp(token, body.choice));
+}
+
+async function answer(pending: ReturnType<typeof applyRsvp>) {
+  try {
+    return respond(await pending);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "שגיאה";
+    if (message === "החברה כבר התקיימה") {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    throw error;
+  }
 }
 
 function respond(result: Awaited<ReturnType<typeof readRsvp>>) {

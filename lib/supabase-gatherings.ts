@@ -14,6 +14,7 @@ type GatheringRow = {
   summary: string | null;
   audio_url: string | null;
   status: Gathering["status"];
+  attended_ids?: string[] | null;
 };
 
 type RsvpRow = {
@@ -32,8 +33,8 @@ type MediaRow = {
   created_at: string;
 };
 
-function gatheringRow(event: Gathering) {
-  return {
+function gatheringRow(event: Gathering, withAttendance = true) {
+  const row: Record<string, unknown> = {
     id: event.id,
     title: event.title || "",
     starts_at: event.startsAt,
@@ -47,6 +48,13 @@ function gatheringRow(event: Gathering) {
     audio_url: event.audioUrl || null,
     status: event.status,
   };
+  if (withAttendance) row.attended_ids = event.attendedIds ?? [];
+  return row;
+}
+
+function isMissingAttendanceColumn(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  return /attended_ids/i.test(message) && /does not exist|schema cache|Could not find/i.test(message);
 }
 
 function sameGathering(a: Gathering, b: Gathering) {
@@ -123,6 +131,7 @@ export async function loadGatheringsFromSupabase(): Promise<{
     summary: row.summary ?? undefined,
     audioUrl: row.audio_url ?? undefined,
     status: row.status,
+    attendedIds: Array.isArray(row.attended_ids) ? row.attended_ids.filter(Boolean) : [],
     rsvps: rsvps.get(row.id) ?? {},
     media: (media.get(row.id) ?? []).sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)),
   }));
@@ -148,8 +157,19 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
   for (const event of after.gatherings) {
     const prev = before.gatherings.find((item) => item.id === event.id);
     if (!prev || !sameGathering(prev, event)) {
-      const { error } = await db.from("gatherings").upsert(gatheringRow(event));
-      if (error) throw error;
+      const full = gatheringRow(event);
+      const { error } = await db.from("gatherings").upsert(full);
+      if (error && isMissingAttendanceColumn(error)) {
+        const rest = { ...full };
+        delete rest.attended_ids;
+        const retry = await db.from("gatherings").upsert(rest);
+        if (retry.error) throw retry.error;
+        console.error(
+          "Attendance column missing. Run: alter table public.gatherings add column if not exists attended_ids text[] not null default '{}';"
+        );
+      } else if (error) {
+        throw error;
+      }
     }
     if (!prev || !sameRsvps(prev.rsvps, event.rsvps)) {
       await replaceRsvps(event, prev?.rsvps);

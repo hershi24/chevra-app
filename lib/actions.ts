@@ -2,6 +2,7 @@ import type { BankAccount, ChatEmailPrefs, Gathering, Message, PaymentMethod, Ro
 
 export type ActionBody =
   | { type: "rsvp"; eventId: string; status: RsvpStatus }
+  | { type: "setAttendance"; eventId: string; memberId: string; attended: boolean }
   | {
       type: "createEvent";
       title?: string;
