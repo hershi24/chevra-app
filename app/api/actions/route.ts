@@ -21,6 +21,7 @@ import {
   scopedSettlement,
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
+import { gatheringHeld } from "@/lib/selectors";
 import { emitToMembers } from "@/lib/realtime";
 import { inviteOrigin } from "@/lib/request-origin";
 import { updateState, toPublicState } from "@/lib/store";
@@ -194,6 +195,7 @@ function applyAction(
       if (!can(me, "rsvp")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
+      if (event.status !== "upcoming" || gatheringHeld(event)) throw new Error("החברה כבר התקיימה");
       event.rsvps[me.id] = body.status;
       return;
     }

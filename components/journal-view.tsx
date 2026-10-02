@@ -15,6 +15,7 @@ import {
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
+import { gatheringHeld } from "@/lib/selectors";
 import type { Gathering, Member } from "@/lib/types";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
@@ -81,14 +82,14 @@ export function JournalView() {
   if (!state || !me) return null;
   const user = me;
 
-  const upcoming = state.gatherings
-    .filter((g) => g.status === "upcoming")
+  const ahead = state.gatherings
+    .filter((g) => g.status === "upcoming" && !gatheringHeld(g))
     .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
   const past = state.gatherings
-    .filter((g) => g.status !== "upcoming")
+    .filter((g) => g.status === "cancelled" || gatheringHeld(g))
     .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
-  const next = upcoming[0];
-  const later = next ? upcoming.slice(1) : upcoming;
+  const next = ahead[0];
+  const later = ahead.slice(1);
   const trips = state.gatherings.filter((g) => gatheringLabel(g).includes("טיול")).length;
   const photoCount = state.gatherings.reduce((sum, g) => sum + images(g).length, 0);
   const count = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
@@ -327,7 +328,8 @@ function JournalEntry({
   onDelete: () => void;
 }) {
   const href = `/journal/${event.id}`;
-  const isUpcoming = event.status === "upcoming";
+  const held = gatheringHeld(event);
+  const isUpcoming = event.status === "upcoming" && !held;
   const { kind } = splitGatheringTitle(event);
   const { heading, body } = storyCopy(event, isUpcoming);
   const { day, month } = hebrewDateParts(event.startsAt);
@@ -338,13 +340,15 @@ function JournalEntry({
   const pics = images(event);
   const text = body;
   const facts = [
-    yes.length
-      ? isUpcoming
-        ? `${yes.length} מגיעים`
-        : yes.length === members.length
-          ? `כל ${members.length} החברים הגיעו`
-          : `${yes.length} השתתפו`
-      : null,
+    held
+      ? null
+      : yes.length
+        ? isUpcoming
+          ? `${yes.length} מגיעים`
+          : yes.length === members.length
+            ? `כל ${members.length} החברים הגיעו`
+            : `${yes.length} השתתפו`
+        : null,
     pics.length ? `${pics.length} תמונות` : null,
   ].filter(Boolean);
 
@@ -368,7 +372,8 @@ function JournalEntry({
             {day} ב{month} · {formatDayMonth(event.startsAt)} ·
           </span>
           {kind ? <Chip tone="gray">{kind}</Chip> : null}
-          {isUpcoming ? <Chip>קרובה · {formatTimeHe(event.startsAt)}</Chip> : null}
+          {gatheringHeld(event) ? <Chip>התקיימה</Chip> : null}
+          {isUpcoming && !gatheringHeld(event) ? <Chip>קרובה · {formatTimeHe(event.startsAt)}</Chip> : null}
           {event.status === "cancelled" ? <Chip tone="gray">בוטלה</Chip> : null}
         </div>
         <h3 className="mt-1.5 mb-1 text-[18px] leading-snug font-medium">
@@ -386,6 +391,13 @@ function JournalEntry({
         ) : (
           <div className="h-3" />
         )}
+        {held ? (
+          <p className="mb-3 text-[13.5px] leading-6 font-light text-[#1f2328]">
+            {yes.length
+              ? `השתתפו: ${yes.map((member) => member.displayName).join(", ")}`
+              : "לא סומנו משתתפים"}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2.5 text-[12px] font-light text-muted-foreground">
           {yes.length ? (
             <span className="flex -space-x-1.5">
