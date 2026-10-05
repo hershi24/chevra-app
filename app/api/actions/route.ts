@@ -21,7 +21,8 @@ import {
   scopedSettlement,
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
-import { gatheringHeld } from "@/lib/selectors";
+import { boardEnabled, normalizeBoard, resolveBoard } from "@/lib/community-board";
+import { galleryItems, gatheringHeld } from "@/lib/selectors";
 import { emitToMembers } from "@/lib/realtime";
 import { inviteOrigin } from "@/lib/request-origin";
 import { updateState, toPublicState } from "@/lib/store";
@@ -190,6 +191,20 @@ function applyAction(
   pushed: Message[],
   now = new Date().toISOString()
 ) {
+  if (
+    boardEnabled(s) &&
+    (body.type === "sendMessage" ||
+      body.type === "react" ||
+      body.type === "createPoll" ||
+      body.type === "votePoll" ||
+      body.type === "closePoll" ||
+      body.type === "deleteMessage" ||
+      body.type === "editMessage" ||
+      body.type === "forwardMessage" ||
+      body.type === "createDm")
+  ) {
+    throw new Error("הדף לא זמין");
+  }
   switch (body.type) {
     case "rsvp": {
       if (!can(me, "rsvp")) throw new Error("forbidden");
@@ -814,6 +829,34 @@ function applyAction(
       );
       prefs.channelIds = prefs.channelIds.filter((id) => rooms.has(id));
       s.chatEmailPrefs = { ...(s.chatEmailPrefs ?? {}), [me.id]: prefs };
+      return;
+    }
+    case "setCommunityBoard": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const previous = resolveBoard(s);
+      const next = normalizeBoard(body.board, s.members);
+      const votes = new Map(previous.poll.options.map((option) => [option.id, option.voterIds]));
+      next.poll.options = next.poll.options.map((option) => ({
+        ...option,
+        voterIds: (votes.get(option.id) ?? []).filter((id) => s.members.some((member) => member.id === id)),
+      }));
+      if (next.poll.options.length < 2) throw new Error("לסקר צריך לפחות שתי אפשרויות");
+      const images = new Set(galleryItems(s).filter((item) => item.type === "image").map((item) => item.id));
+      next.photoIds = next.photoIds.filter((id) => images.has(id));
+      s.settings.communityBoard = next;
+      return;
+    }
+    case "voteCommunityPoll": {
+      const board = resolveBoard(s);
+      if (!board.enabled) throw new Error("הלוח לא פעיל");
+      if (board.poll.closed) throw new Error("הסקר נסגר");
+      const option = board.poll.options.find((item) => item.id === body.optionId);
+      if (!option) throw new Error("האפשרות לא נמצאה");
+      for (const item of board.poll.options) {
+        item.voterIds = item.voterIds.filter((id) => id !== me.id);
+      }
+      option.voterIds.push(me.id);
+      s.settings.communityBoard = board;
       return;
     }
     default:

@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { CommunityHome } from "@/components/community-home";
+import { boardEnabled } from "@/lib/community-board";
 import { Countdown } from "@/components/countdown";
 import { EventDialog } from "@/components/event-dialog";
 import { UserAvatar } from "@/components/user-avatar";
@@ -43,6 +45,7 @@ const CARD =
 export function DashboardView() {
   const { state, me, act } = useApp();
   if (!state || !me) return null;
+  if (boardEnabled(state)) return <CommunityHome />;
   return <Dashboard state={state} me={me} act={act} />;
 }
 

@@ -10,6 +10,7 @@ import {
   setNotificationsEnabled,
   showChatNotification,
 } from "@/lib/chat-notify";
+import { boardEnabled } from "@/lib/community-board";
 import { cn } from "@/lib/utils";
 import type { PublicState } from "@/lib/types";
 
@@ -31,6 +32,10 @@ export function ChatAlerts({ state }: { state: PublicState | null }) {
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; url?: string; messageId?: string } | null;
       if (!data || data.type !== "open-chat" || !data.url) return;
+      if (boardEnabled(state)) {
+        router.replace("/");
+        return;
+      }
       if (data.messageId) {
         sessionStorage.setItem("chevra-reply", data.messageId);
         window.dispatchEvent(new CustomEvent("chevra-open-reply", { detail: data.messageId }));
@@ -39,10 +44,10 @@ export function ChatAlerts({ state }: { state: PublicState | null }) {
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [router]);
+  }, [router, state]);
 
   useEffect(() => {
-    if (!state) return;
+    if (!state || boardEnabled(state)) return;
     if (!seen.current) {
       seen.current = new Set(state.messages.map((message) => message.id));
       return;

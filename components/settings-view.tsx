@@ -5,6 +5,8 @@ import type { LucideIcon } from "lucide-react";
 import { Bell, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { CommunityBoardPanel } from "@/components/community-board-panel";
+import { boardEnabled } from "@/lib/community-board";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ export function SettingsView() {
 
   const visible = SECTIONS.filter((section) => {
     if (!me) return false;
+    if (boardEnabled(state) && section.id === "notify") return false;
     if (section.id === "invites") return can(me, "sendInvites");
     if (section.id === "system") return isAdmin(me);
     return true;
@@ -142,13 +145,15 @@ export function SettingsView() {
               <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
             </Section>
 
-            <Section
-              id="notify"
-              title="התראות במייל"
-              subtitle="אילו הודעות בצ׳אט יגיעו אליך גם למייל, עם כפתור השבה ישיר."
-            >
-              <ChatEmailPanel />
-            </Section>
+            {boardEnabled(state) ? null : (
+              <Section
+                id="notify"
+                title="התראות במייל"
+                subtitle="אילו הודעות בצ׳אט יגיעו אליך גם למייל, עם כפתור השבה ישיר."
+              >
+                <ChatEmailPanel />
+              </Section>
+            )}
 
             <Section
               id="members"
@@ -162,6 +167,7 @@ export function SettingsView() {
 
             {isAdmin(me) ? (
               <Section id="system" title="מערכת" subtitle="רק למנהל המערכת.">
+                <CommunityBoardPanel />
                 <SystemPanel />
               </Section>
             ) : null}

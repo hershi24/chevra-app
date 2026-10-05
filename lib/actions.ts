@@ -1,4 +1,13 @@
-import type { BankAccount, ChatEmailPrefs, Gathering, Message, PaymentMethod, Role, RsvpStatus } from "./types";
+import type {
+  BankAccount,
+  ChatEmailPrefs,
+  CommunityBoard,
+  Gathering,
+  Message,
+  PaymentMethod,
+  Role,
+  RsvpStatus,
+} from "./types";
 
 export type ActionBody =
   | { type: "rsvp"; eventId: string; status: RsvpStatus }
@@ -113,4 +122,6 @@ export type ActionBody =
     }
   | { type: "deletePayment"; paymentId: string }
   | { type: "setBankAccount"; memberId: string; account: Partial<BankAccount> | null }
-  | { type: "setChatEmailPrefs"; prefs: ChatEmailPrefs };
+  | { type: "setChatEmailPrefs"; prefs: ChatEmailPrefs }
+  | { type: "setCommunityBoard"; board: CommunityBoard }
+  | { type: "voteCommunityPoll"; optionId: string };
