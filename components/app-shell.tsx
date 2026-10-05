@@ -109,13 +109,17 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
     <div className={cn("min-h-dvh", isChat && "flex h-dvh flex-col overflow-hidden")}>
       <BackgroundLayer />
 
-      <header className="sticky top-0 z-30 hidden h-16 shrink-0 border-b border-[#d0d5dc] bg-[#e4e8ee] md:block">
-        <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-8">
-          <Link href="/" className="min-w-0 shrink-0">
-            <img src="/brand-logo.png" alt="אש קודש" className="h-[46px] w-auto" />
+      <header className="sticky top-0 z-30 hidden h-[72px] shrink-0 border-b border-[#e3e6eb] bg-[#fbfcfd] md:block">
+        <div className="flex h-full items-center justify-between gap-6 px-5 md:px-8">
+          <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3">
+            <img src="/brand-logo.png" alt="" className="h-[38px] w-auto" />
+            <span className="min-w-0 text-start">
+              <span className="block text-[20px] leading-none tracking-tight">אש קודש</span>
+              <span className="mt-1 block text-[11px] font-light text-[#8a8174]">מיין חברה</span>
+            </span>
           </Link>
 
-          <nav className="flex items-center rounded-full bg-[#f4f6f8] p-1">
+          <nav className="flex h-full min-w-0 items-stretch">
             {nav.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -126,28 +130,33 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
                   title={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-light transition lg:px-3.5",
-                    active
-                      ? "bg-[#a9782c] text-[#fffdf8] shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                    "relative flex items-center gap-2 px-2.5 text-[14px] font-light lg:px-4 lg:text-[15px]",
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <item.icon className="size-3.5" />
+                  <item.icon className={cn("size-4 shrink-0", active && "text-primary")} />
                   {item.short}
+                  {active ? (
+                    <span className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-t bg-primary lg:inset-x-4" />
+                  ) : null}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="hidden min-w-0 text-end lg:block">
-              <div className="truncate text-[13px] font-normal">{me.displayName}</div>
-              <div className="text-[11px] font-light text-muted-foreground">
-                {roleLabel(me.role)}
-              </div>
+          <div className="flex shrink-0 items-center gap-3 rounded-full bg-[#f4f6f8] py-1.5 ps-3.5 pe-1.5">
+            <div className="hidden min-w-0 text-start lg:block">
+              <div className="truncate text-[13px]">{me.displayName}</div>
+              <div className="text-[11px] font-light text-muted-foreground">{roleLabel(me.role)}</div>
             </div>
             <UserAvatar member={me} />
-            <Button variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label="יציאה">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-[#8b919a]"
+              onClick={() => void logout()}
+              aria-label="יציאה"
+            >
               <LogOut className="size-4" />
             </Button>
           </div>

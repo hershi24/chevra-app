@@ -204,7 +204,7 @@ function Dashboard({
   ];
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 md:gap-8">
+    <div className="flex flex-col gap-6 md:gap-8">
       <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[13px] font-light text-muted-foreground">

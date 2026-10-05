@@ -300,7 +300,7 @@ export function JournalDetail({
             </button>
           </div>
         ) : null}
-        <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[1120px] px-5 pb-7 text-white md:px-8 md:pb-[34px]">
+        <div className="absolute inset-x-0 bottom-0 px-5 pb-7 text-white md:px-8 md:pb-[34px]">
           <div className="text-[12.5px] font-light tracking-[.04em] text-[#f1d9a8]">
             {[kind, formatHebrewDate(event.startsAt), formatDateHe(event.startsAt), formatTimeHe(event.startsAt)]
               .filter(Boolean)
@@ -317,7 +317,7 @@ export function JournalDetail({
         </div>
       </section>
 
-      <div className="mx-auto max-w-[720px] px-5 pt-8 md:px-8">
+      <div className="px-5 pt-8 md:px-8">
         {host || lecturer || kibud ? (
           <div className="grid gap-3 sm:grid-cols-3">
             <Credit label="מארח" member={host} />
@@ -444,7 +444,7 @@ export function JournalDetail({
         ) : null}
       </div>
 
-      <div className="mx-auto mt-8 max-w-[1120px] px-5 md:px-8">
+      <div className="mt-8 px-5 md:px-8">
         {visual.length ? (
           showAll ? (
             <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
@@ -559,7 +559,7 @@ export function JournalDetail({
       </div>
 
       {held ? (
-        <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
+        <div className="mt-9 px-5 text-center md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">מי השתתף</h3>
           {isAdmin(me) ? (
             <div className="mb-4">
@@ -598,7 +598,7 @@ export function JournalDetail({
           </p>
         </div>
       ) : isUpcoming && coming.length ? (
-        <div className="mx-auto mt-9 max-w-[720px] px-5 text-center md:px-8">
+        <div className="mt-9 px-5 text-center md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">מי מגיע</h3>
           <span className="inline-flex -space-x-2.5">
             {coming.map((m) => (
@@ -609,7 +609,7 @@ export function JournalDetail({
       ) : null}
 
       {!held && can(me, "viewRsvps") ? (
-        <div className="mx-auto mt-9 max-w-[720px] px-5 md:px-8">
+        <div className="mt-9 px-5 md:px-8">
           <h3 className="mb-3 text-[15px] font-medium">אישורי הגעה</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => (
@@ -628,7 +628,7 @@ export function JournalDetail({
       ) : null}
 
       {newer || older ? (
-        <div className="mx-auto mt-10 grid max-w-[1120px] gap-4 px-5 md:grid-cols-2 md:px-8">
+        <div className="mt-10 grid gap-4 px-5 md:grid-cols-2 md:px-8">
           <NeighborCard event={newer} label="← החברה הבאה" />
           <NeighborCard event={older} label="החברה הקודמת →" />
         </div>

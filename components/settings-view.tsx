@@ -77,7 +77,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div>
       <div>
         <p className="text-[13px] font-light text-muted-foreground">
           {isAdmin(me) ? "החשבון, החברים והמערכת" : "החשבון שלך וחברי החבורה"}

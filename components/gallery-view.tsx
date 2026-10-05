@@ -132,7 +132,7 @@ export function GalleryView() {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 md:gap-7">
+    <div className="flex flex-col gap-6 md:gap-7">
       <header className="flex items-end justify-between gap-4">
         <div>
           <p className="text-[13px] font-light text-muted-foreground">כל הרגעים של החבורה</p>
