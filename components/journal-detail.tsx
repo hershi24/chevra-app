@@ -262,7 +262,7 @@ export function JournalDetail({
   const viewing = viewer === null ? null : visual[viewer];
 
   return (
-    <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:pb-16">
+    <div className="-mx-5 -mt-6 -mb-28 min-h-dvh bg-[#faf8f4] pb-28 md:-mx-8 md:-mt-10 md:min-h-[calc(100dvh-4.5rem)] md:-mb-16 md:pb-16">
       <section className="relative h-[300px] overflow-hidden bg-linear-to-br from-[#3b2f1e] to-[#8a5f1c] md:h-[380px]">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
