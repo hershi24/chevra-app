@@ -145,7 +145,7 @@ export function JournalView() {
 
   return (
     <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:px-8 md:pt-10 md:pb-16">
-      <div className="mx-auto max-w-6xl">
+      <div>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-[1.75rem] font-medium tracking-tight md:text-[32px]">יומן החבורה</h1>

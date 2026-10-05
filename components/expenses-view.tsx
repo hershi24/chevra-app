@@ -122,7 +122,7 @@ export function ExpensesView() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[880px] flex-col">
+    <div className="flex flex-col">
       <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-[13px] font-light text-muted-foreground">{expenseScopeLabel(state, scope)}</p>
