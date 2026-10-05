@@ -144,7 +144,7 @@ export function JournalView() {
   const hostName = next ? memberById(state.members, next.hostId)?.displayName : null;
 
   return (
-    <div className="-mx-5 -mt-6 -mb-28 bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:-mb-16 md:px-8 md:pt-10 md:pb-16">
+    <div className="-mx-5 -mt-6 -mb-28 min-h-dvh bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:min-h-[calc(100dvh-4.5rem)] md:-mb-16 md:px-8 md:pt-10 md:pb-16">
       <div>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
