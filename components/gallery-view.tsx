@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { boardEnabled } from "@/lib/community-board";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
@@ -556,6 +557,7 @@ function Lightbox({
   onDelete: (item: GalleryItem) => Promise<void>;
   onShare: (channel: Channel, label: string) => Promise<void>;
 }) {
+  const { state } = useApp();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const touchX = useRef<number | null>(null);
@@ -715,7 +717,7 @@ function Lightbox({
             <Download className="size-3.5" aria-hidden />
             הורדה
           </a>
-          {writable.length && can(me, "chat") ? (
+          {writable.length && can(me, "chat") && !boardEnabled(state) ? (
             <DropdownMenu dir="rtl">
               <DropdownMenuTrigger
                 disabled={busy}

@@ -22,6 +22,8 @@ import {
   syncBankAccounts,
   syncExpenseLedger,
 } from "./supabase-expenses";
+import { loadSiteBoard, syncSiteBoard } from "./supabase-board";
+import { boardEnabled } from "./community-board";
 import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -141,6 +143,8 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     }
     if (accounts) state.bankAccounts = accounts;
     if (emailPrefs) state.chatEmailPrefs = emailPrefs;
+    const board = await loadSiteBoard();
+    if (board) state.settings.communityBoard = board;
     markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
@@ -164,6 +168,7 @@ export async function persistQuietly(
         await syncExpenseLedger(before, current);
         await syncBankAccounts(before, current);
         await syncChatEmailPrefs(before, current);
+        await syncSiteBoard(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -194,6 +199,7 @@ export async function updateState(
         await syncExpenseLedger(before, current);
         await syncBankAccounts(before, current);
         await syncChatEmailPrefs(before, current);
+        await syncSiteBoard(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -225,12 +231,13 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     : messages.map((message) =>
         message.poll ? { ...message, poll: publicPoll(message.poll, me.id) } : message
       );
+  const quiet = boardEnabled(state);
   return {
     members: state.members.map(publicMember),
     gatherings: state.gatherings,
     gallery: state.gallery ?? [],
-    channels,
-    messages: visibleMessages,
+    channels: quiet ? [] : channels,
+    messages: quiet ? [] : visibleMessages,
     settings: state.settings,
     expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
     expenseWaivers: state.settings.showExpenses === false ? [] : (state.expenseWaivers ?? []),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, KeyRound, MessageCircle, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { boardEnabled } from "@/lib/community-board";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,14 @@ import { cn } from "@/lib/utils";
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
 const COLLAPSED_COUNT = 6;
 const ROLES: Role[] = ["admin", "leader", "member"];
+
+function quietRoles() {
+  return ROLE_HELP.map((item) => {
+    const lines = item.lines.filter((line) => !/צ׳אט|צ'אט|הודע|שיחה|חדר/.test(line));
+    if (item.role === "member") lines.unshift("יומן וגלריה");
+    return { ...item, lines };
+  });
+}
 
 const ROLE_HELP: { role: Role; title: string; lines: string[] }[] = [
   {
@@ -69,6 +78,7 @@ function sortMembers(members: Member[], onlineIds: string[], meId?: string) {
 
 export function MemberAdmin() {
   const { state, me, onlineIds } = useApp();
+  const quiet = boardEnabled(state);
   const openChat = useOpenChat();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -166,7 +176,7 @@ export function MemberAdmin() {
               online={onlineIds.includes(member.id)}
               open={openId === member.id}
               onToggle={() => setOpenId((id) => (id === member.id ? null : member.id))}
-              onChat={() => void openChat(member)}
+              onChat={quiet ? undefined : () => void openChat(member)}
             />
           ))}
           {filtered.length === 0 ? (
@@ -189,7 +199,7 @@ export function MemberAdmin() {
       </div>
 
       <div className="grid gap-2.5 px-1 text-[12.5px] font-light text-muted-foreground md:grid-cols-3 md:gap-0">
-        {ROLE_HELP.map((item, index) => (
+        {(quiet ? quietRoles() : ROLE_HELP).map((item, index) => (
           <div key={item.role} className={cn("leading-relaxed md:px-4", index === 0 ? "md:ps-1" : "md:border-s md:border-[#e3e7ec]")}>
             <div className="mb-0.5 text-[13px] font-normal text-foreground">{item.title}</div>
             {item.lines.join(" · ")}
@@ -239,7 +249,7 @@ function MemberRow({
   online: boolean;
   open: boolean;
   onToggle: () => void;
-  onChat: () => void;
+  onChat?: () => void;
 }) {
   const { act } = useApp();
   const [draft, setDraft] = useState({
@@ -320,7 +330,7 @@ function MemberRow({
           <RolePill role={member.role} />
         </span>
         <div className="flex shrink-0 items-center text-[#9aa1ab]">
-          {!isMe ? (
+          {!isMe && onChat ? (
             <Button type="button" variant="ghost" size="icon" className="hidden rounded-xl sm:inline-flex" aria-label="צ׳אט" onClick={onChat}>
               <MessageCircle />
             </Button>
@@ -593,7 +603,8 @@ function AddMemberForm({ onDone }: { onDone: () => void }) {
 }
 
 export function MemberDirectory({ members }: { members: Member[] }) {
-  const { me, onlineIds } = useApp();
+  const { state, me, onlineIds } = useApp();
+  const quiet = boardEnabled(state);
   const openChat = useOpenChat();
   const sorted = sortMembers(members, onlineIds, me?.id);
   return (
@@ -616,7 +627,7 @@ export function MemberDirectory({ members }: { members: Member[] }) {
               </div>
             </div>
             <RolePill role={member.role} />
-            {!isMe ? (
+            {!isMe && !quiet ? (
               <Button
                 type="button"
                 variant="ghost"

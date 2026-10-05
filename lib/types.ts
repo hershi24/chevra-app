@@ -151,11 +151,45 @@ export type BankAccount = {
   updatedAt: string;
 };
 
+export type BoardNotice = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+export type BoardPrayer = {
+  id: string;
+  name: string;
+  time: string;
+};
+
+export type BoardFile = {
+  id: string;
+  title: string;
+  url: string;
+};
+
+export type BoardPoll = {
+  question: string;
+  options: PollOption[];
+  closed: boolean;
+};
+
+export type CommunityBoard = {
+  enabled: boolean;
+  notices: BoardNotice[];
+  prayers: BoardPrayer[];
+  files: BoardFile[];
+  poll: BoardPoll;
+  photoIds: string[];
+};
+
 export type AppSettings = {
   groupName: string;
   backgroundImageId: string | null;
   backgrounds: BackgroundImage[];
   showExpenses?: boolean;
+  communityBoard?: CommunityBoard;
 };
 
 export type EmailDelivery = {

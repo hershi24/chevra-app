@@ -18,6 +18,7 @@ import { PasswordNotice } from "@/components/password-notice";
 import { BackgroundLayer } from "@/components/background-layer";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
+import { boardEnabled } from "@/lib/community-board";
 import { roleLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -85,8 +86,16 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
   const isChat = pathname.startsWith("/chat");
   const isDashboard = pathname === "/";
-  const nav =
-    state?.settings.showExpenses === false ? NAV.filter((item) => item.href !== "/expenses") : NAV;
+  const quiet = boardEnabled(state);
+  const nav = NAV.filter((item) => {
+    if (item.href === "/expenses" && state?.settings.showExpenses === false) return false;
+    if (item.href === "/chat" && quiet) return false;
+    return true;
+  });
+
+  useEffect(() => {
+    if (quiet && pathname.startsWith("/chat")) router.replace("/");
+  }, [pathname, quiet, router]);
 
   if (loading) {
     return (
