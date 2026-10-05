@@ -121,6 +121,35 @@
   }
 }
 
+.page-stage {
+  view-transition-name: page;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(page) {
+  animation: 320ms ease-in-out both page-fade-out;
+}
+
+::view-transition-new(page) {
+  animation: 320ms ease-in-out both page-fade-in;
+}
+
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes chat-typing-hop {
   0%,
   60%,
