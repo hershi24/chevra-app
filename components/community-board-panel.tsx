@@ -8,10 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { resolveBoard } from "@/lib/community-board";
+import { pickedBoardPhotos, resolveBoard, visibleHomePhotos } from "@/lib/community-board";
 import { readPdf } from "@/lib/pdf-preview";
 import { uploadWithProgress } from "@/lib/upload-client";
-import { galleryItems } from "@/lib/selectors";
 import type { CommunityBoard } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +21,13 @@ export function CommunityBoardPanel() {
   const [draft, setDraft] = useState<CommunityBoard | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   if (!state) return null;
-  const board = draft ?? resolveBoard(state);
-  const images = galleryItems(state).filter((item) => item.type === "image");
+  const app = state;
+  const board = draft ?? resolveBoard(app);
+  const photos = visibleHomePhotos(board, app);
 
   function patch(next: CommunityBoard) {
     setDraft(next);
@@ -79,6 +81,47 @@ export function CommunityBoardPanel() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function uploadPhoto(list: FileList | null) {
+    const file = list?.[0];
+    if (photoRef.current) photoRef.current.value = "";
+    if (!file) return;
+    const image = /^image\/(jpeg|png|webp|gif)$/.test(file.type) || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+    if (!image) {
+      toast.error("אפשר להעלות רק תמונה");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("הקובץ גדול מדי");
+      return;
+    }
+    const base = Array.isArray(board.photos) ? board.photos : pickedBoardPhotos(board, app);
+    if (base.length >= 24) {
+      toast.error("אפשר עד 24 תמונות");
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const uploaded = await uploadWithProgress(file, {}, () => undefined);
+      const caption = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "מהחבורה";
+      await save(
+        {
+          ...board,
+          photos: [...base, { id: crypto.randomUUID(), url: uploaded.url, caption }].slice(0, 24),
+        },
+        "התמונה נוספה"
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ההעלאה נכשלה");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  function removePhoto(id: string) {
+    const base = Array.isArray(board.photos) ? board.photos : photos;
+    void save({ ...board, photos: base.filter((item) => item.id !== id) }, "התמונה נמחקה");
   }
 
   return (
@@ -234,7 +277,7 @@ export function CommunityBoardPanel() {
           {board.files.length < 8 ? (
             <button
               type="button"
-              disabled={uploading || saving}
+              disabled={uploading || photoBusy || saving}
               onClick={() => fileRef.current?.click()}
               className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
             >
@@ -293,37 +336,46 @@ export function CommunityBoardPanel() {
 
         <Field label="תמונות בלוח">
           <p className="text-[12.5px] font-light text-muted-foreground">
-            רק תמונות מסומנות מופיעות. בלי סימון מוצגות תמונות הספרים.
+            התמונות שמופיעות בדף הבית. אפשר להעלות ולמחוק.
           </p>
-          {images.length ? (
-            <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
-              {images.map((item) => {
-                const on = board.photoIds.includes(item.id);
-                return (
+          {photos.length ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {photos.map((photo) => (
+                <div key={photo.id} className="relative overflow-hidden rounded-xl border border-[#e9ecef]">
+                  <img src={photo.url} alt={photo.caption} className="aspect-square w-full object-cover" />
                   <button
-                    key={item.id}
                     type="button"
-                    onClick={() =>
-                      patch({
-                        ...board,
-                        photoIds: on
-                          ? board.photoIds.filter((id) => id !== item.id)
-                          : [...board.photoIds, item.id],
-                      })
-                    }
-                    className={cn(
-                      "overflow-hidden rounded-xl border",
-                      on ? "border-primary" : "border-transparent opacity-70"
-                    )}
+                    aria-label="מחיקת התמונה"
+                    disabled={saving || photoBusy}
+                    onClick={() => removePhoto(photo.id)}
+                    className="absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full bg-white/95 text-[#3f4650] shadow-sm"
                   >
-                    <img src={item.url} alt={item.caption ?? ""} className="aspect-square w-full object-cover" />
+                    <X className="size-3.5" />
                   </button>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="text-[12.5px] font-light text-muted-foreground">אין עדיין תמונות בגלריה.</p>
+            <p className="text-[12.5px] font-light text-muted-foreground">אין תמונות בלוח.</p>
           )}
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+            className="hidden"
+            onChange={(event) => void uploadPhoto(event.target.files)}
+          />
+          {photos.length < 24 ? (
+            <button
+              type="button"
+              disabled={photoBusy || uploading || saving}
+              onClick={() => photoRef.current?.click()}
+              className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
+            >
+              <Plus className="size-3.5" />
+              {photoBusy ? "מעלה…" : "העלאת תמונה"}
+            </button>
+          ) : null}
         </Field>
 
         <Button
