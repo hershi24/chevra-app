@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { LayoutDashboard, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { resolveBoard } from "@/lib/community-board";
+import { readPdf } from "@/lib/pdf-preview";
+import { uploadWithProgress } from "@/lib/upload-client";
 import { galleryItems } from "@/lib/selectors";
 import type { CommunityBoard } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,8 @@ export function CommunityBoardPanel() {
   const { state, act } = useApp();
   const [draft, setDraft] = useState<CommunityBoard | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   if (!state) return null;
   const board = draft ?? resolveBoard(state);
   const images = galleryItems(state).filter((item) => item.type === "image");
@@ -37,6 +41,43 @@ export function CommunityBoardPanel() {
       toast.error(error instanceof Error ? error.message : "השמירה נכשלה");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadPdf(list: FileList | null) {
+    const file = list?.[0];
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    const pdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!pdf) {
+      toast.error("אפשר להעלות רק PDF");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("הקובץ גדול מדי");
+      return;
+    }
+    setUploading(true);
+    try {
+      let body = "";
+      try {
+        body = (await readPdf(await file.arrayBuffer())).text;
+      } catch {
+        body = "";
+      }
+      const uploaded = await uploadWithProgress(file, {}, () => undefined);
+      const title = file.name.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() || "דף לימוד";
+      await save(
+        {
+          ...board,
+          files: [...board.files, { id: crypto.randomUUID(), title, url: uploaded.url, ...(body ? { body } : {}) }].slice(0, 8),
+        },
+        "הדף נוסף"
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ההעלאה נכשלה");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -155,11 +196,52 @@ export function CommunityBoardPanel() {
         </Field>
 
         <Field label="דפי לימוד">
-          {board.files.map((file) => (
-            <div key={file.id} className="text-[13px] font-light text-[#3f4650]">
-              {file.title}
+          {board.files.map((file, index) => (
+            <div key={file.id} className="grid gap-2 rounded-2xl border border-[#e9ecef] p-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={file.title}
+                  onChange={(event) => {
+                    const files = board.files.map((item, at) =>
+                      at === index ? { ...item, title: event.target.value } : item
+                    );
+                    patch({ ...board, files });
+                  }}
+                  placeholder="כותרת"
+                />
+                <button
+                  type="button"
+                  className="text-[#9aa1ab]"
+                  aria-label="מחיקת הדף"
+                  disabled={saving}
+                  onClick={() => void save({ ...board, files: board.files.filter((item) => item.id !== file.id) }, "הדף נמחק")}
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              {file.body ? (
+                <p className="line-clamp-3 text-[13px] font-light leading-6 text-[#3f4650]">{file.body}</p>
+              ) : null}
             </div>
           ))}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="hidden"
+            onChange={(event) => void uploadPdf(event.target.files)}
+          />
+          {board.files.length < 8 ? (
+            <button
+              type="button"
+              disabled={uploading || saving}
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
+            >
+              <Plus className="size-3.5" />
+              {uploading ? "מעלה…" : "העלאת PDF"}
+            </button>
+          ) : null}
         </Field>
 
         <Field label="סקר">

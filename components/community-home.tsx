@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, FileText, MapPin } from "lucide-react";
+import { Clock, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { BoardFileCard } from "@/components/board-file-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { resolveBoard } from "@/lib/community-board";
 import { formatHebrewDate, formatTimeHe, gatheringLabel, memberById } from "@/lib/format";
@@ -151,20 +152,9 @@ export function CommunityHome() {
       {board.files.length ? (
         <section>
           <h2 className="mb-3 text-[1.15rem] font-medium">דפי לימוד</h2>
-          <div className="grid gap-4">
+          <div className="grid gap-3 md:grid-cols-2">
             {board.files.map((file) => (
-              <article key={file.id} className={cn(CARD, "overflow-hidden")}>
-                <div className="flex items-center justify-between gap-3 px-5 py-3">
-                  <h3 className="inline-flex items-center gap-2 text-[15px]">
-                    <FileText className="size-4 text-primary" />
-                    {file.title}
-                  </h3>
-                  <a href={file.url} target="_blank" rel="noreferrer" className="text-[13px] font-light text-primary">
-                    פתיחה
-                  </a>
-                </div>
-                <iframe title={file.title} src={file.url} className="h-[420px] w-full border-t border-[#e9ecef] bg-white md:h-[520px]" />
-              </article>
+              <BoardFileCard key={file.id} title={file.title} url={file.url} body={file.body} />
             ))}
           </div>
         </section>

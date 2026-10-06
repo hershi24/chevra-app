@@ -167,6 +167,7 @@ export type BoardFile = {
   id: string;
   title: string;
   url: string;
+  body?: string;
 };
 
 export type BoardPoll = {

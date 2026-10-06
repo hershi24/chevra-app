@@ -29,8 +29,18 @@ export function defaultBoard(): CommunityBoard {
       { id: "p4", name: "שיעור", time: "20:30" },
     ],
     files: [
-      { id: "f1", title: "דף לימוד", url: "/materials/daf-limud.pdf" },
-      { id: "f2", title: "מודעה לחבורה", url: "/materials/hodaah.pdf" },
+      {
+        id: "f1",
+        title: "דף לימוד",
+        url: "/materials/daf-limud.pdf",
+        body: "השיעור השבועי של החבורה. לומדים ביחד, לאט, עם המקורות על השולחן. אפשר להדפיס את הדף ולהביא אותו להתכנסות.",
+      },
+      {
+        id: "f2",
+        title: "מודעה לחבורה",
+        url: "/materials/hodaah.pdf",
+        body: "החבורה מתכנסת ללימוד. השעה והמקום מתפרסמים בלוח הבית. כל החברים מוזמנים.",
+      },
     ],
     poll: {
       question: "איזו מתנה נביא לראש החבורה?",
@@ -52,6 +62,16 @@ export function cleanBoardText(value: unknown, max: number) {
     .slice(0, max);
 }
 
+function knownFileBody(url: string) {
+  if (url === "/materials/daf-limud.pdf") {
+    return "השיעור השבועי של החבורה. לומדים ביחד, לאט, עם המקורות על השולחן. אפשר להדפיס את הדף ולהביא אותו להתכנסות.";
+  }
+  if (url === "/materials/hodaah.pdf") {
+    return "החבורה מתכנסת ללימוד. השעה והמקום מתפרסמים בלוח הבית. כל החברים מוזמנים.";
+  }
+  return "";
+}
+
 function cleanId(value: unknown, fallback: string) {
   const id = String(value ?? "").trim().slice(0, 80);
   return id || fallback;
@@ -71,7 +91,7 @@ export function normalizeBoard(value: unknown, members: { id: string }[] = []): 
 
   const notices = Array.isArray(raw.notices) && raw.notices.length ? raw.notices : base.notices;
   const prayers = Array.isArray(raw.prayers) && raw.prayers.length ? raw.prayers : base.prayers;
-  const files = Array.isArray(raw.files) && raw.files.length ? raw.files : base.files;
+  const files = Array.isArray(raw.files) ? raw.files : base.files;
   const poll = raw.poll && typeof raw.poll === "object" ? raw.poll : base.poll;
   const options = Array.isArray(poll.options) ? poll.options : base.poll.options;
 
@@ -94,12 +114,17 @@ export function normalizeBoard(value: unknown, members: { id: string }[] = []): 
       }))
       .filter((item) => item.name && item.time),
     files: files
-      .slice(0, 6)
-      .map((item, index) => ({
-        id: cleanId(item?.id, `f${index + 1}`),
-        title: cleanBoardText(item?.title, 80),
-        url: cleanUrl(item?.url),
-      }))
+      .slice(0, 8)
+      .map((item, index) => {
+        const url = cleanUrl(item?.url);
+        const body = cleanBoardText(item?.body, 2000) || knownFileBody(url);
+        return {
+          id: cleanId(item?.id, `f${index + 1}`),
+          title: cleanBoardText(item?.title, 80),
+          url,
+          ...(body ? { body } : {}),
+        };
+      })
       .filter((item) => item.title && item.url),
     poll: {
       question: cleanBoardText(poll.question, 120) || base.poll.question,
@@ -127,7 +152,6 @@ export function resolveBoard(state: Pick<AppState, "settings" | "members"> | Pic
   const board = normalizeBoard(stored, state.members);
   if (board.notices.length === 0) board.notices = defaultBoard().notices;
   if (board.prayers.length === 0) board.prayers = defaultBoard().prayers;
-  if (board.files.length === 0) board.files = defaultBoard().files;
   if (board.poll.options.length < 2) board.poll = defaultBoard().poll;
   return board;
 }
