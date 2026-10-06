@@ -1,5 +1,10 @@
-import type { AppState, CommunityBoard, PublicState } from "./types";
+import type { AppState, BoardPhoto, CommunityBoard, PublicState } from "./types";
 import { galleryItems } from "./selectors";
+
+export const STOCK_HOME_PHOTOS: BoardPhoto[] = [
+  { id: "stock-library", url: "/board/library.jpg", caption: "ארון ספרים" },
+  { id: "stock-shelves", url: "/board/shelves.jpg", caption: "ספרייה" },
+];
 
 export function boardEnabled(
   state: { settings?: { communityBoard?: { enabled?: boolean } | null } } | null | undefined
@@ -143,7 +148,24 @@ export function normalizeBoard(value: unknown, members: { id: string }[] = []): 
     photoIds: Array.isArray(raw.photoIds)
       ? [...new Set(raw.photoIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0))].slice(0, 24)
       : [],
+    ...cleanPhotos(raw.photos),
   };
+}
+
+function cleanPhotos(value: unknown): { photos: BoardPhoto[] } | Record<string, never> {
+  if (!Array.isArray(value)) return {};
+  const photos: BoardPhoto[] = [];
+  value.slice(0, 24).forEach((item, index) => {
+    if (!item || typeof item !== "object") return;
+    const url = cleanUrl((item as { url?: unknown }).url);
+    if (!url) return;
+    photos.push({
+      id: cleanId((item as { id?: unknown }).id, `ph${index + 1}`),
+      url,
+      caption: cleanBoardText((item as { caption?: unknown }).caption, 80) || "מהחבורה",
+    });
+  });
+  return { photos };
 }
 
 export function resolveBoard(state: Pick<AppState, "settings" | "members"> | Pick<PublicState, "settings" | "members">) {
@@ -156,8 +178,29 @@ export function resolveBoard(state: Pick<AppState, "settings" | "members"> | Pic
   return board;
 }
 
-export function boardPhotos(state: Pick<AppState, "settings" | "members" | "gatherings" | "gallery">) {
-  const ids = new Set(resolveBoard(state).photoIds);
-  if (!ids.size) return [];
-  return galleryItems(state).filter((item) => item.type === "image" && ids.has(item.id));
+type PhotoSource = Parameters<typeof galleryItems>[0];
+
+export function pickedBoardPhotos(board: CommunityBoard, state: PhotoSource): BoardPhoto[] {
+  const images = new Map(
+    galleryItems(state)
+      .filter((item) => item.type === "image")
+      .map((item) => [item.id, item])
+  );
+  return board.photoIds.flatMap((id) => {
+    const item = images.get(id);
+    if (!item) return [];
+    return [
+      {
+        id: item.id,
+        url: item.url,
+        caption: item.caption?.trim() || (item.eventId ? item.eventLabel : "") || "מהחבורה",
+      },
+    ];
+  });
+}
+
+export function visibleHomePhotos(board: CommunityBoard, state: PhotoSource): BoardPhoto[] {
+  if (Array.isArray(board.photos)) return board.photos;
+  const picked = pickedBoardPhotos(board, state);
+  return picked.length ? picked : STOCK_HOME_PHOTOS;
 }
