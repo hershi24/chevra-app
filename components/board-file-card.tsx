@@ -1,54 +1,62 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readPdf } from "@/lib/pdf-preview";
-import { cn } from "@/lib/utils";
+import { BoardViewer } from "@/components/board-viewer";
+import { pdfPageImages } from "@/lib/pdf-preview";
 
 const CARD =
-  "rounded-[1.5rem] border border-[#d5dbe3] bg-[#fbfcfd] shadow-[0_10px_28px_rgba(80,90,105,0.05)]";
+  "overflow-hidden rounded-[1.5rem] border border-[#d5dbe3] bg-[#fbfcfd] text-start shadow-[0_10px_28px_rgba(80,90,105,0.05)]";
 
-export function BoardFileCard({
-  title,
-  url,
-  body,
-}: {
-  title: string;
-  url: string;
-  body?: string;
-}) {
-  const written = body?.trim() ?? "";
-  const [text, setText] = useState(written);
-  const [image, setImage] = useState("");
+function isImageUrl(url: string) {
+  return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url);
+}
+
+export function BoardFileCard({ title, url }: { title: string; url: string }) {
+  const [pages, setPages] = useState<string[]>(() => (isImageUrl(url) ? [url] : []));
+  const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (written.length >= 20) {
-      setText(written);
-      setImage("");
+    if (isImageUrl(url)) {
+      setPages([url]);
+      setFailed(false);
       return;
     }
     let live = true;
-    readPdf(url)
-      .then((result) => {
+    setPages([]);
+    setFailed(false);
+    pdfPageImages(url)
+      .then((images) => {
         if (!live) return;
-        const next = written || result.text;
-        setText(next);
-        setImage(next.trim().length >= 20 ? "" : result.image);
+        setPages(images);
+        setFailed(images.length === 0);
       })
       .catch(() => {
-        if (live) setText(written);
+        if (live) setFailed(true);
       });
     return () => {
       live = false;
     };
-  }, [url, written]);
+  }, [url]);
+
+  const preview = pages[0];
 
   return (
-    <article className={cn(CARD, "px-5 py-4")}>
-      <h3 className="text-[16px]">{title}</h3>
-      {text ? (
-        <p className="mt-1.5 whitespace-pre-wrap text-[14px] font-light leading-7 text-[#3f4650]">{text}</p>
-      ) : null}
-      {image ? <img src={image} alt="" className="mt-3 w-full rounded-xl bg-white" /> : null}
-    </article>
+    <>
+      <button type="button" className={CARD} onClick={() => preview && setOpen(true)} disabled={!preview}>
+        {preview ? (
+          <img src={preview} alt={title} className="w-full bg-white" />
+        ) : (
+          <div className="grid h-64 w-full place-items-center bg-[#f4f6f8] text-[13px] font-light text-muted-foreground">
+            {failed ? "לא הצלחנו להציג את הדף" : "טוען את הדף…"}
+          </div>
+        )}
+        <span className="flex items-center justify-between gap-3 px-4 py-3">
+          <span className="truncate text-[16px]">{title}</span>
+          {preview ? <span className="shrink-0 text-[12px] text-primary">צפייה</span> : null}
+        </span>
+      </button>
+      {open && preview ? <BoardViewer title={title} pages={pages} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }

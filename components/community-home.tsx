@@ -136,16 +136,29 @@ export function CommunityHome() {
       {notices.length ? (
         <section>
           <h2 className="mb-3 text-[1.15rem] font-medium">מודעות</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {notices.map((notice) => (
-              <article key={notice.id} className={cn(CARD, "px-5 py-4")}>
-                <h3 className="text-[16px]">{notice.title}</h3>
-                {notice.body ? (
-                  <p className="mt-1.5 text-[14px] font-light leading-7 text-[#3f4650]">{notice.body}</p>
-                ) : null}
-              </article>
-            ))}
-          </div>
+          {notices.some((notice) => notice.image) ? (
+            <div className="mb-3 grid gap-3 md:grid-cols-2">
+              {notices
+                .filter((notice) => notice.image)
+                .map((notice) => (
+                  <BoardFileCard key={notice.id} title={notice.title || "מודעה"} url={notice.image!} />
+                ))}
+            </div>
+          ) : null}
+          {notices.some((notice) => !notice.image && (notice.title || notice.body)) ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {notices
+                .filter((notice) => !notice.image && (notice.title || notice.body))
+                .map((notice) => (
+                  <article key={notice.id} className={cn(CARD, "px-5 py-4")}>
+                    <h3 className="text-[16px]">{notice.title}</h3>
+                    {notice.body ? (
+                      <p className="mt-1.5 text-[14px] font-light leading-7 text-[#3f4650]">{notice.body}</p>
+                    ) : null}
+                  </article>
+                ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -154,7 +167,7 @@ export function CommunityHome() {
           <h2 className="mb-3 text-[1.15rem] font-medium">דפי לימוד</h2>
           <div className="grid gap-3 md:grid-cols-2">
             {board.files.map((file) => (
-              <BoardFileCard key={file.id} title={file.title} url={file.url} body={file.body} />
+              <BoardFileCard key={file.id} title={file.title} url={file.url} />
             ))}
           </div>
         </section>
