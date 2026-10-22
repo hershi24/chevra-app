@@ -6,17 +6,12 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { BoardFileCard } from "@/components/board-file-card";
 import { UserAvatar } from "@/components/user-avatar";
-import { resolveBoard } from "@/lib/community-board";
+import { resolveBoard, visibleHomePhotos } from "@/lib/community-board";
 import { formatHebrewDate, formatTimeHe, gatheringLabel, memberById } from "@/lib/format";
 import { upcomingGathering } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 const CARD = "rounded-[1.5rem] border border-[#d5dbe3] bg-[#fbfcfd] shadow-[0_10px_28px_rgba(80,90,105,0.05)]";
-
-const FALLBACK_PHOTOS = [
-  { src: "/board/library.jpg", caption: "ארון ספרים" },
-  { src: "/board/shelves.jpg", caption: "ספרייה" },
-];
 
 export function CommunityHome() {
   const { state, me, act } = useApp();
@@ -36,17 +31,7 @@ export function CommunityHome() {
     .slice(0, 3);
   const leader = state.members.find((member) => member.role === "leader");
   const notices = board.notices;
-  const selected = board.photoIds
-    .map((id) => {
-      for (const event of state.gatherings) {
-        const media = event.media.find((item) => item.id === id && item.type === "image");
-        if (media) return { src: media.url, caption: media.caption?.trim() || gatheringLabel(event) };
-      }
-      const loose = (state.gallery ?? []).find((item) => item.id === id && item.type === "image");
-      return loose ? { src: loose.url, caption: loose.caption?.trim() || "מהחבורה" } : null;
-    })
-    .filter((item): item is { src: string; caption: string } => Boolean(item));
-  const photos = selected.length ? selected : FALLBACK_PHOTOS;
+  const photos = visibleHomePhotos(board, state);
   const host = next ? memberById(state.members, next.hostId) : null;
   const mine = pick ?? board.poll.options.find((option) => option.voterIds.includes(me.id))?.id ?? null;
 
@@ -208,7 +193,7 @@ export function CommunityHome() {
             </section>
           ) : null}
 
-          <div className={cn("grid gap-8 md:gap-10", board.files.length && "xl:grid-cols-2 xl:gap-8")}>
+          <div className={cn("grid gap-8 md:gap-10", board.files.length && photos.length && "xl:grid-cols-2 xl:gap-8")}>
             {board.files.length ? (
               <section className="min-w-0">
                 <h2 className="mb-3 text-[1.1rem] font-medium">דפי לימוד</h2>
@@ -220,17 +205,19 @@ export function CommunityHome() {
               </section>
             ) : null}
 
-            <section className="min-w-0">
-              <h2 className="mb-3 text-[1.1rem] font-medium">תמונות מהחבורה</h2>
-              <div className={cn("grid grid-cols-2 gap-3 md:grid-cols-3", board.files.length ? "xl:grid-cols-2" : "xl:grid-cols-4")}>
-                {photos.map((photo) => (
-                  <figure key={photo.src} className={cn(CARD, "overflow-hidden")}>
-                    <img src={photo.src} alt={photo.caption} className="aspect-[4/3] w-full object-cover" />
-                    <figcaption className="px-3 py-2 text-[13px] font-light text-[#3f4650]">{photo.caption}</figcaption>
-                  </figure>
-                ))}
-              </div>
-            </section>
+            {photos.length ? (
+              <section className="min-w-0">
+                <h2 className="mb-3 text-[1.1rem] font-medium">תמונות מהחבורה</h2>
+                <div className={cn("grid grid-cols-2 gap-3 md:grid-cols-3", board.files.length ? "xl:grid-cols-2" : "xl:grid-cols-4")}>
+                  {photos.map((photo) => (
+                    <figure key={photo.id} className={cn(CARD, "overflow-hidden")}>
+                      <img src={photo.url} alt={photo.caption} className="aspect-[4/3] w-full object-cover" />
+                      <figcaption className="px-3 py-2 text-[13px] font-light text-[#3f4650]">{photo.caption}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
 

@@ -177,6 +177,12 @@ export type BoardPoll = {
   closed: boolean;
 };
 
+export type BoardPhoto = {
+  id: string;
+  url: string;
+  caption: string;
+};
+
 export type CommunityBoard = {
   enabled: boolean;
   notices: BoardNotice[];
@@ -184,6 +190,7 @@ export type CommunityBoard = {
   files: BoardFile[];
   poll: BoardPoll;
   photoIds: string[];
+  photos?: BoardPhoto[];
 };
 
 export type AppSettings = {
