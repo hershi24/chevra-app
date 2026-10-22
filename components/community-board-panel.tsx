@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { pickedBoardPhotos, resolveBoard, visibleHomePhotos } from "@/lib/community-board";
-import { readPdf } from "@/lib/pdf-preview";
 import { uploadWithProgress } from "@/lib/upload-client";
 import type { CommunityBoard } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -21,8 +20,10 @@ export function CommunityBoardPanel() {
   const [draft, setDraft] = useState<CommunityBoard | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
+  const [noticeBusy, setNoticeBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const noticeRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   if (!state) return null;
   const app = state;
@@ -61,18 +62,12 @@ export function CommunityBoardPanel() {
     }
     setUploading(true);
     try {
-      let body = "";
-      try {
-        body = (await readPdf(await file.arrayBuffer())).text;
-      } catch {
-        body = "";
-      }
       const uploaded = await uploadWithProgress(file, {}, () => undefined);
       const title = file.name.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() || "דף לימוד";
       await save(
         {
           ...board,
-          files: [...board.files, { id: crypto.randomUUID(), title, url: uploaded.url, ...(body ? { body } : {}) }].slice(0, 8),
+          files: [...board.files, { id: crypto.randomUUID(), title, url: uploaded.url }].slice(0, 8),
         },
         "הדף נוסף"
       );
@@ -80,6 +75,41 @@ export function CommunityBoardPanel() {
       toast.error(error instanceof Error ? error.message : "ההעלאה נכשלה");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function uploadNoticeImage(list: FileList | null) {
+    const file = list?.[0];
+    if (noticeRef.current) noticeRef.current.value = "";
+    if (!file) return;
+    const image = /^image\/(jpeg|png|webp|gif)$/.test(file.type) || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+    if (!image) {
+      toast.error("אפשר להעלות רק תמונה");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("הקובץ גדול מדי");
+      return;
+    }
+    if (board.notices.length >= 8) {
+      toast.error("אפשר עד 8 מודעות");
+      return;
+    }
+    setNoticeBusy(true);
+    try {
+      const uploaded = await uploadWithProgress(file, {}, () => undefined);
+      const title = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "מודעה";
+      await save(
+        {
+          ...board,
+          notices: [...board.notices, { id: crypto.randomUUID(), title, body: "", image: uploaded.url }].slice(0, 8),
+        },
+        "המודעה נוספה"
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ההעלאה נכשלה");
+    } finally {
+      setNoticeBusy(false);
     }
   }
 
@@ -163,33 +193,51 @@ export function CommunityBoardPanel() {
                   type="button"
                   className="text-[#9aa1ab]"
                   aria-label="הסרת מודעה"
-                  onClick={() => patch({ ...board, notices: board.notices.filter((_, at) => at !== index) })}
+                  disabled={saving || noticeBusy}
+                  onClick={() => {
+                    const notices = board.notices.filter((item) => item.id !== notice.id);
+                    if (notice.image) void save({ ...board, notices }, "המודעה נמחקה");
+                    else patch({ ...board, notices });
+                  }}
                 >
                   <X className="size-4" />
                 </button>
               </div>
-              <Textarea
-                value={notice.body}
-                rows={2}
-                onChange={(event) => {
-                  const notices = board.notices.map((item, at) =>
-                    at === index ? { ...item, body: event.target.value } : item
-                  );
-                  patch({ ...board, notices });
-                }}
-                placeholder="תוכן"
-              />
+              {notice.image ? (
+                <img src={notice.image} alt="" className="h-28 w-24 rounded-xl object-cover" />
+              ) : (
+                <Textarea
+                  value={notice.body}
+                  rows={2}
+                  onChange={(event) => {
+                    const notices = board.notices.map((item, at) =>
+                      at === index ? { ...item, body: event.target.value } : item
+                    );
+                    patch({ ...board, notices });
+                  }}
+                  placeholder="תוכן"
+                />
+              )}
             </div>
           ))}
-          <Add
-            label="מודעה"
-            onClick={() =>
-              patch({
-                ...board,
-                notices: [...board.notices, { id: crypto.randomUUID(), title: "", body: "" }],
-              })
-            }
+          <input
+            ref={noticeRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+            className="hidden"
+            onChange={(event) => void uploadNoticeImage(event.target.files)}
           />
+          {board.notices.length < 8 ? (
+            <button
+              type="button"
+              disabled={noticeBusy || uploading || photoBusy || saving}
+              onClick={() => noticeRef.current?.click()}
+              className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
+            >
+              <Plus className="size-3.5" />
+              {noticeBusy ? "מעלה…" : "העלאת תמונת מודעה"}
+            </button>
+          ) : null}
         </Field>
 
         <Field label="זמני תפילה">
@@ -239,6 +287,9 @@ export function CommunityBoardPanel() {
         </Field>
 
         <Field label="דפי לימוד">
+          <p className="text-[12.5px] font-light text-muted-foreground">
+            הדף מופיע בדף הבית כתמונה, והחברים פותחים אותו לצפייה.
+          </p>
           {board.files.map((file, index) => (
             <div key={file.id} className="grid gap-2 rounded-2xl border border-[#e9ecef] p-3">
               <div className="flex items-center gap-2">
@@ -262,9 +313,6 @@ export function CommunityBoardPanel() {
                   <X className="size-4" />
                 </button>
               </div>
-              {file.body ? (
-                <p className="line-clamp-3 text-[13px] font-light leading-6 text-[#3f4650]">{file.body}</p>
-              ) : null}
             </div>
           ))}
           <input
@@ -277,7 +325,7 @@ export function CommunityBoardPanel() {
           {board.files.length < 8 ? (
             <button
               type="button"
-              disabled={uploading || photoBusy || saving}
+              disabled={uploading || noticeBusy || photoBusy || saving}
               onClick={() => fileRef.current?.click()}
               className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
             >
@@ -368,7 +416,7 @@ export function CommunityBoardPanel() {
           {photos.length < 24 ? (
             <button
               type="button"
-              disabled={photoBusy || uploading || saving}
+              disabled={photoBusy || uploading || noticeBusy || saving}
               onClick={() => photoRef.current?.click()}
               className="inline-flex w-fit items-center gap-1 text-[13px] text-primary"
             >

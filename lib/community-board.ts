@@ -104,12 +104,16 @@ export function normalizeBoard(value: unknown, members: { id: string }[] = []): 
     enabled: raw.enabled === true,
     notices: notices
       .slice(0, 8)
-      .map((item, index) => ({
-        id: cleanId(item?.id, `n${index + 1}`),
-        title: cleanBoardText(item?.title, 80),
-        body: cleanBoardText(item?.body, 500),
-      }))
-      .filter((item) => item.title || item.body),
+      .map((item, index) => {
+        const image = cleanUrl(item?.image);
+        return {
+          id: cleanId(item?.id, `n${index + 1}`),
+          title: cleanBoardText(item?.title, 80),
+          body: cleanBoardText(item?.body, 500),
+          ...(image ? { image } : {}),
+        };
+      })
+      .filter((item) => item.title || item.body || item.image),
     prayers: prayers
       .slice(0, 8)
       .map((item, index) => ({

@@ -155,6 +155,7 @@ export type BoardNotice = {
   id: string;
   title: string;
   body: string;
+  image?: string;
 };
 
 export type BoardPrayer = {
