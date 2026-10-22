@@ -207,7 +207,7 @@ function Dashboard({
   ];
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 md:gap-8">
       <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[13px] font-light text-muted-foreground">
@@ -234,80 +234,94 @@ function Dashboard({
         </div>
       </header>
 
-      {event ? (
-        <HeroEvent event={event} members={state.members} me={me} onRsvp={onRsvp} />
-      ) : (
-        <section className={cn(CARD, "px-6 py-12")}>
-          <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
-          {canCreate ? (
-            <div className="mt-4">
-              <EventDialog trigger={<Button variant="outline" className="rounded-full">קביעת חברה</Button>} />
-            </div>
+      <div className="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="flex min-w-0 flex-col gap-6 md:gap-8">
+          {event ? (
+            <HeroEvent event={event} members={state.members} me={me} onRsvp={onRsvp} />
           ) : (
-            <p className="mt-2 text-sm font-light text-muted-foreground">
-              כשמנהל המערכת יקבע חברה — היא תופיע כאן.
-            </p>
+            <section className={cn(CARD, "px-6 py-12")}>
+              <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
+              {canCreate ? (
+                <div className="mt-4">
+                  <EventDialog trigger={<Button variant="outline" className="rounded-full">קביעת חברה</Button>} />
+                </div>
+              ) : (
+                <p className="mt-2 text-sm font-light text-muted-foreground">
+                  כשמנהל המערכת יקבע חברה — היא תופיע כאן.
+                </p>
+              )}
+            </section>
           )}
-        </section>
-      )}
 
-      <nav
-        className={cn(
-          "grid grid-cols-2 gap-px overflow-hidden rounded-[1.25rem] border border-[#dfe3e9] bg-[#e7eaee]",
-          quick.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
-        )}
-      >
-        {quick.map((item, index) => (
-          <QuickLink
-            key={item.href}
-            {...item}
-            className={cn(quick.length % 2 === 1 && index === quick.length - 1 && "col-span-2 md:col-span-1")}
-          />
-        ))}
-      </nav>
+          <nav
+            className={cn(
+              "grid grid-cols-2 gap-px overflow-hidden rounded-[1.25rem] border border-[#dfe3e9] bg-[#e7eaee] lg:hidden",
+              quick.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
+            )}
+          >
+            {quick.map((item, index) => (
+              <QuickLink
+                key={item.href}
+                {...item}
+                className={cn(quick.length % 2 === 1 && index === quick.length - 1 && "col-span-2 md:col-span-1")}
+              />
+            ))}
+          </nav>
 
-      <section
-        className={cn(
-          "grid grid-cols-1 gap-6 md:gap-8",
-          lastWithPhotos && "lg:grid-cols-[1.2fr_1fr]"
-        )}
-      >
-        <div className="min-w-0">
-          <SectionHead title="מה חדש בצ׳אט" href="/chat" link="לצ׳אט" />
-          {latestMessages.length ? (
-            <ul className="divide-y divide-[#e7eaee]">
-              {latestMessages.slice(0, 3).map((msg) => {
-                const author = memberById(state.members, msg.authorId);
-                return (
-                  <li key={msg.id}>
-                    <Link href="/chat" className="flex items-center gap-3 py-3">
-                      <UserAvatar member={author} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2 text-[13px]">
-                          <span className="truncate font-normal">{author?.displayName}</span>
-                          <span className="shrink-0 text-[11px] font-light text-muted-foreground">
-                            {channelLabel(msg.channelId)}
-                          </span>
-                          <span className="ms-auto shrink-0 text-[11px] font-light text-muted-foreground">
-                            {formatRelativeHe(msg.createdAt)}
-                          </span>
+          <div className="min-w-0 lg:rounded-[1.5rem] lg:border lg:border-[#d5dbe3] lg:bg-[#fbfcfd] lg:px-6 lg:py-5 lg:shadow-[0_10px_28px_rgba(80,90,105,0.05)]">
+            <SectionHead title="מה חדש בצ׳אט" href="/chat" link="לצ׳אט" />
+            {latestMessages.length ? (
+              <ul className="divide-y divide-[#e7eaee]">
+                {latestMessages.slice(0, 3).map((msg) => {
+                  const author = memberById(state.members, msg.authorId);
+                  return (
+                    <li key={msg.id}>
+                      <Link href="/chat" className="flex items-center gap-3 py-3">
+                        <UserAvatar member={author} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2 text-[13px]">
+                            <span className="truncate font-normal">{author?.displayName}</span>
+                            <span className="shrink-0 text-[11px] font-light text-muted-foreground">
+                              {channelLabel(msg.channelId)}
+                            </span>
+                            <span className="ms-auto shrink-0 text-[11px] font-light text-muted-foreground">
+                              {formatRelativeHe(msg.createdAt)}
+                            </span>
+                          </div>
+                          <p className="font-chat truncate text-[13px] font-normal text-foreground/65">
+                            {messagePreview(msg)}
+                          </p>
                         </div>
-                        <p className="font-chat truncate text-[13px] font-normal text-foreground/65">
-                          {messagePreview(msg)}
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="py-3 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
-          )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="py-3 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
+            )}
+          </div>
+
+          {lastWithPhotos ? (
+            <div className="lg:hidden">
+              <LastGathering event={lastWithPhotos} />
+            </div>
+          ) : null}
         </div>
 
-        {lastWithPhotos ? <LastGathering event={lastWithPhotos} /> : null}
-      </section>
+        <aside className="hidden min-w-0 flex-col gap-6 lg:sticky lg:top-24 lg:flex">
+          <nav className={cn(CARD, "flex flex-col divide-y divide-[#e7eaee] overflow-hidden")}>
+            {quick.map((item) => (
+              <QuickLink key={item.href} {...item} className="px-5 py-4" />
+            ))}
+          </nav>
+          {lastWithPhotos ? (
+            <div className={cn(CARD, "px-5 py-5")}>
+              <LastGathering event={lastWithPhotos} />
+            </div>
+          ) : null}
+        </aside>
+      </div>
     </div>
   );
 }

@@ -45,14 +45,18 @@ export function BoardFileCard({ title, url }: { title: string; url: string }) {
     <>
       <button type="button" className={CARD} onClick={() => preview && setOpen(true)} disabled={!preview}>
         {preview ? (
-          <img src={preview} alt={title} className="w-full bg-white" />
+          <img
+            src={preview}
+            alt={title}
+            className="aspect-[3/4] w-full border-b border-[#e9ecef] bg-white object-cover object-top"
+          />
         ) : (
-          <div className="grid h-64 w-full place-items-center bg-[#f4f6f8] text-[13px] font-light text-muted-foreground">
+          <div className="grid aspect-[3/4] w-full place-items-center bg-[#f4f6f8] text-[13px] font-light text-muted-foreground">
             {failed ? "לא הצלחנו להציג את הדף" : "טוען את הדף…"}
           </div>
         )}
         <span className="flex items-center justify-between gap-3 px-4 py-3">
-          <span className="truncate text-[16px]">{title}</span>
+          <span className="truncate text-[14.5px]">{title}</span>
           {preview ? <span className="shrink-0 text-[12px] text-primary">צפייה</span> : null}
         </span>
       </button>
