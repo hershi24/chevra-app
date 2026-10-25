@@ -4,6 +4,7 @@ import { getQuickSession, getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { notifyChatEmail } from "@/lib/chat-email";
 import { normalizeChatEmailPrefs } from "@/lib/chat-email-prefs";
+import { cleanEmail } from "@/lib/email";
 import { deliverExpenseMail, expenseNoticeHtml } from "@/lib/expense-email";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
@@ -506,7 +507,7 @@ function applyAction(
         displayName: body.displayName.trim(),
         role: body.role ?? "member",
         phone: body.phone?.trim() || "",
-        email: body.email?.trim() || `${body.username.trim()}@chevra.local`,
+        email: cleanEmail(body.email) || `${body.username.trim()}@chevra.local`,
         avatarColor: ["#0F766E", "#B45309", "#1D4ED8", "#7C3AED"][s.members.length % 4],
         initials: initialsFrom(body.displayName),
         passwordHash: hashPassword(DEFAULT_PASSWORD),
@@ -539,7 +540,7 @@ function applyAction(
         member.initials = initialsFrom(displayName);
       }
       if (body.patch.phone !== undefined) member.phone = body.patch.phone.trim();
-      if (body.patch.email !== undefined) member.email = body.patch.email.trim();
+      if (body.patch.email !== undefined) member.email = cleanEmail(body.patch.email);
       if (body.patch.role !== undefined) {
         applyRole(s, me, member, body.patch.role);
       }
