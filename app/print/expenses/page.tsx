@@ -69,7 +69,7 @@ export default async function PrintExpensesPage({
           {report.totals.memberCount} חברים.{" "}
           {report.totals.sharesEqual
             ? "הסכום מתחלק שווה בשווה; מה שכל אחד קנה ומה שהעביר יורד מהחלק שלו."
-            : "יש החרגות, אז החלק לא שווה לכולם. מה שכל אחד קנה ומה שהעביר יורד מהחלק שלו."}
+            : "יש החרגות: מי שמוחרג לא משלם את החלק שלו, והשאר לא מכסים אותו."}
         </p>
 
         <h2 className="mt-5 mb-1.5 text-[14px] font-medium">סיכום לפי חבר</h2>

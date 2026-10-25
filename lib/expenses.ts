@@ -249,6 +249,8 @@ export type SettlementRow = {
   shareAgorot: number;
   paidAgorot: number;
   receivedAgorot: number;
+  /** Part of what this member bought that exempt people do not pay back. */
+  absorbedAgorot: number;
   balanceAgorot: number;
   owesAgorot: number;
 };
@@ -263,6 +265,8 @@ export type Settlement = {
   /** False once a member is left out of an item or a gathering, so there is no single "לכל אחד". */
   sharesEqual: boolean;
   paymentsAgorot: number;
+  /** Shares that were taken off the bill. The buyer keeps that part; the others do not cover it. */
+  waivedAgorot: number;
   rows: SettlementRow[];
 };
 
@@ -286,6 +290,16 @@ export function expensePayers(expense: Expense, memberIds: string[], waivers: Ga
 
 export type Transfer = { fromId: string; toId: string; amountAgorot: number };
 
+function evenSplit(total: number, ids: string[]) {
+  const count = ids.length;
+  const base = count ? Math.floor(total / count) : 0;
+  const extra = count ? total % count : 0;
+  const order = [...ids].sort();
+  const parts = new Map<string, number>();
+  for (const id of ids) parts.set(id, base + (order.indexOf(id) < extra ? 1 : 0));
+  return parts;
+}
+
 export function settlement(
   expenses: Expense[],
   memberIds: string[],
@@ -294,45 +308,38 @@ export function settlement(
 ): Settlement {
   const members = new Set(memberIds);
   const visible = expenses.filter((item) => members.has(item.memberId));
-  const includedAgorot = visible
-    .filter((item) => !item.excluded)
-    .reduce((sum, item) => sum + agorot(item.amount), 0);
+  const included = visible.filter((item) => !item.excluded);
+  const includedAgorot = included.reduce((sum, item) => sum + agorot(item.amount), 0);
   const excludedAgorot = visible
     .filter((item) => item.excluded)
     .reduce((sum, item) => sum + agorot(item.amount), 0);
   const memberCount = memberIds.length;
-  const groups = new Map<string, { payers: string[]; total: number }>();
   const spent = new Map<string, number>();
-  for (const item of visible) {
-    if (item.excluded) continue;
-    spent.set(item.memberId, (spent.get(item.memberId) ?? 0) + agorot(item.amount));
-    const named = expensePayers(item, memberIds, waivers);
-    const payers = named.length ? named : memberIds;
-    const key = [...payers].sort().join("\0");
-    const group = groups.get(key) ?? { payers, total: 0 };
-    group.total += agorot(item.amount);
-    groups.set(key, group);
+  const share = new Map<string, number>();
+  const absorbed = new Map<string, number>();
+  let waivedAgorot = 0;
+  let anyExempt = false;
+  for (const item of included) {
+    const value = agorot(item.amount);
+    spent.set(item.memberId, (spent.get(item.memberId) ?? 0) + value);
+    const exempt = new Set(exemptMemberIds(item, memberIds, waivers));
+    if (exempt.size) anyExempt = true;
+    let itemWaived = 0;
+    for (const [id, part] of evenSplit(value, memberIds)) {
+      if (exempt.has(id)) itemWaived += part;
+      else share.set(id, (share.get(id) ?? 0) + part);
+    }
+    waivedAgorot += itemWaived;
+    if (itemWaived) absorbed.set(item.memberId, (absorbed.get(item.memberId) ?? 0) + itemWaived);
   }
-  const sharesEqual =
-    groups.size === 0 || (groups.size === 1 && [...groups.values()][0].payers.length === memberIds.length);
+  const sharesEqual = !anyExempt;
   const shareAgorot = sharesEqual && memberCount ? Math.floor(includedAgorot / memberCount) : 0;
   const remainderAgorot = sharesEqual && memberCount ? includedAgorot % memberCount : 0;
-  const share = new Map<string, number>();
   if (sharesEqual) {
+    share.clear();
     const order = [...memberIds].sort();
     for (const memberId of memberIds) {
       share.set(memberId, shareAgorot + (order.indexOf(memberId) < remainderAgorot ? 1 : 0));
-    }
-  } else {
-    for (const group of groups.values()) {
-      const count = group.payers.length;
-      if (!count) continue;
-      const base = Math.floor(group.total / count);
-      const extra = group.total % count;
-      const order = [...group.payers].sort();
-      for (const memberId of group.payers) {
-        share.set(memberId, (share.get(memberId) ?? 0) + base + (order.indexOf(memberId) < extra ? 1 : 0));
-      }
     }
   }
   const paid = new Map<string, number>();
@@ -348,15 +355,17 @@ export function settlement(
   const rows = memberIds.map((memberId) => {
     const part = share.get(memberId) ?? 0;
     const spentAgorot = spent.get(memberId) ?? 0;
+    const absorbedAgorot = absorbed.get(memberId) ?? 0;
     const paidAgorot = paid.get(memberId) ?? 0;
     const receivedAgorot = received.get(memberId) ?? 0;
-    const balanceAgorot = spentAgorot - part + paidAgorot - receivedAgorot;
+    const balanceAgorot = spentAgorot - part - absorbedAgorot + paidAgorot - receivedAgorot;
     return {
       memberId,
       spentAgorot,
       shareAgorot: part,
       paidAgorot,
       receivedAgorot,
+      absorbedAgorot,
       balanceAgorot,
       owesAgorot: balanceAgorot < 0 ? -balanceAgorot : 0,
     };
@@ -369,6 +378,7 @@ export function settlement(
     remainderAgorot,
     sharesEqual,
     paymentsAgorot,
+    waivedAgorot,
     rows,
   };
 }

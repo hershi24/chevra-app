@@ -40,6 +40,7 @@ export function buildExpenseReport(state: AppState, scope: string) {
       excluded: shekels(report.excludedAgorot),
       share: shekels(report.shareAgorot),
       sharesEqual: report.sharesEqual,
+      waived: shekels(report.waivedAgorot),
       paid: shekels(report.paymentsAgorot),
       memberCount: report.memberCount,
       remainderAgorot: report.remainderAgorot,

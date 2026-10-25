@@ -12,7 +12,6 @@ import {
   canEditExpense,
   canEditPayment,
   expenseNoticeText,
-  expensePayers,
   expenseScopeLabel,
   isPaymentMethod,
   expensesOpen,
@@ -671,38 +670,31 @@ function applyAction(
       const ids = new Set(expense.exemptIds ?? []);
       if (body.exempt) ids.add(body.memberId);
       else ids.delete(body.memberId);
-      const next = [...ids];
-      const payers = expensePayers(
-        { ...expense, exemptIds: next },
-        s.members.map((item) => item.id),
-        s.expenseWaivers ?? []
-      );
-      if (!payers.length) throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
-      if (next.length) expense.exemptIds = next;
-      else delete expense.exemptIds;
+      writeExpenseExempt(s, expense, [...ids]);
+      return;
+    }
+    case "setExpenseExemptIds": {
+      assertExpensesOpen(s);
+      const expense = findExpense(s, body.expenseId);
+      if (!canEditExpense(me, expense)) throw new Error("forbidden");
+      writeExpenseExempt(s, expense, body.memberIds);
       return;
     }
     case "setGatheringExempt": {
       assertExpensesOpen(s);
       if (!isAdmin(me)) throw new Error("forbidden");
-      if (!s.gatherings.some((item) => item.id === body.eventId)) throw new Error("החברה לא נמצאה");
       if (!s.members.some((item) => item.id === body.memberId)) throw new Error("החבר לא נמצא");
-      const memberIds = s.members.map((item) => item.id);
-      const current = s.expenseWaivers ?? [];
-      const previous = current.find((item) => item.eventId === body.eventId)?.memberIds ?? [];
+      const previous = (s.expenseWaivers ?? []).find((item) => item.eventId === body.eventId)?.memberIds ?? [];
       const ids = new Set(previous);
       if (body.exempt) ids.add(body.memberId);
       else ids.delete(body.memberId);
-      if (ids.size >= memberIds.length) throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
-      const next = current.filter((item) => item.eventId !== body.eventId);
-      if (ids.size) next.push({ eventId: body.eventId, memberIds: [...ids] });
-      for (const expense of s.expenses ?? []) {
-        if (expense.eventId !== body.eventId || expense.excluded) continue;
-        if (!expensePayers(expense, memberIds, next).length) {
-          throw new Error("חייבים להשאיר לפחות חבר אחד בחשבון");
-        }
-      }
-      s.expenseWaivers = next;
+      writeGatheringWaiver(s, body.eventId, [...ids]);
+      return;
+    }
+    case "setGatheringExemptIds": {
+      assertExpensesOpen(s);
+      if (!isAdmin(me)) throw new Error("forbidden");
+      writeGatheringWaiver(s, body.eventId, body.memberIds);
       return;
     }
     case "deleteExpense": {
@@ -911,6 +903,32 @@ function findPayment(state: AppState, paymentId: string) {
   const payment = (state.payments ?? []).find((item) => item.id === paymentId);
   if (!payment) throw new Error("התשלום לא נמצא");
   return payment;
+}
+
+function knownMemberIds(state: AppState, ids: string[]) {
+  const known = new Set(state.members.map((item) => item.id));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!known.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function writeExpenseExempt(state: AppState, expense: Expense, memberIds: string[]) {
+  const ids = knownMemberIds(state, memberIds);
+  if (ids.length) expense.exemptIds = ids;
+  else delete expense.exemptIds;
+}
+
+function writeGatheringWaiver(state: AppState, eventId: string, memberIds: string[]) {
+  if (!state.gatherings.some((item) => item.id === eventId)) throw new Error("החברה לא נמצאה");
+  const ids = knownMemberIds(state, memberIds);
+  const next = (state.expenseWaivers ?? []).filter((item) => item.eventId !== eventId);
+  if (ids.length) next.push({ eventId, memberIds: ids });
+  state.expenseWaivers = next;
 }
 
 function findExpense(state: AppState, expenseId: string) {
