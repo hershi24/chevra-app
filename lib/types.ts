@@ -217,6 +217,27 @@ export type EmailLog = {
   deliveries?: EmailDelivery[];
 };
 
+export type NudgeSettings = {
+  enabled: boolean;
+  everyHours: number;
+  maxPerMember: number;
+  includeMaybe: boolean;
+};
+
+export type NudgeRecord = {
+  lastAt?: string;
+  invitedAt?: string;
+  nudges: number;
+  lastNudgeAt?: string;
+  lastStatus?: "sent" | "failed";
+  lastError?: string;
+};
+
+export type NudgeState = {
+  settings: NudgeSettings;
+  events: Record<string, Record<string, NudgeRecord>>;
+};
+
 export type IvrLog = {
   id: string;
   at: string;
@@ -251,6 +272,7 @@ export type AppState = {
   ivrLog: IvrLog[];
   chatReads?: Record<string, Record<string, string>>;
   chatEmailPrefs?: Record<string, ChatEmailPrefs>;
+  nudge?: NudgeState;
   revision: number;
 };
 

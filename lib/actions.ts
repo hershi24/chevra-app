@@ -1,4 +1,5 @@
 import type {
+  NudgeSettings,
   BankAccount,
   ChatEmailPrefs,
   CommunityBoard,
@@ -124,4 +125,5 @@ export type ActionBody =
   | { type: "setBankAccount"; memberId: string; account: Partial<BankAccount> | null }
   | { type: "setChatEmailPrefs"; prefs: ChatEmailPrefs }
   | { type: "setCommunityBoard"; board: CommunityBoard }
-  | { type: "voteCommunityPoll"; optionId: string };
+  | { type: "voteCommunityPoll"; optionId: string }
+  | { type: "setNudgeSettings"; settings: NudgeSettings };

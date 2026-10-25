@@ -56,8 +56,10 @@ export function invitationHtml(opts: {
   noUrl: string;
   note?: string;
   origin: string;
+  variant?: "invite" | "nudge";
 }) {
   const { member, event, hostName, kibudName, lecturerName, senderName, yesUrl, maybeUrl, noUrl, note, origin } = opts;
+  const nudge = opts.variant === "nudge";
   const when = jerusalemParts(event.startsAt);
   const title = gatheringLabel(event);
   const personal = note?.trim() ? escapeHtml(note.trim()).replaceAll("\n", "<br>") : "";
@@ -82,10 +84,22 @@ export function invitationHtml(opts: {
     )
     .join("");
 
-  const inner = `
+  const opening = nudge
+    ? `
+    ${kicker("תזכורת קטנה")}
+    ${heading(`${escapeHtml(firstName(member.displayName))}, מחכים רק להחלטה שלך`)}
+    ${paragraph(
+      confirmed
+        ? `${confirmed === 1 ? "חבר אחד כבר אישר" : `${confirmed} חברים כבר אישרו`} שהם מגיעים ${whenPhrase(event.startsAt)}. נשאר רק לדעת מה איתך. לחיצה אחת ומסיימים.`
+        : `החברה ${whenPhrase(event.startsAt)} כבר בפתח, ונשאר רק לדעת מה איתך. לחיצה אחת ומסיימים.`
+    )}`
+    : `
     ${kicker("הזמנה לחברה")}
     ${heading(`${escapeHtml(firstName(member.displayName))}, מחכים לך ${whenPhrase(event.startsAt)}`)}
-    ${paragraph("החברה הבאה כבר בפתח. נשמח לראות אותך — ספר לנו אם אתה מגיע.")}
+    ${paragraph("החברה הבאה כבר בפתח. נשמח לראות אותך — ספר לנו אם אתה מגיע.")}`;
+
+  const inner = `
+    ${opening}
 
     <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;background:#ffffff;border:1px solid ${line};border-radius:18px;${A}">
       <tr><td style="padding:18px 20px;${A}">
@@ -133,10 +147,36 @@ export function invitationHtml(opts: {
 
   return emailShell({
     origin,
-    title: "הזמנה לחברה",
-    preheader: "לחיצה על כפתור מעדכנת את ההגעה — בלי להתחבר לאתר.",
+    title: nudge ? "מחכים רק להחלטה שלך" : "הזמנה לחברה",
+    preheader: nudge
+      ? "עוד לא ענית אם אתה מגיע. כפתור אחד, בלי להתחבר לאתר."
+      : "לחיצה על כפתור מעדכנת את ההגעה — בלי להתחבר לאתר.",
     inner,
   });
+}
+
+export function nudgeSubject(member: Member) {
+  return `${firstName(member.displayName)}, מחכים רק להחלטה שלך`;
+}
+
+function resendReason(status: number, text: string) {
+  let message = "";
+  try {
+    const data = JSON.parse(text) as { message?: string; error?: string; name?: string };
+    message = data.message || data.error || data.name || "";
+  } catch {
+    message = text;
+  }
+  message = message.replace(/\s+/g, " ").trim();
+  if (/testing emails|verify a domain|domain is not verified/i.test(message)) {
+    return "הדומיין של השולח לא מאומת ב־Resend, אפשר לשלוח רק לכתובת של בעל החשבון";
+  }
+  if (/invalid.*(to|email)|not a valid email/i.test(message)) return "כתובת המייל לא תקינה";
+  if (/api key is invalid|invalid api key|unauthorized/i.test(message) || status === 401) {
+    return "מפתח Resend לא תקין";
+  }
+  if (status === 429 || /rate limit|too many/i.test(message)) return "יותר מדי שליחות ברגע אחד, נסו שוב בעוד דקה";
+  return message ? `Resend: ${message.slice(0, 160)}` : `Resend החזיר שגיאה ${status}`;
 }
 
 export async function sendEmail(opts: {
@@ -149,17 +189,22 @@ export async function sendEmail(opts: {
   if (!key) {
     return { id: `mock-${Date.now()}`, mock: true as const, ok: false as const };
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+    });
+  } catch {
+    return { ok: false as const, error: "השרת לא הצליח להתחבר ל־Resend" };
+  }
   if (!res.ok) {
     const text = await res.text();
-    return { ok: false as const, error: text.slice(0, 180) };
+    return { ok: false as const, error: resendReason(res.status, text) };
   }
   const data = (await res.json()) as { id?: string };
   return { ok: true as const, id: data.id };
