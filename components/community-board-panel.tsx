@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { LayoutDashboard, Plus, X } from "lucide-react";
+import { Calendar, FileText, Image as ImageIcon, LayoutDashboard, Megaphone, Plus, Vote, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,11 @@ import { cn } from "@/lib/utils";
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
 
-export function CommunityBoardPanel() {
+type BoardTab = "notices" | "prayers" | "files" | "poll" | "photos";
+
+export function CommunityBoardPanel({ tabbed = false }: { tabbed?: boolean }) {
   const { state, act } = useApp();
+  const [tab, setTab] = useState<BoardTab>("notices");
   const [draft, setDraft] = useState<CommunityBoard | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -29,6 +32,15 @@ export function CommunityBoardPanel() {
   const app = state;
   const board = draft ?? resolveBoard(app);
   const photos = visibleHomePhotos(board, app);
+  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(resolveBoard(app));
+  const show = (id: BoardTab) => !tabbed || tab === id;
+  const tabs: { id: BoardTab; label: string; icon: typeof Plus; count?: number }[] = [
+    { id: "notices", label: "מודעות", icon: Megaphone, count: board.notices.length },
+    { id: "prayers", label: "זמני תפילה", icon: Calendar, count: board.prayers.length },
+    { id: "files", label: "דפי לימוד", icon: FileText, count: board.files.length },
+    { id: "poll", label: "סקר", icon: Vote },
+    { id: "photos", label: "תמונות", icon: ImageIcon, count: photos.length },
+  ];
 
   function patch(next: CommunityBoard) {
     setDraft(next);
@@ -155,15 +167,19 @@ export function CommunityBoardPanel() {
   }
 
   return (
-    <div className={cn(PANEL, "mb-4")}>
+    <div className={cn(PANEL, tabbed ? "overflow-clip" : "mb-4")}>
       <div className="flex items-center gap-3.5 px-4 py-4 md:px-5">
         <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
           <LayoutDashboard className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px]">לוח הבית</div>
+          <div className="text-[15px]">{tabbed ? "הצגת הלוח בדף הבית" : "לוח הבית"}</div>
           <div className="text-[12.5px] font-light text-muted-foreground">
-            מודעות, זמנים, דפי לימוד, תמונות וסקר בדף הבית
+            {tabbed
+              ? board.enabled
+                ? "הלוח מוצג עכשיו לכל החברים"
+                : "כבוי, דף הבית מוצג כרגיל"
+              : "מודעות, זמנים, דפי לימוד, תמונות וסקר בדף הבית"}
           </div>
         </div>
         <Switch
@@ -174,7 +190,38 @@ export function CommunityBoardPanel() {
         />
       </div>
 
-      <div className="grid gap-5 border-t border-[#e9ecef] px-4 py-4 md:px-5">
+      {tabbed ? (
+        <div className="border-t border-[#e9ecef] px-3 pt-3 md:px-4">
+          <div
+            role="tablist"
+            aria-label="חלקי הלוח"
+            className="flex gap-1 overflow-x-auto rounded-full bg-[#eef0f3] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {tabs.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                onClick={() => setTab(item.id)}
+                className={cn(
+                  "flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[13.5px] transition-colors",
+                  tab === item.id
+                    ? "bg-white text-foreground shadow-[0_1px_3px_rgba(16,24,40,0.12)]"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <item.icon className="hidden size-4 sm:block" />
+                {item.label}
+                {item.count ? <span className="text-[#9aa1ab] tabular-nums">{item.count}</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className={cn("grid gap-5 px-4 py-4 md:px-5", !tabbed && "border-t border-[#e9ecef]")}>
+        {show("notices") ? (
         <Field label="מודעות">
           {board.notices.map((notice, index) => (
             <div key={notice.id} className="grid gap-2 rounded-2xl border border-[#e9ecef] p-3">
@@ -239,7 +286,9 @@ export function CommunityBoardPanel() {
             </button>
           ) : null}
         </Field>
+        ) : null}
 
+        {show("prayers") ? (
         <Field label="זמני תפילה">
           {board.prayers.map((prayer, index) => (
             <div key={prayer.id} className="flex items-center gap-2">
@@ -285,7 +334,9 @@ export function CommunityBoardPanel() {
             }
           />
         </Field>
+        ) : null}
 
+        {show("files") ? (
         <Field label="דפי לימוד">
           <p className="text-[12.5px] font-light text-muted-foreground">
             הדף מופיע בדף הבית כתמונה, והחברים פותחים אותו לצפייה.
@@ -334,7 +385,9 @@ export function CommunityBoardPanel() {
             </button>
           ) : null}
         </Field>
+        ) : null}
 
+        {show("poll") ? (
         <Field label="סקר">
           <Input
             value={board.poll.question}
@@ -381,7 +434,9 @@ export function CommunityBoardPanel() {
             }
           />
         </Field>
+        ) : null}
 
+        {show("photos") ? (
         <Field label="תמונות בלוח">
           <p className="text-[12.5px] font-light text-muted-foreground">
             התמונות שמופיעות בדף הבית. אפשר להעלות ולמחוק.
@@ -425,16 +480,32 @@ export function CommunityBoardPanel() {
             </button>
           ) : null}
         </Field>
+        ) : null}
 
-        <Button
-          type="button"
-          disabled={saving}
-          className="h-10 w-fit rounded-full px-5"
-          onClick={() => void save(board, "הלוח נשמר")}
-        >
-          שמירת הלוח
-        </Button>
+        {tabbed ? null : (
+          <Button
+            type="button"
+            disabled={saving}
+            className="h-10 w-fit rounded-full px-5"
+            onClick={() => void save(board, "הלוח נשמר")}
+          >
+            שמירת הלוח
+          </Button>
+        )}
       </div>
+      {tabbed && dirty ? (
+        <div className="sticky bottom-20 z-10 mx-3 mb-3 flex items-center justify-between gap-3 rounded-full border border-[#e2d3b5] bg-[#fbf6ec] py-2 pe-2 ps-5 text-sm md:bottom-4 md:mx-4">
+          יש שינויים שעוד לא נשמרו
+          <div className="flex gap-1.5">
+            <Button type="button" variant="ghost" className="rounded-full" disabled={saving} onClick={() => setDraft(null)}>
+              ביטול
+            </Button>
+            <Button type="button" className="rounded-full px-5" disabled={saving} onClick={() => void save(board, "הלוח נשמר")}>
+              {saving ? "שומר…" : "שמירת הלוח"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

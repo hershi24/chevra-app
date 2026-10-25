@@ -15,17 +15,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "רק מנהל מערכת יכול לשלוח הזמנות" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { eventId?: string; note?: string; memberId?: string };
+  const body = (await request.json()) as {
+    eventId?: string;
+    note?: string;
+    memberId?: string;
+    memberIds?: string[];
+    variant?: "invite" | "nudge";
+  };
+  const variant = body.variant === "nudge" ? "nudge" : "invite";
   const note = body.note?.trim().slice(0, 1000) ?? "";
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
   if (!event) {
     return NextResponse.json({ error: "החברה לא נמצאה" }, { status: 404 });
   }
-  const members = body.memberId
-    ? state.members.filter((member) => member.id === body.memberId)
-    : state.members;
-  if (body.memberId && !members.length) {
+  const picked = body.memberId ? [body.memberId] : Array.isArray(body.memberIds) ? body.memberIds : null;
+  const members = picked ? state.members.filter((member) => picked.includes(member.id)) : state.members;
+  if (picked && !members.length) {
     return NextResponse.json({ error: "החבר לא נמצא" }, { status: 404 });
   }
 
@@ -37,7 +43,7 @@ export async function POST(request: Request) {
       origin,
       note,
       senderName: me.displayName,
-      variant: "invite",
+      variant,
     });
     rows.push({ memberId: member.id, delivery });
   }
@@ -47,7 +53,7 @@ export async function POST(request: Request) {
   const failedCount = deliveries.filter((row) => row.status === "failed").length;
   try {
     await updateState((s) => {
-      recordDeliveries(s, event.id, rows, "invite");
+      recordDeliveries(s, event.id, rows, variant);
       s.emailLog.unshift({
         id: crypto.randomUUID(),
         eventId: event.id,

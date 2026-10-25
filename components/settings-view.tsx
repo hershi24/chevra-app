@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
+import { ArrowRight, Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { AdminHub, type HubScreen } from "@/components/admin-hub";
 import { CommunityBoardPanel } from "@/components/community-board-panel";
 import { boardEnabled } from "@/lib/community-board";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
@@ -33,7 +35,95 @@ const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon 
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
 
+const PageMode = createContext(false);
+
+const SCREENS: HubScreen[] = ["account", "members", "invites", "board", "system"];
+
 export function SettingsView() {
+  const { me } = useApp();
+  if (me && isAdmin(me)) return <AdminSettings />;
+  return <MemberSettings />;
+}
+
+function AdminSettings() {
+  const { state, me, logout, onlineIds } = useApp();
+  const router = useRouter();
+  const params = useSearchParams();
+  const raw = params.get("s");
+  const screen = SCREENS.includes(raw as HubScreen) ? (raw as HubScreen) : null;
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!screen && (hash === "#password" || hash === "#settings-notify")) {
+      router.replace(`/settings?s=account${hash}`);
+      return;
+    }
+    if (hash) {
+      const target = document.getElementById(hash.slice(1));
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+    }
+    window.scrollTo({ top: 0 });
+  }, [screen, router]);
+
+  if (!state || !me) return null;
+  const open = (next: HubScreen) => router.push(`/settings?s=${next}`);
+  if (!screen) return <AdminHub onOpen={open} />;
+
+  return (
+    <PageMode.Provider value>
+      <div className="grid gap-5">
+        <button
+          type="button"
+          onClick={() => router.push("/settings")}
+          className="inline-flex items-center gap-1.5 justify-self-start text-[13px] text-[#a9782c] hover:underline"
+        >
+          <ArrowRight className="size-4" />
+          חזרה לניהול החבורה
+        </button>
+        {screen === "account" ? (
+          <div className="grid gap-10">
+            <Section id="account" title="החשבון שלי" subtitle="איך החברים רואים אותך, והסיסמה לכניסה.">
+              <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
+            </Section>
+            {boardEnabled(state) ? null : (
+              <Section
+                id="notify"
+                title="התראות במייל"
+                subtitle="אילו הודעות בצ׳אט יגיעו אליך גם למייל, עם כפתור השבה ישיר."
+                small
+              >
+                <ChatEmailPanel />
+              </Section>
+            )}
+          </div>
+        ) : screen === "members" ? (
+          <Section
+            id="members"
+            title="חברי החבורה"
+            subtitle={`${state.members.length} חברים · ${onlineCountLabel(onlineIds.length)}`}
+          >
+            <MemberAdmin />
+          </Section>
+        ) : screen === "invites" ? (
+          <InvitesSection />
+        ) : screen === "board" ? (
+          <Section id="system" title="לוח הבית" subtitle="מה החברים רואים בדף הבית: מודעות, זמנים, דפי לימוד, סקר ותמונות.">
+            <CommunityBoardPanel tabbed />
+          </Section>
+        ) : (
+          <Section id="system" title="מערכת" subtitle="מתגים כלליים באתר ופרטים טכניים.">
+            <SystemPanel />
+          </Section>
+        )}
+      </div>
+    </PageMode.Provider>
+  );
+}
+
+function MemberSettings() {
   const { state, me, logout, onlineIds } = useApp();
   const [active, setActive] = useState<SectionId>("account");
   const pinnedUntil = useRef(0);
@@ -190,19 +280,26 @@ function Section({
   title,
   subtitle,
   action,
+  small,
   children,
 }: {
   id: SectionId;
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  small?: boolean;
   children: ReactNode;
 }) {
+  const page = useContext(PageMode) && !small;
   return (
     <section id={`settings-${id}`} className="scroll-mt-16 md:scroll-mt-24">
-      <div className="mb-3.5 flex items-end justify-between gap-3">
+      <div className={cn("flex items-end justify-between gap-3", page ? "mb-5" : "mb-3.5")}>
         <div>
-          <h2 className="text-[1.2rem] font-normal">{title}</h2>
+          {page ? (
+            <h1 className="text-[1.65rem] font-medium tracking-tight md:text-[2rem]">{title}</h1>
+          ) : (
+            <h2 className="text-[1.2rem] font-normal">{title}</h2>
+          )}
           {subtitle ? <p className="mt-0.5 text-[13px] font-light text-muted-foreground">{subtitle}</p> : null}
         </div>
         {action}
