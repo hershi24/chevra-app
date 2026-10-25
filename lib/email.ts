@@ -179,6 +179,35 @@ function resendReason(status: number, text: string) {
   return message ? `Resend: ${message.slice(0, 160)}` : `Resend החזיר שגיאה ${status}`;
 }
 
+const INVISIBLE = /[\s\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
+
+/** Addresses pasted next to Hebrew text often carry direction marks that Resend rejects. */
+export function cleanEmail(raw: string | undefined | null) {
+  return (raw ?? "").replace(INVISIBLE, "").toLowerCase();
+}
+
+// Resend allows a couple of requests per second per account; back-to-back sends get 429.
+const MIN_GAP_MS = 600;
+const MAX_TRIES = 4;
+const queue = globalThis as unknown as { __chevraResendChain?: Promise<unknown>; __chevraResendLast?: number };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function inLine<T>(task: () => Promise<T>): Promise<T> {
+  const run = (queue.__chevraResendChain ?? Promise.resolve()).then(async () => {
+    const wait = (queue.__chevraResendLast ?? 0) + MIN_GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    try {
+      return await task();
+    } finally {
+      queue.__chevraResendLast = Date.now();
+    }
+  });
+  queue.__chevraResendChain = run.catch(() => undefined);
+  return run;
+}
+
 export async function sendEmail(opts: {
   to: string;
   subject: string;
@@ -189,23 +218,42 @@ export async function sendEmail(opts: {
   if (!key) {
     return { id: `mock-${Date.now()}`, mock: true as const, ok: false as const };
   }
-  let res: Response;
-  try {
-    res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
-    });
-  } catch {
-    return { ok: false as const, error: "השרת לא הצליח להתחבר ל־Resend" };
+  const to = cleanEmail(opts.to);
+  if (!EMAIL_SHAPE.test(to)) {
+    return { ok: false as const, error: `כתובת המייל לא תקינה (${to || "ריקה"})` };
   }
-  if (!res.ok) {
-    const text = await res.text();
-    return { ok: false as const, error: resendReason(res.status, text) };
+  for (let attempt = 1; ; attempt++) {
+    let res: Response;
+    try {
+      res = await inLine(() =>
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ from, to, subject: opts.subject, html: opts.html }),
+        })
+      );
+    } catch {
+      if (attempt < MAX_TRIES) {
+        await sleep(1000 * attempt);
+        continue;
+      }
+      return { ok: false as const, error: "השרת לא הצליח להתחבר ל־Resend" };
+    }
+    if (res.status === 429 && attempt < MAX_TRIES) {
+      await res.text().catch(() => "");
+      const retryAfter = Number(res.headers.get("retry-after"));
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000 * attempt);
+      continue;
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`[email] Resend ${res.status} for ${to}: ${text.slice(0, 300)}`);
+      return { ok: false as const, error: resendReason(res.status, text) };
+    }
+    const data = (await res.json()) as { id?: string };
+    return { ok: true as const, id: data.id };
   }
-  const data = (await res.json()) as { id?: string };
-  return { ok: true as const, id: data.id };
 }
