@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     noUrl: "#",
     note: url.searchParams.get("note")?.slice(0, 1000) ?? "",
     origin: inviteOrigin(request),
+    variant: url.searchParams.get("variant") === "nudge" ? "nudge" : "invite",
   });
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Bell, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
+import { Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { CommunityBoardPanel } from "@/components/community-board-panel";
@@ -13,11 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel } from "@/lib/format";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
-import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member } from "@/lib/types";
+import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, waitingOn } from "@/lib/nudge-rules";
+import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member, NudgeSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SectionId = "account" | "notify" | "members" | "invites" | "system";
@@ -444,7 +445,7 @@ function PasswordForm() {
 }
 
 function InvitesSection() {
-  const { state, me } = useApp();
+  const { state, me, refresh } = useApp();
   const [sending, setSending] = useState(false);
   const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
@@ -476,6 +477,7 @@ function InvitesSection() {
       }
       setDeliveries(data.deliveries ?? []);
       setShowReport(true);
+      void refresh();
       if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
       else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
       else toast.error("אף מייל לא נשלח");
@@ -583,7 +585,223 @@ function InvitesSection() {
           אין חברה קרובה ביומן. אחרי שתיקבע חברה אפשר לשלוח הזמנות מכאן.
         </div>
       )}
+      {event ? (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <MemberInvites event={event} note={inviteNote} />
+          <NudgePanel event={event} />
+        </div>
+      ) : null}
     </Section>
+  );
+}
+
+function MemberInvites({ event, note }: { event: Gathering; note: string }) {
+  const { state, refresh } = useApp();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, EmailDelivery>>({});
+  if (!state) return null;
+  const records = state.nudge?.events[event.id] ?? {};
+  const members = [...state.members].sort((a, b) => {
+    const rank = (member: Member) => (event.rsvps[member.id] ?? "pending") === "pending" ? 0 : 1;
+    return rank(a) - rank(b) || a.displayName.localeCompare(b.displayName, "he");
+  });
+
+  async function sendOne(member: Member) {
+    if (busyId) return;
+    setBusyId(member.id);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, memberId: member.id, note }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "השליחה נכשלה");
+        return;
+      }
+      const delivery = (data.deliveries as EmailDelivery[] | undefined)?.[0];
+      if (delivery) setResults((prev) => ({ ...prev, [member.id]: delivery }));
+      if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
+      else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
+      void refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className={PANEL}>
+      <div className="flex items-baseline justify-between gap-3 border-b border-[#e9ecef] px-4 py-3 md:px-5">
+        <div className="text-[15px]">לכל חבר בנפרד</div>
+        <div className="text-[12px] font-light text-muted-foreground">שליחה לחבר אחד, עם המילה האישית שלמעלה</div>
+      </div>
+      <ul className="divide-y divide-[#eef0f3]">
+        {members.map((member) => {
+          const address = memberAddress(member);
+          const status = event.rsvps[member.id] ?? "pending";
+          const record = records[member.id];
+          const fresh = results[member.id];
+          const failedReason =
+            fresh?.status === "failed" || fresh?.status === "skipped"
+              ? fresh.error || "השליחה נכשלה"
+              : !fresh && record?.lastStatus === "failed"
+                ? record.lastError || "השליחה נכשלה"
+                : "";
+          const sentAt = fresh?.status === "sent" ? new Date().toISOString() : record?.lastStatus === "sent" ? record.lastAt : undefined;
+          return (
+            <li key={member.id} className="flex items-center gap-3 px-4 py-2.5 md:px-5">
+              <UserAvatar member={member} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate text-sm">{member.displayName}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-px text-[11px]",
+                      status === "yes"
+                        ? "bg-[#e6f2ea] text-[#3d8f62]"
+                        : status === "no"
+                          ? "bg-[#f3ecec] text-[#8a5a55]"
+                          : status === "maybe"
+                            ? "bg-[#f5f0e7] text-primary"
+                            : "bg-[#f1f3f6] text-[#6b7280]"
+                    )}
+                  >
+                    {rsvpLabel(status)}
+                  </span>
+                </div>
+                <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
+                  {address ? <span className="[unicode-bidi:plaintext]">{address}</span> : "אין כתובת מייל"}
+                </div>
+                {failedReason ? (
+                  <div className="mt-0.5 text-[12px] leading-4 text-destructive">נכשל: {failedReason}</div>
+                ) : sentAt ? (
+                  <div className="mt-0.5 text-[12px] leading-4 text-[#3d8f62]">
+                    נשלח {formatRelativeHe(sentAt)}
+                    {record?.nudges ? ` · ${record.nudges === 1 ? "תזכורת אחת" : `${record.nudges} תזכורות`}` : ""}
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-full"
+                disabled={!address || busyId !== null}
+                onClick={() => void sendOne(member)}
+              >
+                <Mail data-icon="inline-start" />
+                {busyId === member.id ? "שולח…" : "שליחה"}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function NudgePanel({ event }: { event: Gathering }) {
+  const { state, act } = useApp();
+  const [saving, setSaving] = useState(false);
+  if (!state) return null;
+  const settings = normalizeNudgeSettings(state.nudge?.settings ?? defaultNudgeSettings());
+  const waiting = state.members.filter((member) => memberAddress(member) && waitingOn(event, member, settings)).length;
+
+  async function save(next: NudgeSettings) {
+    setSaving(true);
+    try {
+      await act({ type: "setNudgeSettings", settings: next });
+      toast.success(next.enabled === settings.enabled ? "נשמר" : next.enabled ? "הנודניק הופעל" : "הנודניק כובה");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "השמירה נכשלה");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const chip = (selected: boolean) =>
+    cn(
+      "rounded-full border px-3 py-1 text-[12.5px] transition-colors disabled:opacity-60",
+      selected ? "border-primary bg-[#f8f1e5] text-primary" : "border-[#e3e7ec] bg-white hover:bg-black/[0.02]"
+    );
+
+  return (
+    <div className={PANEL}>
+      <label className="flex items-center gap-3 px-4 py-3.5 md:px-5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
+          <BellRing className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px]">נודניק</span>
+          <span className="block text-[12px] font-light text-muted-foreground">
+            {settings.enabled
+              ? waiting
+                ? `פעיל · ${waiting === 1 ? "חבר אחד עוד לא ענה" : `${waiting} חברים עוד לא ענו`}`
+                : "פעיל · כולם כבר ענו"
+              : "כבוי"}
+          </span>
+        </span>
+        <Switch checked={settings.enabled} disabled={saving} onCheckedChange={(on) => void save({ ...settings, enabled: on })} />
+      </label>
+      <div className="grid gap-3.5 border-t border-[#e9ecef] px-4 py-3.5 md:px-5">
+        <p className="text-[12.5px] font-light leading-5 text-muted-foreground">
+          כל עוד חבר לא ענה אם הוא מגיע, המערכת שולחת לו מייל תזכורת עם הכותרת{" "}
+          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה. מי שענה מפסיק לקבל. לא נשלח
+          בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
+        </p>
+        <div className="grid gap-1.5">
+          <div className="text-[12px] text-muted-foreground">כל כמה זמן</div>
+          <div className="flex flex-wrap gap-1.5">
+            {NUDGE_EVERY_OPTIONS.map((hours) => (
+              <button
+                key={hours}
+                type="button"
+                disabled={saving}
+                aria-pressed={settings.everyHours === hours}
+                className={chip(settings.everyHours === hours)}
+                onClick={() => void save({ ...settings, everyHours: hours })}
+              >
+                {hours === 24 ? "פעם ביום" : hours === 48 ? "כל יומיים" : hours === 72 ? "כל שלושה ימים" : `כל ${hours} שעות`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <div className="text-[12px] text-muted-foreground">עד כמה תזכורות לכל חבר</div>
+          <div className="flex flex-wrap gap-1.5">
+            {[1, 2, 3, 5].map((count) => (
+              <button
+                key={count}
+                type="button"
+                disabled={saving}
+                aria-pressed={settings.maxPerMember === count}
+                className={chip(settings.maxPerMember === count)}
+                onClick={() => void save({ ...settings, maxPerMember: count })}
+              >
+                {count}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="flex items-center justify-between gap-3 text-[13px]">
+          גם למי שענה ״אולי״
+          <Switch
+            checked={settings.includeMaybe}
+            disabled={saving}
+            onCheckedChange={(on) => void save({ ...settings, includeMaybe: on })}
+          />
+        </label>
+        <a
+          href={`/api/invitations/preview?eventId=${encodeURIComponent(event.id)}&variant=nudge`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 justify-self-start text-[13px] text-primary hover:underline"
+        >
+          <Eye className="size-4" />
+          איך נראית התזכורת
+        </a>
+      </div>
+    </div>
   );
 }
 
@@ -625,6 +843,9 @@ function InviteSide({
   const sent = report?.filter((row) => row.status === "sent").length ?? 0;
   const failed = report?.filter((row) => row.status === "failed").length ?? 0;
   const skipped = report?.filter((row) => row.status === "skipped").length ?? 0;
+  const failedReasons = [
+    ...new Set(report?.filter((row) => row.status === "failed").map((row) => row.error || "השליחה נכשלה") ?? []),
+  ].slice(0, 3);
 
   return (
     <div className="grid content-start gap-3 border-t border-[#e9ecef] bg-gradient-to-b from-[#f6f1e8] to-[#fbfcfd] p-4 md:border-s md:border-t-0 md:p-[18px]">
@@ -648,9 +869,16 @@ function InviteSide({
               <span className="text-[#3d8f62]">✓</span>
             </div>
             {failed ? (
-              <div className="flex justify-between gap-2 text-destructive">
-                <span>{failed} נכשלו</span>
-                <span>!</span>
+              <div className="grid gap-0.5 text-destructive">
+                <div className="flex justify-between gap-2">
+                  <span>{failed} נכשלו</span>
+                  <span>!</span>
+                </div>
+                {failedReasons.map((reason) => (
+                  <div key={reason} className="text-[11.5px] leading-4 text-destructive/85">
+                    {reason}
+                  </div>
+                ))}
               </div>
             ) : null}
             {skipped ? (
@@ -666,17 +894,21 @@ function InviteSide({
           {showReport ? (
             <ul className="grid gap-1.5 border-t border-[#ebe3d4] pt-2.5 text-[12px]">
               {report.map((row) => (
-                <li key={`${row.name}-${row.to}`} className="flex items-baseline justify-between gap-2">
-                  <span className="truncate">{row.name}</span>
-                  <span
-                    className={cn(
-                      "shrink-0",
-                      row.status === "failed" ? "text-destructive" : row.status === "sent" ? "text-[#3d8f62]" : "text-muted-foreground"
-                    )}
-                    title={row.error}
-                  >
-                    {row.status === "sent" ? "נשלח" : row.status === "failed" ? "נכשל" : "לא נשלח"}
+                <li key={`${row.name}-${row.to}`} className="grid gap-0.5">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate">{row.name}</span>
+                    <span
+                      className={cn(
+                        "shrink-0",
+                        row.status === "failed" ? "text-destructive" : row.status === "sent" ? "text-[#3d8f62]" : "text-muted-foreground"
+                      )}
+                    >
+                      {row.status === "sent" ? "נשלח" : row.status === "failed" ? "נכשל" : "לא נשלח"}
+                    </span>
                   </span>
+                  {row.status === "failed" && row.error ? (
+                    <span className="text-[11.5px] leading-4 text-destructive/85">{row.error}</span>
+                  ) : null}
                 </li>
               ))}
             </ul>

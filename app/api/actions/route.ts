@@ -23,6 +23,7 @@ import {
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { boardEnabled, normalizeBoard, resolveBoard } from "@/lib/community-board";
 import { galleryItems, gatheringHeld } from "@/lib/selectors";
+import { normalizeNudgeSettings, nudgeState } from "@/lib/nudge";
 import { emitToMembers } from "@/lib/realtime";
 import { inviteOrigin } from "@/lib/request-origin";
 import { updateState, toPublicState } from "@/lib/store";
@@ -829,6 +830,11 @@ function applyAction(
       );
       prefs.channelIds = prefs.channelIds.filter((id) => rooms.has(id));
       s.chatEmailPrefs = { ...(s.chatEmailPrefs ?? {}), [me.id]: prefs };
+      return;
+    }
+    case "setNudgeSettings": {
+      if (!can(me, "sendInvites")) throw new Error("forbidden");
+      s.nudge = { settings: normalizeNudgeSettings(body.settings), events: nudgeState(s).events };
       return;
     }
     case "setCommunityBoard": {

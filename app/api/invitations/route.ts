@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { invitationHtml, sendEmail } from "@/lib/email";
-import { gatheringLabel, memberById } from "@/lib/format";
+import { gatheringLabel } from "@/lib/format";
+import { recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudge";
 import { can } from "@/lib/permissions";
-import { signRsvpToken } from "@/lib/rsvp-link";
 import { inviteOrigin } from "@/lib/request-origin";
 import { readState, updateState } from "@/lib/store";
 import type { EmailDelivery } from "@/lib/types";
@@ -16,71 +15,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "רק מנהל מערכת יכול לשלוח הזמנות" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { eventId?: string; note?: string };
+  const body = (await request.json()) as { eventId?: string; note?: string; memberId?: string };
   const note = body.note?.trim().slice(0, 1000) ?? "";
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
   if (!event) {
     return NextResponse.json({ error: "החברה לא נמצאה" }, { status: 404 });
   }
+  const members = body.memberId
+    ? state.members.filter((member) => member.id === body.memberId)
+    : state.members;
+  if (body.memberId && !members.length) {
+    return NextResponse.json({ error: "החבר לא נמצא" }, { status: 404 });
+  }
 
   const origin = inviteOrigin(request);
-  const deliveries: EmailDelivery[] = [];
-
-  for (const member of state.members) {
-    const address = member.email?.trim() ?? "";
-    if (!address || address.endsWith("@chevra.local")) {
-      deliveries.push({
-        to: address || "—",
-        name: member.displayName,
-        status: "skipped",
-        error: address ? "כתובת הדגמה לא נשלחת" : "אין כתובת מייל",
-      });
-      continue;
-    }
-    const token = signRsvpToken(member.id, event.id);
-    const yesUrl = `${origin}/rsvp/${token}?c=yes`;
-    const maybeUrl = `${origin}/rsvp/${token}?c=maybe`;
-    const noUrl = `${origin}/rsvp/${token}?c=no`;
-    const html = invitationHtml({
-      member,
-      event,
-      hostName: memberById(state.members, event.hostId)?.displayName ?? "",
-      kibudName: memberById(state.members, event.kibudId)?.displayName,
-      lecturerName: memberById(state.members, event.lecturerId)?.displayName,
-      senderName: me.displayName,
-      yesUrl,
-      maybeUrl,
-      noUrl,
-      note,
+  rememberOrigin(origin);
+  const rows: { memberId: string; delivery: EmailDelivery }[] = [];
+  for (const member of members) {
+    const delivery = await sendGatheringEmail(state, event, member, {
       origin,
+      note,
+      senderName: me.displayName,
+      variant: "invite",
     });
-    const result = await sendEmail({
-      to: address,
-      subject: `הזמנה: ${gatheringLabel(event)}`,
-      html,
-    });
-    if ("mock" in result) {
-      deliveries.push({
-        to: address,
-        name: member.displayName,
-        status: "failed",
-        error: "אין מפתח Resend בשרת, המייל לא יצא",
-      });
-      continue;
-    }
-    deliveries.push({
-      to: address,
-      name: member.displayName,
-      status: result.ok ? "sent" : "failed",
-      error: result.ok ? undefined : result.error || "השליחה נכשלה",
-    });
+    rows.push({ memberId: member.id, delivery });
   }
+  const deliveries = rows.map((row) => row.delivery);
 
   const sentCount = deliveries.filter((row) => row.status === "sent").length;
   const failedCount = deliveries.filter((row) => row.status === "failed").length;
   try {
     await updateState((s) => {
+      recordDeliveries(s, event.id, rows, "invite");
       s.emailLog.unshift({
         id: crypto.randomUUID(),
         eventId: event.id,
