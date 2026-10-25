@@ -150,7 +150,7 @@ function useTasks(state: PublicState | null, event: Gathering | null, onOpen: (s
         });
       }
     }
-    const failed = state.members.filter((member) => records[member.id]?.lastStatus === "failed");
+    const failed = state.members.filter((member) => memberAddress(member) && records[member.id]?.lastStatus === "failed");
     if (failed.length) {
       tasks.push({
         id: "failed",
@@ -228,7 +228,7 @@ function TaskList({ tasks }: { tasks: Task[] }) {
         {tasks.map((task) => (
           <li key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap md:px-5">
             <IconChip icon={task.icon} tone={task.tone} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
               <div className="text-[15px]">{task.text}</div>
               <div className="text-[12.5px] font-light leading-5 text-muted-foreground">{task.sub}</div>
             </div>

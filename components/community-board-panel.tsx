@@ -173,9 +173,13 @@ export function CommunityBoardPanel({ tabbed = false }: { tabbed?: boolean }) {
           <LayoutDashboard className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px]">לוח הבית</div>
+          <div className="text-[15px]">{tabbed ? "הצגת הלוח בדף הבית" : "לוח הבית"}</div>
           <div className="text-[12.5px] font-light text-muted-foreground">
-            מודעות, זמנים, דפי לימוד, תמונות וסקר בדף הבית
+            {tabbed
+              ? board.enabled
+                ? "הלוח מוצג עכשיו לכל החברים"
+                : "כבוי, דף הבית מוצג כרגיל"
+              : "מודעות, זמנים, דפי לימוד, תמונות וסקר בדף הבית"}
           </div>
         </div>
         <Switch

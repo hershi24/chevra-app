@@ -25,7 +25,7 @@ export function PasswordNotice() {
       <div className="shrink-0 border-b border-[#d0d5dc] bg-[#e8ebf0] px-5 py-3 text-sm md:px-8">
         <div className="flex w-full flex-col items-start gap-1 md:flex-row md:items-center md:justify-between md:gap-6">
           <p>הסיסמה שלכם עדיין ברירת המחדל. מומלץ להחליף אותה.</p>
-          <Link href="/settings#password" className="shrink-0 text-primary">
+          <Link href="/settings?s=account#password" className="shrink-0 text-primary">
             להחלפת הסיסמה
           </Link>
         </div>
@@ -48,7 +48,7 @@ export function PasswordNotice() {
             </p>
             <div className="mt-6 flex flex-col gap-2 md:flex-row md:items-center">
               <Button asChild className="h-11 rounded-full px-5">
-                <Link href="/settings#password" onClick={() => setOpen(false)}>
+                <Link href="/settings?s=account#password" onClick={() => setOpen(false)}>
                   להחלפת הסיסמה
                 </Link>
               </Button>
