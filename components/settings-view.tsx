@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
@@ -575,8 +575,11 @@ function InvitesSection() {
       setDeliveries(data.deliveries ?? []);
       setShowReport(true);
       void refresh();
-      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
+      const called = Number(data.callCount) || 0;
+      if (data.sentCount && !data.failedCount && called) toast.success(`נשלחו ${data.sentCount} הזמנות, ויצא צינתוק ל־${called}`);
+      else if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
       else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
+      else if (called) toast.success(`יצא צינתוק ל־${called}`);
       else toast.error("אף מייל לא נשלח");
     } finally {
       setSending(false);
@@ -606,7 +609,7 @@ function InvitesSection() {
     <Section
       id="invites"
       title="הזמנות במייל"
-      subtitle="כל חבר מקבל מייל אישי עם כפתורי הגעה — בלי להתחבר."
+      subtitle="כל חבר מקבל מייל עם כפתורי הגעה, וגם צינתוק לטלפון. מי שעונה מקליד 1 מגיע, 2 אולי, 3 לא."
       action={
         previewHref ? (
           <a
@@ -719,7 +722,10 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
       }
       const delivery = (data.deliveries as EmailDelivery[] | undefined)?.[0];
       if (delivery) setResults((prev) => ({ ...prev, [member.id]: delivery }));
-      if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
+      const called = Boolean(data.callCount);
+      if (delivery?.status === "sent" && called) toast.success(`ההזמנה נשלחה ל${member.displayName}, ויצא צינתוק`);
+      else if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
+      else if (called) toast.success(`יצא צינתוק ל${member.displayName}`);
       else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
       void refresh();
     } finally {
@@ -1050,9 +1056,9 @@ function SystemPanel() {
             <Phone className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[15px]">IVR אחרון</div>
+            <div className="text-[15px]">צינתוק אחרון</div>
             <div className="truncate text-[12.5px] font-light text-muted-foreground">
-              {lastIvr.result} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
+              {ivrResultLabel(lastIvr.result)} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
             </div>
           </div>
         </div>
