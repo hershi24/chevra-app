@@ -132,6 +132,19 @@ export function rsvpLabel(status: RsvpStatus) {
   return "טרם השיב";
 }
 
+export function ivrResultLabel(result: string) {
+  if (result === "tzintuk_sent") return "יצא צינתוק";
+  if (result === "tzintuk_failed") return "הצינתוק לא יצא";
+  if (result === "tzintuk_queued") return "צינתוק נרשם";
+  if (result === "rsvp_yes") return "מגיע";
+  if (result === "rsvp_maybe") return "אולי";
+  if (result === "rsvp_no") return "לא מגיע";
+  if (result === "unknown_phone") return "מספר לא מזוהה";
+  if (result === "already_held") return "החברה כבר לא פתוחה";
+  if (result === "invalid_choice") return "הקשה לא נקלט";
+  return result;
+}
+
 export function memberById(members: Member[], id?: string) {
   return members.find((m) => m.id === id);
 }

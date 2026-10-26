@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { normalizePhone } from "@/lib/phone";
 import { gatheringHeld } from "@/lib/selectors";
 import { updateState, upcomingGathering } from "@/lib/store";
 import type { RsvpStatus } from "@/lib/types";
@@ -96,8 +97,4 @@ export async function POST(request: Request) {
     twiml: `<?xml version="1.0" encoding="UTF-8"?><Response><Say language="he-IL">${say}</Say></Response>`,
     log: state.ivrLog[0],
   });
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/[^\d]/g, "").replace(/^972/, "0");
 }

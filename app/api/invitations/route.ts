@@ -6,7 +6,8 @@ import { recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudg
 import { can } from "@/lib/permissions";
 import { inviteOrigin } from "@/lib/request-origin";
 import { readState, updateState } from "@/lib/store";
-import type { EmailDelivery } from "@/lib/types";
+import type { EmailDelivery, IvrLog } from "@/lib/types";
+import { sendTzintuk, yemotConfigured } from "@/lib/yemot";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
   const origin = inviteOrigin(request);
   rememberOrigin(origin);
   const rows: { memberId: string; delivery: EmailDelivery }[] = [];
+  const calls: { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string }[] = [];
+  const shouldCall = variant === "invite" && yemotConfigured();
   for (const member of members) {
     const delivery = await sendGatheringEmail(state, event, member, {
       origin,
@@ -47,11 +50,14 @@ export async function POST(request: Request) {
       variant,
     });
     rows.push({ memberId: member.id, delivery });
+    if (shouldCall) calls.push({ memberId: member.id, ...(await sendTzintuk(member.phone)) });
   }
   const deliveries = rows.map((row) => row.delivery);
 
   const sentCount = deliveries.filter((row) => row.status === "sent").length;
   const failedCount = deliveries.filter((row) => row.status === "failed").length;
+  const callCount = calls.filter((row) => row.ok).length;
+  const callFailedCount = calls.filter((row) => !row.ok && !row.skipped).length;
   try {
     await updateState((s) => {
       recordDeliveries(s, event.id, rows, variant);
@@ -68,10 +74,23 @@ export async function POST(request: Request) {
               : `הזמנה: ${gatheringLabel(event)}`,
         deliveries,
       });
+      for (const call of calls) {
+        if (call.skipped) continue;
+        const entry: IvrLog = {
+          id: crypto.randomUUID(),
+          at: new Date().toISOString(),
+          phone: call.phone,
+          action: "tzintuk",
+          memberId: call.memberId,
+          eventId: event.id,
+          result: call.ok ? "tzintuk_sent" : "tzintuk_failed",
+        };
+        s.ivrLog.unshift(entry);
+      }
     });
   } catch {
     // The send report still goes back even if the log could not be stored.
   }
 
-  return NextResponse.json({ deliveries, sentCount, failedCount });
+  return NextResponse.json({ deliveries, sentCount, failedCount, callCount, callFailedCount });
 }
