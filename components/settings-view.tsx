@@ -20,7 +20,7 @@ import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
 import { upcomingGathering } from "@/lib/selectors";
 import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, waitingOn } from "@/lib/nudge-rules";
-import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member, NudgeSettings } from "@/lib/types";
+import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, IvrLog, Member, NudgeSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SectionId = "account" | "notify" | "members" | "invites" | "system";
@@ -34,6 +34,25 @@ const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon 
 ];
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
+
+type TzintukCall = { status: "sent" | "failed" | "skipped"; error?: string };
+
+function joinNotes(first: string, second: string) {
+  return second ? `${first} · ${second}` : first;
+}
+
+function callSummary(calls: TzintukCall[] | undefined) {
+  if (!calls?.length) return "";
+  const sent = calls.filter((call) => call.status === "sent").length;
+  const failed = calls.filter((call) => call.status === "failed");
+  if (sent && !failed.length) return sent === 1 ? "הצינתוק יצא" : `צינתוק ל־${sent}`;
+  if (sent) return `צינתוק ל־${sent}, ${failed.length} לא יצאו`;
+  return failed[0]?.error || "הצינתוק לא יצא";
+}
+
+function callLine(log: IvrLog[], eventId: string, memberId: string) {
+  return log.find((row) => row.action === "tzintuk" && row.eventId === eventId && row.memberId === memberId)?.result ?? "";
+}
 
 const PageMode = createContext(false);
 
@@ -567,7 +586,13 @@ function InvitesSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id, note: inviteNote }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        error?: string;
+        deliveries?: EmailDelivery[];
+        sentCount?: number;
+        failedCount?: number;
+        calls?: TzintukCall[];
+      };
       if (!res.ok) {
         toast.error(data.error || "שליחה נכשלה");
         return;
@@ -575,27 +600,32 @@ function InvitesSection() {
       setDeliveries(data.deliveries ?? []);
       setShowReport(true);
       void refresh();
-      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
-      else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
-      else toast.error("אף מייל לא נשלח");
+      const callNote = callSummary(data.calls);
+      if (data.sentCount && !data.failedCount) toast.success(joinNotes(`נשלחו ${data.sentCount} הזמנות`, callNote));
+      else if (data.sentCount) toast.success(joinNotes(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`, callNote));
+      else if (data.calls?.some((call) => call.status === "sent")) toast.success(callNote);
+      else toast.error(joinNotes("אף מייל לא נשלח", callNote));
     } finally {
       setSending(false);
     }
   }
 
   async function pingIvr() {
-    if (!me) return;
-    const res = await fetch("/api/ivr", {
+    if (!event) return;
+    const res = await fetch("/api/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: me.phone, digits: "1", action: "tzintuk", eventId: event?.id }),
+      body: JSON.stringify({ eventId: event.id, callOnly: true }),
     });
-    const data = await res.json();
+    const data = (await res.json()) as { error?: string; calls?: TzintukCall[] };
     if (!res.ok) {
-      toast.error(data.error || "IVR נכשל");
+      toast.error(data.error || "הצינתוק לא יצא");
       return;
     }
-    toast.success("צילצול / עדכון IVR נרשם");
+    void refresh();
+    const note = callSummary(data.calls);
+    if (data.calls?.some((call) => call.status === "sent")) toast.success(note);
+    else toast.error(note || "הצינתוק לא יצא");
   }
 
   const previewHref = event
@@ -658,7 +688,7 @@ function InvitesSection() {
               {can(me, "triggerIvr") ? (
                 <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => void pingIvr()}>
                   <Phone data-icon="inline-start" />
-                  צינתוק IVR
+                  צינתוק בלי מייל
                 </Button>
               ) : null}
               {unreachable ? (
@@ -666,6 +696,9 @@ function InvitesSection() {
                   {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
                 </span>
               ) : null}
+              <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
+                השליחה גם מחייגת צינתוק. בהקשה 1 מגיע, 2 אולי, 3 לא מגיע, והסטטוס מתעדכן כאן.
+              </p>
             </div>
           </div>
           <InviteSide
@@ -712,15 +745,18 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id, memberId: member.id, note }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string; deliveries?: EmailDelivery[]; calls?: TzintukCall[] };
       if (!res.ok) {
         toast.error(data.error || "השליחה נכשלה");
         return;
       }
-      const delivery = (data.deliveries as EmailDelivery[] | undefined)?.[0];
+      const delivery = data.deliveries?.[0];
+      const call = data.calls?.[0];
       if (delivery) setResults((prev) => ({ ...prev, [member.id]: delivery }));
-      if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
-      else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
+      const callNote =
+        call?.status === "sent" ? "הצינתוק יצא" : call?.status === "failed" ? `הצינתוק לא יצא: ${call.error}` : "";
+      if (delivery?.status === "sent") toast.success(joinNotes(`ההזמנה נשלחה ל${member.displayName}`, callNote));
+      else toast.error(joinNotes(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`, callNote));
       void refresh();
     } finally {
       setBusyId(null);
@@ -746,6 +782,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 ? record.lastError || "השליחה נכשלה"
                 : "";
           const sentAt = fresh?.status === "sent" ? new Date().toISOString() : record?.lastStatus === "sent" ? record.lastAt : undefined;
+          const dial = callLine(state.ivrLog, event.id, member.id);
           return (
             <li key={member.id} className="flex items-center gap-3 px-4 py-2.5 md:px-5">
               <UserAvatar member={member} size="sm" />
@@ -770,6 +807,11 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
                   {address ? <span className="[unicode-bidi:plaintext]">{address}</span> : "אין כתובת מייל"}
                 </div>
+                {dial ? (
+                  <div className={cn("mt-0.5 text-[12px] leading-4", dial === "צינתוק יצא" ? "text-[#3d8f62]" : "text-destructive")}>
+                    {dial}
+                  </div>
+                ) : null}
                 {failedReason ? (
                   <div className="mt-0.5 text-[12px] leading-4 text-destructive">נכשל: {failedReason}</div>
                 ) : sentAt ? (
@@ -1050,7 +1092,7 @@ function SystemPanel() {
             <Phone className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[15px]">IVR אחרון</div>
+            <div className="text-[15px]">צינתוק אחרון</div>
             <div className="truncate text-[12.5px] font-light text-muted-foreground">
               {lastIvr.result} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
             </div>
