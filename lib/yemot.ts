@@ -12,6 +12,9 @@ export const YEMOT_PROMPT =
 export const YEMOT_THANKS =
   "read=t-תודה רבה, בחירתכם נרשמה בהצלחה. להתראות.=no&hangup=yes";
 
+export const YEMOT_UNKNOWN =
+  "read=t-לא זיהינו את מספר הטלפון השמור באתר. להתראות.=no&hangup=yes";
+
 const KEYPAD: Record<string, RsvpStatus> = {
   "1": "yes",
   "2": "maybe",
@@ -115,16 +118,47 @@ export async function paramsFromYemot(request: Request) {
   return params;
 }
 
+function lowerParams(params: Record<string, string>) {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) out[key.toLowerCase()] = value.trim();
+  return out;
+}
+
 function pick(params: Record<string, string>, keys: string[]) {
+  const lower = lowerParams(params);
   for (const key of keys) {
-    const value = params[key]?.trim();
+    const value = lower[key.toLowerCase()];
     if (value) return value;
   }
   return "";
 }
 
+/** The person on the line, not the system's own number (ApiDID). */
+export function callerPhone(params: Record<string, string>) {
+  const lower = lowerParams(params);
+  const system = new Set(
+    [lower.apidid, lower.apirealdid, lower.did]
+      .map((value) => normalizePhone(value ?? ""))
+      .filter(Boolean)
+  );
+  const candidates = [
+    lower.apiphone,
+    lower.phone,
+    lower.from,
+    lower.callerid,
+    lower.apicallerid,
+    lower.apidestphone,
+    lower.apidestination,
+  ];
+  for (const raw of candidates) {
+    const phone = normalizePhone(raw ?? "");
+    if (phone && !system.has(phone)) return raw;
+  }
+  return lower.apiphone || lower.phone || "";
+}
+
 export async function handleMeetingResponse(params: Record<string, string>) {
-  const phone = pick(params, ["ApiPhone", "phone", "From", "CallerID", "ApiCallerId"]);
+  const phone = callerPhone(params);
   const selected = pick(params, ["SelectedResponse", "digits", "Digits", "ApiDigits"]);
 
   if (!selected) return ymText(YEMOT_PROMPT);
@@ -161,5 +195,5 @@ export async function handleMeetingResponse(params: Record<string, string>) {
     state.ivrLog.unshift(entry);
   });
 
-  return ymText(YEMOT_THANKS);
+  return ymText(result === "unknown_phone" ? YEMOT_UNKNOWN : YEMOT_THANKS);
 }
