@@ -506,7 +506,7 @@ export function AdminHub({ onOpen }: { onOpen: (screen: HubScreen) => void }) {
   const lastIvr = state.ivrLog[0];
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[13px] font-light text-muted-foreground">

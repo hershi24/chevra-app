@@ -167,7 +167,7 @@ export function CommunityBoardPanel({ tabbed = false }: { tabbed?: boolean }) {
   }
 
   return (
-    <div className={cn(PANEL, tabbed ? "overflow-clip" : "mb-4")}>
+    <div className={cn(PANEL, "min-w-0", tabbed ? "overflow-clip" : "mb-4")}>
       <div className="flex items-center gap-3.5 px-4 py-4 md:px-5">
         <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
           <LayoutDashboard className="size-4" />
@@ -191,12 +191,8 @@ export function CommunityBoardPanel({ tabbed = false }: { tabbed?: boolean }) {
       </div>
 
       {tabbed ? (
-        <div className="border-t border-[#e9ecef] px-3 pt-3 md:px-4">
-          <div
-            role="tablist"
-            aria-label="חלקי הלוח"
-            className="flex gap-1 overflow-x-auto rounded-full bg-[#eef0f3] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
+        <div className="min-w-0 border-t border-[#e9ecef] px-3 pt-3 md:px-4">
+          <div role="tablist" aria-label="חלקי הלוח" className="flex flex-wrap gap-1.5">
             {tabs.map((item) => (
               <button
                 key={item.id}
@@ -205,10 +201,10 @@ export function CommunityBoardPanel({ tabbed = false }: { tabbed?: boolean }) {
                 aria-selected={tab === item.id}
                 onClick={() => setTab(item.id)}
                 className={cn(
-                  "flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[13.5px] transition-colors",
+                  "inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[13.5px] transition-colors",
                   tab === item.id
-                    ? "bg-white text-foreground shadow-[0_1px_3px_rgba(16,24,40,0.12)]"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "border-[#d5dbe3] bg-white text-foreground shadow-[0_1px_3px_rgba(16,24,40,0.12)]"
+                    : "border-transparent bg-[#eef0f3] text-muted-foreground hover:text-foreground"
                 )}
               >
                 <item.icon className="hidden size-4 sm:block" />

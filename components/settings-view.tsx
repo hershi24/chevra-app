@@ -74,7 +74,7 @@ function AdminSettings() {
 
   return (
     <PageMode.Provider value>
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-5 [&>*]:min-w-0">
         <button
           type="button"
           onClick={() => router.push("/settings")}
@@ -84,7 +84,7 @@ function AdminSettings() {
           חזרה לניהול החבורה
         </button>
         {screen === "account" ? (
-          <div className="grid gap-10">
+          <div className="grid gap-10 [&>*]:min-w-0">
             <Section id="account" title="החשבון שלי" subtitle="איך החברים רואים אותך, והסיסמה לכניסה.">
               <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
             </Section>
@@ -292,7 +292,7 @@ function Section({
 }) {
   const page = useContext(PageMode) && !small;
   return (
-    <section id={`settings-${id}`} className="scroll-mt-16 md:scroll-mt-24">
+    <section id={`settings-${id}`} className="min-w-0 scroll-mt-16 md:scroll-mt-24">
       <div className={cn("flex items-end justify-between gap-3", page ? "mb-5" : "mb-3.5")}>
         <div>
           {page ? (
