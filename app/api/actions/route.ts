@@ -257,7 +257,9 @@ function applyAction(
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
-      Object.assign(event, body.patch);
+      const { status, ...rest } = body.patch;
+      Object.assign(event, rest);
+      if (status === "upcoming" || status === "past" || status === "cancelled") event.status = status;
       return;
     }
     case "cancelEvent": {

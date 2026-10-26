@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { cancelSubject } from "@/lib/email";
 import { gatheringLabel } from "@/lib/format";
 import { recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudge";
 import { can } from "@/lib/permissions";
@@ -20,9 +21,9 @@ export async function POST(request: Request) {
     note?: string;
     memberId?: string;
     memberIds?: string[];
-    variant?: "invite" | "nudge";
+    variant?: "invite" | "nudge" | "cancel";
   };
-  const variant = body.variant === "nudge" ? "nudge" : "invite";
+  const variant = body.variant === "nudge" || body.variant === "cancel" ? body.variant : "invite";
   const note = body.note?.trim().slice(0, 1000) ?? "";
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
@@ -59,7 +60,12 @@ export async function POST(request: Request) {
         eventId: event.id,
         sentAt: new Date().toISOString(),
         recipients: deliveries.filter((row) => row.status === "sent").map((row) => row.to),
-        subject: `הזמנה: ${gatheringLabel(event)}`,
+        subject:
+          variant === "cancel"
+            ? cancelSubject(event)
+            : variant === "nudge"
+              ? "מחכים רק להחלטה שלך"
+              : `הזמנה: ${gatheringLabel(event)}`,
         deliveries,
       });
     });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { invitationHtml } from "@/lib/email";
+import { cancellationHtml, invitationHtml } from "@/lib/email";
 import { memberById } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { inviteOrigin } from "@/lib/request-origin";
@@ -19,20 +19,27 @@ export async function GET(request: Request) {
   if (!event) {
     return NextResponse.json({ error: "החברה לא נמצאה" }, { status: 404 });
   }
-  const html = invitationHtml({
+  const note = url.searchParams.get("note")?.slice(0, 1000) ?? "";
+  const shared = {
     member: me,
     event,
     hostName: memberById(state.members, event.hostId)?.displayName ?? "",
     kibudName: memberById(state.members, event.kibudId)?.displayName,
     lecturerName: memberById(state.members, event.lecturerId)?.displayName,
     senderName: me.displayName,
-    yesUrl: "#",
-    maybeUrl: "#",
-    noUrl: "#",
-    note: url.searchParams.get("note")?.slice(0, 1000) ?? "",
+    note,
     origin: inviteOrigin(request),
-    variant: url.searchParams.get("variant") === "nudge" ? "nudge" : "invite",
-  });
+  };
+  const html =
+    url.searchParams.get("variant") === "cancel"
+      ? cancellationHtml(shared)
+      : invitationHtml({
+          ...shared,
+          yesUrl: "#",
+          maybeUrl: "#",
+          noUrl: "#",
+          variant: url.searchParams.get("variant") === "nudge" ? "nudge" : "invite",
+        });
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
