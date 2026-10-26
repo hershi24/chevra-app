@@ -309,7 +309,13 @@ async function replaceRsvps(event: Gathering, previous?: Gathering) {
   if (rows.length) {
     const { error } = await db.from("rsvps").upsert(rows);
     if (error && isMissingViaColumn(error)) {
-      const retry = await db.from("rsvps").upsert(rows.map(({ via: _via, ...rest }) => rest));
+      const retry = await db.from("rsvps").upsert(
+        rows.map((row) => ({
+          gathering_id: row.gathering_id,
+          member_id: row.member_id,
+          status: row.status,
+        }))
+      );
       if (retry.error) throw retry.error;
     } else if (error) {
       throw error;
