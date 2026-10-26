@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { cancelSubject } from "@/lib/email";
 import { gatheringLabel } from "@/lib/format";
-import { recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudge";
+import { mergeNudgeRows, recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudge";
 import { can } from "@/lib/permissions";
 import { inviteOrigin } from "@/lib/request-origin";
 import { readState, updateState } from "@/lib/store";
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   rememberOrigin(origin);
   const rows: { memberId: string; delivery: EmailDelivery }[] = [];
   const calls: { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string }[] = [];
-  const shouldCall = variant === "invite" && yemotConfigured();
+  const shouldCall = variant === "nudge" && yemotConfigured();
   for (const member of members) {
     const delivery = await sendGatheringEmail(state, event, member, {
       origin,
@@ -60,7 +60,14 @@ export async function POST(request: Request) {
   const callFailedCount = calls.filter((row) => !row.ok && !row.skipped).length;
   try {
     await updateState((s) => {
-      recordDeliveries(s, event.id, rows, variant);
+      recordDeliveries(
+        s,
+        event.id,
+        variant === "nudge"
+          ? mergeNudgeRows(rows, calls, (id) => s.members.find((member) => member.id === id)?.displayName ?? id)
+          : rows,
+        variant
+      );
       s.emailLog.unshift({
         id: crypto.randomUUID(),
         eventId: event.id,

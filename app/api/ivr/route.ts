@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { normalizePhone } from "@/lib/phone";
+import { setMemberRsvp } from "@/lib/rsvp-record";
 import { gatheringHeld } from "@/lib/selectors";
 import { updateState, upcomingGathering } from "@/lib/store";
 import type { RsvpStatus } from "@/lib/types";
@@ -59,10 +60,10 @@ export async function POST(request: Request) {
 
     if (member && event && gatheringHeld(event)) {
       result = "already_held";
-    } else if (member && event && (digits === "1" || digits === "2")) {
-      const status: RsvpStatus = digits === "1" ? "yes" : "no";
-      event.rsvps[member.id] = status;
-      result = status === "yes" ? "rsvp_yes" : "rsvp_no";
+    } else if (member && event && (digits === "1" || digits === "2" || digits === "3")) {
+      const status: RsvpStatus = digits === "1" ? "yes" : digits === "2" ? "maybe" : "no";
+      setMemberRsvp(event, member.id, status, "phone");
+      result = status === "yes" ? "rsvp_yes" : status === "maybe" ? "rsvp_maybe" : "rsvp_no";
     } else if (action === "tzintuk") {
       result = member ? "tzintuk_queued" : "unknown_phone";
     } else if (!member) {

@@ -1,5 +1,5 @@
 import { getServiceSupabase, isSupabaseEnabled } from "./supabase";
-import type { AppState, EventMedia, Gathering, RsvpStatus, RsvpToken } from "./types";
+import type { AppState, EventMedia, Gathering, RsvpStatus, RsvpToken, RsvpVia } from "./types";
 
 type GatheringRow = {
   id: string;
@@ -21,6 +21,7 @@ type RsvpRow = {
   gathering_id: string;
   member_id: string;
   status: RsvpStatus;
+  via?: string | null;
 };
 
 type MediaRow = {
@@ -69,6 +70,26 @@ function sameRsvps(a: Gathering["rsvps"], b: Gathering["rsvps"]) {
   return true;
 }
 
+function sameVia(a?: Gathering["rsvpVia"], b?: Gathering["rsvpVia"]) {
+  const left = a ?? {};
+  const right = b ?? {};
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function parseVia(value?: string | null): RsvpVia | undefined {
+  if (value === "email" || value === "phone" || value === "site") return value;
+  return undefined;
+}
+
+function isMissingViaColumn(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  return /(?:\bvia\b|rsvps\.via)/i.test(message) && /does not exist|schema cache|Could not find/i.test(message);
+}
+
 function sameMedia(a: EventMedia[], b: EventMedia[]) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -91,10 +112,16 @@ export async function loadGatheringsFromSupabase(): Promise<{
   if (mediaRes.error) throw mediaRes.error;
 
   const rsvps = new Map<string, Gathering["rsvps"]>();
+  const vias = new Map<string, NonNullable<Gathering["rsvpVia"]>>();
   for (const row of (rsvpsRes.data ?? []) as RsvpRow[]) {
     const current = rsvps.get(row.gathering_id) ?? {};
     current[row.member_id] = row.status;
     rsvps.set(row.gathering_id, current);
+    const via = parseVia(row.via);
+    if (!via) continue;
+    const currentVia = vias.get(row.gathering_id) ?? {};
+    currentVia[row.member_id] = via;
+    vias.set(row.gathering_id, currentVia);
   }
 
   const media = new Map<string, EventMedia[]>();
@@ -133,6 +160,7 @@ export async function loadGatheringsFromSupabase(): Promise<{
     status: row.status,
     attendedIds: Array.isArray(row.attended_ids) ? row.attended_ids.filter(Boolean) : [],
     rsvps: rsvps.get(row.id) ?? {},
+    rsvpVia: vias.get(row.id) ?? {},
     media: (media.get(row.id) ?? []).sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)),
   }));
   return { gatherings, gallery };
@@ -171,8 +199,8 @@ export async function syncGatheringsDiff(before: AppState, after: AppState) {
         throw error;
       }
     }
-    if (!prev || !sameRsvps(prev.rsvps, event.rsvps)) {
-      await replaceRsvps(event, prev?.rsvps);
+    if (!prev || !sameRsvps(prev.rsvps, event.rsvps) || !sameVia(prev.rsvpVia, event.rsvpVia)) {
+      await replaceRsvps(event, prev);
     }
     if (!prev || !sameMedia(prev.media, event.media)) {
       await replaceMedia(prev?.media ?? [], event);
@@ -263,21 +291,31 @@ async function syncLooseGallery(before: EventMedia[], after: EventMedia[]) {
   }
 }
 
-async function replaceRsvps(event: Gathering, previous: Gathering["rsvps"] = {}) {
+async function replaceRsvps(event: Gathering, previous?: Gathering) {
   const db = getServiceSupabase();
   if (!db) return;
+  const prevRsvps = previous?.rsvps ?? {};
+  const prevVia = previous?.rsvpVia ?? {};
   const rows = Object.entries(event.rsvps)
-    .filter(([memberId, status]) => previous[memberId] !== status)
+    .filter(
+      ([memberId, status]) => prevRsvps[memberId] !== status || prevVia[memberId] !== event.rsvpVia?.[memberId]
+    )
     .map(([memberId, status]) => ({
       gathering_id: event.id,
       member_id: memberId,
       status,
+      via: event.rsvpVia?.[memberId] ?? null,
     }));
   if (rows.length) {
     const { error } = await db.from("rsvps").upsert(rows);
-    if (error) throw error;
+    if (error && isMissingViaColumn(error)) {
+      const retry = await db.from("rsvps").upsert(rows.map(({ via: _via, ...rest }) => rest));
+      if (retry.error) throw retry.error;
+    } else if (error) {
+      throw error;
+    }
   }
-  const removed = Object.keys(previous).filter((memberId) => event.rsvps[memberId] === undefined);
+  const removed = Object.keys(prevRsvps).filter((memberId) => event.rsvps[memberId] === undefined);
   if (!removed.length) return;
   const { error } = await db.from("rsvps").delete().eq("gathering_id", event.id).in("member_id", removed);
   if (error) throw error;

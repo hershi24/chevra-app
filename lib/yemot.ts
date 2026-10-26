@@ -1,19 +1,69 @@
-import { gatheringHeld, upcomingGathering } from "./selectors";
+import { gatheringLabel } from "./format";
 import { memberByPhone, normalizePhone } from "./phone";
-import { updateState } from "./store";
-import type { IvrLog, RsvpStatus } from "./types";
+import { setMemberRsvp } from "./rsvp-record";
+import { gatheringHeld, upcomingGathering } from "./selectors";
+import { readState, updateState } from "./store";
+import type { AppState, IvrLog, RsvpStatus } from "./types";
 
 export const YEMOT_TEMPLATE_ID = "130645";
 export const YEMOT_GOTO_FOLDER = "/3";
-
-export const YEMOT_PROMPT =
-  "read=t-שלום לכם. להזמנה למפגש הבא: הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול.=digits,1,1,1,SelectedResponse,no,no,1,7";
 
 export const YEMOT_THANKS =
   "read=t-תודה רבה, בחירתכם נרשמה בהצלחה. להתראות.=no&hangup=yes";
 
 export const YEMOT_UNKNOWN =
   "read=t-לא זיהינו את מספר הטלפון השמור באתר. להתראות.=no&hangup=yes";
+
+const TZ = "Asia/Jerusalem";
+
+function ymSafe(text: string) {
+  return text.replace(/[=&]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function ymRead(text: string, hangup = false) {
+  const body = `read=t-${ymSafe(text)}=${hangup ? "no" : "digits,1,1,3,SelectedResponse,no,no,8"}`;
+  return hangup ? `${body}&hangup=yes` : body;
+}
+
+function jerusalemWhen(iso: string) {
+  const date = new Date(iso);
+  const pick = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("he-IL", { timeZone: TZ, ...options }).format(date);
+  return {
+    weekday: pick({ weekday: "long" }),
+    day: pick({ day: "numeric" }),
+    month: pick({ month: "long" }),
+    time: pick({ hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
+}
+
+function countPhrase(count: number, one: string, many: string, none: string) {
+  if (count === 0) return none;
+  if (count === 1) return one;
+  return `${count} ${many}`;
+}
+
+export function gatheringPrompt(state: AppState) {
+  const event = upcomingGathering(state);
+  if (!event) {
+    return ymRead("אין כרגע חברה קרובה ביומן. להתראות.", true);
+  }
+  const when = jerusalemWhen(event.startsAt);
+  const yes = state.members.filter((member) => event.rsvps[member.id] === "yes").length;
+  const maybe = state.members.filter((member) => event.rsvps[member.id] === "maybe").length;
+  const no = state.members.filter((member) => event.rsvps[member.id] === "no").length;
+  const pending = state.members.filter((member) => (event.rsvps[member.id] ?? "pending") === "pending").length;
+  const title = gatheringLabel(event);
+  const text = [
+    `שלום. החברה הבאה, ${title}, תתקיים ב${when.weekday}, ${when.day} ב${when.month}, בשעה ${when.time}.`,
+    `${countPhrase(yes, "חבר אחד כבר אישר הגעה", "כבר אישרו הגעה", "עדיין אף אחד לא אישר הגעה")}.`,
+    `${countPhrase(maybe, "חבר אחד ענה אולי", "ענו אולי", "אף אחד לא ענה אולי")}.`,
+    `${countPhrase(no, "חבר אחד לא מגיע", "לא מגיעים", "אף אחד לא ביטל")}.`,
+    `${countPhrase(pending, "חבר אחד טרם השיב", "טרם השיבו", "כולם כבר ענו")}.`,
+    "הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול.",
+  ].join(" ");
+  return ymRead(text);
+}
 
 const KEYPAD: Record<string, RsvpStatus> = {
   "1": "yes",
@@ -158,12 +208,24 @@ export function callerPhone(params: Record<string, string>) {
 }
 
 export async function handleMeetingResponse(params: Record<string, string>) {
+  const lower = lowerParams(params);
+  // Only ApiHangup means the caller dropped. A leftover hangup= query must not cut the prompt.
+  if (lower.apihangup === "yes") {
+    return ymText("hangup=yes");
+  }
+
   const phone = callerPhone(params);
-  const selected = pick(params, ["SelectedResponse", "digits", "Digits", "ApiDigits"]);
-
-  if (!selected) return ymText(YEMOT_PROMPT);
-
+  const selected = pick(params, ["SelectedResponse"]);
   const status = KEYPAD[selected];
+
+  if (!status) {
+    try {
+      return ymText(gatheringPrompt(await readState()));
+    } catch {
+      return ymText(ymRead("שלום. הקישו 1 לאישור הגעה, 2 לאולי, או 3 לביטול."));
+    }
+  }
+
   const at = new Date().toISOString();
   let result = "logged";
   let memberId: string | undefined;
@@ -177,9 +239,8 @@ export async function handleMeetingResponse(params: Record<string, string>) {
 
     if (!member) result = "unknown_phone";
     else if (!event || gatheringHeld(event) || event.status === "cancelled") result = "already_held";
-    else if (!status) result = "invalid_choice";
     else {
-      event.rsvps[member.id] = status;
+      setMemberRsvp(event, member.id, status, "phone");
       result = status === "yes" ? "rsvp_yes" : status === "maybe" ? "rsvp_maybe" : "rsvp_no";
     }
 

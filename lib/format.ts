@@ -1,4 +1,4 @@
-import type { Member, Role, RsvpStatus } from "./types";
+import type { Member, Role, RsvpStatus, RsvpVia } from "./types";
 
 export function formatDateHe(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -130,6 +130,18 @@ export function rsvpLabel(status: RsvpStatus) {
   if (status === "no") return "לא מגיע";
   if (status === "maybe") return "אולי";
   return "טרם השיב";
+}
+
+export function rsvpViaLabel(via?: RsvpVia) {
+  if (via === "email") return "במייל";
+  if (via === "phone") return "בטלפון";
+  if (via === "site") return "באתר";
+  return "";
+}
+
+export function rsvpWithVia(status: RsvpStatus, via?: RsvpVia) {
+  const source = status === "pending" ? "" : rsvpViaLabel(via);
+  return source ? `${rsvpLabel(status)} · ${source}` : rsvpLabel(status);
 }
 
 export function ivrResultLabel(result: string) {
