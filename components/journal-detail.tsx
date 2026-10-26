@@ -19,6 +19,7 @@ import {
   journalHeading,
   memberById,
   rsvpLabel,
+  rsvpWithVia,
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
@@ -725,7 +726,9 @@ export function JournalDetail({
                     <UserAvatar member={member} size="sm" />
                     {member.displayName}
                   </span>
-                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>{rsvpLabel(answer)}</span>
+                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>
+                    {rsvpWithVia(answer, event.rsvpVia?.[member.id])}
+                  </span>
                 </div>
               );
             })}

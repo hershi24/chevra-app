@@ -46,6 +46,7 @@ create table public.rsvps (
   gathering_id text references public.gatherings(id) on delete cascade,
   member_id text references public.members(id) on delete cascade,
   status public.rsvp_status not null default 'pending',
+  via text,
   updated_at timestamptz not null default now(),
   primary key (gathering_id, member_id)
 );

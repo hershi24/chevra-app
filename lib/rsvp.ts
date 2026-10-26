@@ -1,4 +1,5 @@
 import { publicMember } from "./password";
+import { setMemberRsvp } from "./rsvp-record";
 import { gatheringHeld } from "./selectors";
 import { readSignedToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
@@ -36,7 +37,7 @@ export async function applyRsvp(token: string, choice: RsvpStatus): Promise<Rsvp
     const event = state.gatherings.find((item) => item.id === row.eventId);
     if (!event) throw new Error("missing-event");
     if (gatheringHeld(event)) throw new Error("held");
-    event.rsvps[row.memberId] = choice;
+    setMemberRsvp(event, row.memberId, choice, "email");
   }).catch((error: unknown) => {
     if (error instanceof Error && (error.message === "missing" || error.message === "missing-event")) {
       return null;

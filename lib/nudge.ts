@@ -4,7 +4,9 @@ import { signRsvpToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
 import type { AppState, EmailDelivery, Gathering, Member, NudgeRecord } from "./types";
 
-import { memberAddress, nudgeState, waitingOn } from "./nudge-rules";
+import { memberHasPhone } from "./phone";
+import { sendTzintuk, yemotConfigured } from "./yemot";
+import { memberAddress, nudgeState, reachableForNudge, waitingOn } from "./nudge-rules";
 
 export * from "./nudge-rules";
 
@@ -94,6 +96,40 @@ export async function sendGatheringEmail(
   };
 }
 
+export function mergeNudgeRows(
+  emailRows: { memberId: string; delivery: EmailDelivery }[],
+  calls: { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string }[],
+  nameOf: (id: string) => string
+) {
+  const emails = new Map(emailRows.map((row) => [row.memberId, row.delivery]));
+  const dials = new Map(calls.filter((row) => !row.skipped).map((row) => [row.memberId, row]));
+  const ids = new Set([...emails.keys(), ...dials.keys()]);
+  const rows: { memberId: string; delivery: EmailDelivery }[] = [];
+  for (const memberId of ids) {
+    const email = emails.get(memberId);
+    const call = dials.get(memberId);
+    if (email?.status === "sent") rows.push({ memberId, delivery: email });
+    else if (call?.ok) {
+      rows.push({
+        memberId,
+        delivery: { to: call.phone, name: nameOf(memberId), status: "sent" },
+      });
+    } else if (email && email.status !== "skipped") rows.push({ memberId, delivery: email });
+    else if (call) {
+      rows.push({
+        memberId,
+        delivery: {
+          to: call.phone,
+          name: nameOf(memberId),
+          status: "failed",
+          error: call.error,
+        },
+      });
+    }
+  }
+  return rows;
+}
+
 export function recordDeliveries(
   state: AppState,
   eventId: string,
@@ -144,7 +180,7 @@ export function dueMembers(state: AppState, now = Date.now()) {
   if (!event) return { event: null, members: [] as Member[] };
   const records = events[event.id] ?? {};
   const members = state.members.filter((member) => {
-    if (!memberAddress(member) || !waitingOn(event, member, settings)) return false;
+    if (!reachableForNudge(member) || !waitingOn(event, member, settings)) return false;
     const record = records[member.id];
     if ((record?.nudges ?? 0) >= settings.maxPerMember) return false;
     if (!record?.lastAt) return true;
@@ -184,15 +220,26 @@ async function runOnce(originArg?: string): Promise<NudgeRunResult> {
   const { event, members } = dueMembers(state);
   if (!event || !members.length) return { ran: false, reason: "אין למי לשלוח", deliveries: [] };
   const origin = originArg || backgroundOrigin();
-  if (!origin) return { ran: false, reason: "חסרה כתובת האתר (PUBLIC_SITE_URL)", deliveries: [] };
+  const canCall = yemotConfigured();
+  if (!origin && !canCall) return { ran: false, reason: "חסרה כתובת האתר (PUBLIC_SITE_URL)", deliveries: [] };
 
   const rows: { memberId: string; delivery: EmailDelivery }[] = [];
+  const calls: { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string }[] = [];
   for (const member of members) {
-    const delivery = await sendGatheringEmail(state, event, member, { origin, variant: "nudge" });
-    rows.push({ memberId: member.id, delivery });
+    if (origin && memberAddress(member)) {
+      const delivery = await sendGatheringEmail(state, event, member, { origin, variant: "nudge" });
+      rows.push({ memberId: member.id, delivery });
+    }
+    if (canCall && memberHasPhone(member)) {
+      calls.push({ memberId: member.id, ...(await sendTzintuk(member.phone)) });
+    }
   }
+  if (!rows.length && !calls.length) {
+    return { ran: false, reason: origin ? "אין למי לשלוח" : "חסרה כתובת האתר (PUBLIC_SITE_URL)", deliveries: [] };
+  }
+  const combined = mergeNudgeRows(rows, calls, (id) => memberById(state.members, id)?.displayName ?? id);
   await updateState((s) => {
-    recordDeliveries(s, event.id, rows, "nudge");
+    recordDeliveries(s, event.id, combined, "nudge");
   });
-  return { ran: true, eventId: event.id, deliveries: rows.map((row) => row.delivery) };
+  return { ran: true, eventId: event.id, deliveries: combined.map((row) => row.delivery) };
 }

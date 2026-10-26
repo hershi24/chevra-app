@@ -22,7 +22,7 @@ import {
   type ReactionRow,
 } from "@/lib/chat-message";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-import type { Member, Message, PublicState, RsvpStatus } from "@/lib/types";
+import type { Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 
 type AppContextValue = {
   state: PublicState | null;
@@ -61,7 +61,11 @@ function withPendingRsvps(
     }
     if (item.rsvps[wait.memberId] === wait.status) return item;
     changed = true;
-    return { ...item, rsvps: { ...item.rsvps, [wait.memberId]: wait.status } };
+    return {
+      ...item,
+      rsvps: { ...item.rsvps, [wait.memberId]: wait.status },
+      rsvpVia: { ...(item.rsvpVia ?? {}), [wait.memberId]: "site" as const },
+    };
   });
   return changed ? { ...data, gatherings } : data;
 }
@@ -237,7 +241,7 @@ export function AppProvider({
   const act = useCallback(async (body: ActionBody) => {
     let staged: Message | null = null;
     let reaction: { messageId: string; emoji: string } | null = null;
-    let undoRsvp: { eventId: string; memberId: string; status?: RsvpStatus } | null = null;
+    let undoRsvp: { eventId: string; memberId: string; status?: RsvpStatus; via?: RsvpVia } | null = null;
     let ticket = 0;
     if (body.type === "sendMessage") {
       const id = body.id && body.id.length > 0 ? body.id : crypto.randomUUID();
@@ -280,6 +284,7 @@ export function AppProvider({
           eventId,
           memberId,
           status: current.gatherings.find((item) => item.id === eventId)?.rsvps[memberId],
+          via: current.gatherings.find((item) => item.id === eventId)?.rsvpVia?.[memberId],
         };
         pendingRsvps.current.set(eventId, {
           eventId,
@@ -293,7 +298,13 @@ export function AppProvider({
             ? {
                 ...prev,
                 gatherings: prev.gatherings.map((item) =>
-                  item.id === eventId ? { ...item, rsvps: { ...item.rsvps, [memberId]: status } } : item
+                  item.id === eventId
+                    ? {
+                        ...item,
+                        rsvps: { ...item.rsvps, [memberId]: status },
+                        rsvpVia: { ...(item.rsvpVia ?? {}), [memberId]: "site" as const },
+                      }
+                    : item
                 ),
               }
             : prev
@@ -337,9 +348,12 @@ export function AppProvider({
             gatherings: prev.gatherings.map((item) => {
               if (item.id !== undo.eventId) return item;
               const rsvps = { ...item.rsvps };
+              const rsvpVia = { ...(item.rsvpVia ?? {}) };
               if (undo.status === undefined) delete rsvps[undo.memberId];
               else rsvps[undo.memberId] = undo.status;
-              return { ...item, rsvps };
+              if (undo.via === undefined) delete rsvpVia[undo.memberId];
+              else rsvpVia[undo.memberId] = undo.via;
+              return { ...item, rsvps, rsvpVia };
             }),
           };
         });

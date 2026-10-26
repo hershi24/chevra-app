@@ -2,6 +2,8 @@ export type Role = "admin" | "leader" | "member";
 
 export type RsvpStatus = "yes" | "no" | "maybe" | "pending";
 
+export type RsvpVia = "email" | "phone" | "site";
+
 export type MediaType = "image" | "video" | "audio";
 
 export type Member = {
@@ -40,6 +42,7 @@ export type Gathering = {
   audioUrl?: string;
   status: "upcoming" | "past" | "cancelled";
   rsvps: Record<string, RsvpStatus>;
+  rsvpVia?: Record<string, RsvpVia>;
   attendedIds?: string[];
   media: EventMedia[];
 };

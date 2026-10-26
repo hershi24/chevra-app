@@ -31,11 +31,11 @@ import {
   formatTimeHe,
   gatheringTitle,
   memberById,
-  rsvpLabel,
+  rsvpWithVia,
 } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { dmName, galleryItems, gatheringHeld, upcomingGathering } from "@/lib/selectors";
-import type { Gathering, Member, Message, PublicState, RsvpStatus } from "@/lib/types";
+import type { Gathering, Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SEEN_KEY = "chevra-dashboard-seen";
@@ -565,9 +565,12 @@ function HeroEvent({
                     <UserAvatar member={member} size="sm" />
                     <span className="min-w-0 truncate text-[13px] font-light">{member.displayName}</span>
                     <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
-                      {rsvpLabel(event.rsvps[member.id] ?? "pending")}
+                      {rsvpWithVia(event.rsvps[member.id] ?? "pending", event.rsvpVia?.[member.id])}
                     </span>
-                    <StatusDot status={event.rsvps[member.id] ?? "pending"} />
+                    <StatusDot
+                      status={event.rsvps[member.id] ?? "pending"}
+                      via={event.rsvpVia?.[member.id]}
+                    />
                   </li>
                 ))}
               </ul>
@@ -632,10 +635,10 @@ function RsvpButton({
   );
 }
 
-function StatusDot({ status }: { status: RsvpStatus }) {
+function StatusDot({ status, via }: { status: RsvpStatus; via?: RsvpVia }) {
   return (
     <span
-      title={rsvpLabel(status)}
+      title={rsvpWithVia(status, via)}
       className={cn(
         "size-1.5 shrink-0 rounded-full",
         status === "yes" && "bg-[#3d8f62]",

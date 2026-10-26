@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Mail,
   MailWarning,
+  Phone,
   Send,
   SlidersHorizontal,
   Users,
@@ -26,7 +27,8 @@ import { Switch } from "@/components/ui/switch";
 import { boardEnabled, resolveBoard } from "@/lib/community-board";
 import { SCOPE_ALL, expensesOpen, formatAgorot, scopedSettlement } from "@/lib/expenses";
 import { formatRelativeHe, formatTimeHe, gatheringLabel, memberById } from "@/lib/format";
-import { memberAddress, normalizeNudgeSettings } from "@/lib/nudge-rules";
+import { memberAddress, normalizeNudgeSettings, reachableForNudge } from "@/lib/nudge-rules";
+import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
 import type { EmailDelivery, Gathering, Member, PublicState } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -61,23 +63,36 @@ function people(count: number, one: string, many: string) {
   return count === 1 ? one : `${count} ${many}`;
 }
 
+type InvitePostResult = {
+  error?: string;
+  deliveries?: EmailDelivery[];
+  sentCount?: number;
+  failedCount?: number;
+  callCount?: number;
+  callFailedCount?: number;
+};
+
 async function postInvites(body: Record<string, unknown>) {
   const res = await fetch("/api/invitations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await res.json()) as { error?: string; deliveries?: EmailDelivery[] };
+  const data = (await res.json()) as InvitePostResult;
   if (!res.ok) throw new Error(data.error || "השליחה נכשלה");
-  return data.deliveries ?? [];
+  return data;
 }
 
-function reportSend(deliveries: EmailDelivery[]) {
-  const sent = deliveries.filter((row) => row.status === "sent").length;
+function reportSend(data: InvitePostResult) {
+  const deliveries = data.deliveries ?? [];
+  const sent = data.sentCount ?? deliveries.filter((row) => row.status === "sent").length;
   const failed = deliveries.filter((row) => row.status !== "sent");
-  if (sent && !failed.length) toast.success(sent === 1 ? "התזכורת נשלחה" : `נשלחו ${sent} תזכורות`);
+  const called = Number(data.callCount) || 0;
+  if (sent && called) toast.success(`נשלחו ${sent} תזכורות, ויצא צינתוק ל־${called}`);
+  else if (sent && !failed.length) toast.success(sent === 1 ? "התזכורת נשלחה" : `נשלחו ${sent} תזכורות`);
   else if (sent) toast.success(`נשלחו ${sent}, ${failed.length} לא יצאו: ${failed[0].error ?? "השליחה נכשלה"}`);
-  else toast.error(failed[0]?.error || "אף מייל לא נשלח");
+  else if (called) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called}`);
+  else toast.error(failed[0]?.error || "אף תזכורת לא יצאה");
 }
 
 type Task = {
@@ -110,7 +125,7 @@ function useTasks(state: PublicState | null, event: Gathering | null, onOpen: (s
     });
   } else {
     const pending = state.members.filter((member) => (event.rsvps[member.id] ?? "pending") === "pending");
-    const reachable = pending.filter((member) => memberAddress(member));
+    const reachable = pending.filter(reachableForNudge);
     if (pending.length) {
       const names = pending.slice(0, 2).map((member) => member.displayName.split(" ")[0]);
       const who =
@@ -125,8 +140,8 @@ function useTasks(state: PublicState | null, event: Gathering | null, onOpen: (s
         tone: "gold",
         text: `${who} עוד ${pending.length === 1 ? "לא ענה" : "לא ענו"} לחברה של ${weekday(event.startsAt)}`,
         sub: reachable.length
-          ? `אפשר לשלוח עכשיו מייל ״מחכים רק להחלטה שלך״${nudge.enabled ? ", או לחכות לנודניק" : ""}`
-          : "אין להם כתובת מייל, אז צריך להזכיר להם בטלפון או להוסיף כתובת",
+          ? `אפשר לשלוח עכשיו תזכורת במייל ובצינתוק${nudge.enabled ? ", או לחכות לנודניק" : ""}`
+          : "אין להם מייל או טלפון, אז צריך להוסיף פרטי קשר",
         action: reachable.length ? "שליחת תזכורת" : "פתיחת ההזמנות",
         run: reachable.length
           ? async () =>
@@ -296,11 +311,13 @@ function RsvpBar({ event, members }: { event: Gathering; members: Member[] }) {
 }
 
 function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Gathering; onOpen: (screen: HubScreen) => void }) {
-  const { act } = useApp();
+  const { act, refresh } = useApp();
   const [busy, setBusy] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [calling, setCalling] = useState(false);
   const host = memberById(state.members, event.hostId)?.displayName;
   const pending = state.members.filter((member) => (event.rsvps[member.id] ?? "pending") === "pending");
+  const withPhone = state.members.filter(memberHasPhone).length;
   const nudge = normalizeNudgeSettings(state.nudge?.settings);
   const records = state.nudge?.events[event.id] ?? {};
   const every = nudge.everyHours === 24 ? "פעם ביום" : nudge.everyHours === 48 ? "כל יומיים" : nudge.everyHours === 72 ? "כל שלושה ימים" : `כל ${nudge.everyHours} שעות`;
@@ -313,6 +330,31 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
       toast.error(error instanceof Error ? error.message : "השליחה נכשלה");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function sendTzintukAll() {
+    if (calling) return;
+    setCalling(true);
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = (await res.json()) as { error?: string; callCount?: number; callFailedCount?: number };
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      const called = Number(data.callCount) || 0;
+      const failed = Number(data.callFailedCount) || 0;
+      if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
+      else if (called) toast.success(`יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error("הצינתוק לא יצא");
+      void refresh();
+    } finally {
+      setCalling(false);
     }
   }
 
@@ -342,6 +384,15 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
             <Users data-icon="inline-start" />
             לכל חבר בנפרד
           </Button>
+          <Button
+            variant="outline"
+            className="h-10 rounded-full px-4"
+            disabled={calling || withPhone === 0}
+            onClick={() => void sendTzintukAll()}
+          >
+            <Phone data-icon="inline-start" />
+            {calling ? "מחייג…" : "שליחת צינתוק"}
+          </Button>
         </div>
       </div>
       <div className="grid content-start gap-3 border-t border-[#e9ecef] bg-[#f7f3ec] p-5 md:border-s md:border-t-0">
@@ -356,16 +407,18 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">{member.displayName}</div>
                     <div className="truncate text-[11.5px] font-light text-muted-foreground">
-                      {!memberAddress(member)
-                        ? "אין כתובת מייל"
+                      {!reachableForNudge(member)
+                        ? "אין מייל או טלפון"
                         : record?.lastStatus === "failed"
-                          ? "המייל האחרון לא יצא"
+                          ? "התזכורת האחרונה לא יצאה"
                           : record?.lastAt
-                            ? `קיבל מייל ${formatRelativeHe(record.lastAt)}`
-                            : "עוד לא קיבל מייל"}
+                            ? `קיבל תזכורת ${formatRelativeHe(record.lastAt)}`
+                            : memberAddress(member)
+                              ? "עוד לא קיבל מייל"
+                              : "יש טלפון, בלי מייל"}
                     </div>
                   </div>
-                  {memberAddress(member) ? (
+                  {reachableForNudge(member) ? (
                     <button
                       type="button"
                       disabled={busy !== null}

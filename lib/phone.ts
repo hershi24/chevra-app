@@ -16,6 +16,10 @@ export function phoneKey(value: string) {
   return phone;
 }
 
+export function memberHasPhone(member: Member) {
+  return Boolean(normalizePhone(member.phone));
+}
+
 export function memberByPhone(members: Member[], raw: string) {
   const exact = normalizePhone(raw);
   const key = phoneKey(raw);

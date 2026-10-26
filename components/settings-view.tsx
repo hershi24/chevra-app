@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpWithVia } from "@/lib/format";
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
+import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
-import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, waitingOn } from "@/lib/nudge-rules";
+import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, reachableForNudge, waitingOn } from "@/lib/nudge-rules";
 import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member, NudgeSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -544,6 +545,7 @@ function PasswordForm() {
 function InvitesSection() {
   const { state, me, refresh } = useApp();
   const [sending, setSending] = useState(false);
+  const [calling, setCalling] = useState(false);
   const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -557,6 +559,7 @@ function InvitesSection() {
     return address && !address.endsWith("@chevra.local");
   }).length;
   const unreachable = state.members.length - reachable;
+  const withPhone = state.members.filter(memberHasPhone).length;
 
   async function sendInvites() {
     if (!event || sending) return;
@@ -575,30 +578,37 @@ function InvitesSection() {
       setDeliveries(data.deliveries ?? []);
       setShowReport(true);
       void refresh();
-      const called = Number(data.callCount) || 0;
-      if (data.sentCount && !data.failedCount && called) toast.success(`נשלחו ${data.sentCount} הזמנות, ויצא צינתוק ל־${called}`);
-      else if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
+      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
       else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
-      else if (called) toast.success(`יצא צינתוק ל־${called}`);
       else toast.error("אף מייל לא נשלח");
     } finally {
       setSending(false);
     }
   }
 
-  async function pingIvr() {
-    if (!me) return;
-    const res = await fetch("/api/ivr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: me.phone, digits: "1", action: "tzintuk", eventId: event?.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.error || "IVR נכשל");
-      return;
+  async function sendTzintukAll() {
+    if (!event || calling) return;
+    setCalling(true);
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      const called = Number(data.callCount) || 0;
+      const failed = Number(data.callFailedCount) || 0;
+      if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
+      else if (called) toast.success(`יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error("הצינתוק לא יצא");
+      void refresh();
+    } finally {
+      setCalling(false);
     }
-    toast.success("צילצול / עדכון IVR נרשם");
   }
 
   const previewHref = event
@@ -608,8 +618,8 @@ function InvitesSection() {
   return (
     <Section
       id="invites"
-      title="הזמנות במייל"
-      subtitle="כל חבר מקבל מייל עם כפתורי הגעה, וגם צינתוק לטלפון השמור בכרטיס שלו. מי שעונה מזוהה לפי אותו מספר, ומקליד 1 מגיע, 2 אולי, 3 לא."
+      title="הזמנות וצינתוק"
+      subtitle="המייל יוצא מכאן עם כפתורי הגעה. הצינתוק יוצא בנפרד לטלפון השמור — 1 מגיע, 2 אולי, 3 לא. ליד כל תשובה כתוב אם אושרה במייל, בטלפון או באתר."
       action={
         previewHref ? (
           <a
@@ -659,9 +669,14 @@ function InvitesSection() {
                 {sending ? "שולח…" : `שליחה ל־${reachable} חברים`}
               </Button>
               {can(me, "triggerIvr") ? (
-                <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => void pingIvr()}>
+                <Button
+                  variant="outline"
+                  className="h-10 rounded-full px-4"
+                  disabled={calling || withPhone === 0}
+                  onClick={() => void sendTzintukAll()}
+                >
                   <Phone data-icon="inline-start" />
-                  צינתוק IVR
+                  {calling ? "מחייג…" : withPhone ? "שליחת צינתוק" : "אין מספרי טלפון"}
                 </Button>
               ) : null}
               {unreachable ? (
@@ -697,7 +712,7 @@ function InvitesSection() {
 
 function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   const { state, refresh } = useApp();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ id: string; kind: "mail" | "call" } | null>(null);
   const [results, setResults] = useState<Record<string, EmailDelivery>>({});
   if (!state) return null;
   const records = state.nudge?.events[event.id] ?? {};
@@ -707,8 +722,8 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   });
 
   async function sendOne(member: Member) {
-    if (busyId) return;
-    setBusyId(member.id);
+    if (busy) return;
+    setBusy({ id: member.id, kind: "mail" });
     try {
       const res = await fetch("/api/invitations", {
         method: "POST",
@@ -722,14 +737,33 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
       }
       const delivery = (data.deliveries as EmailDelivery[] | undefined)?.[0];
       if (delivery) setResults((prev) => ({ ...prev, [member.id]: delivery }));
-      const called = Boolean(data.callCount);
-      if (delivery?.status === "sent" && called) toast.success(`ההזמנה נשלחה ל${member.displayName}, ויצא צינתוק`);
-      else if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
-      else if (called) toast.success(`יצא צינתוק ל${member.displayName}`);
+      if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
       else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
       void refresh();
     } finally {
-      setBusyId(null);
+      setBusy(null);
+    }
+  }
+
+  async function callOne(member: Member) {
+    if (busy) return;
+    setBusy({ id: member.id, kind: "call" });
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, memberId: member.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      if (data.callCount) toast.success(`יצא צינתוק ל${member.displayName}`);
+      else toast.error(data.calls?.[0]?.error || `הצינתוק ל${member.displayName} לא יצא`);
+      void refresh();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -737,7 +771,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
     <div className={PANEL}>
       <div className="flex items-baseline justify-between gap-3 border-b border-[#e9ecef] px-4 py-3 md:px-5">
         <div className="text-[15px]">לכל חבר בנפרד</div>
-        <div className="text-[12px] font-light text-muted-foreground">שליחה לחבר אחד, עם המילה האישית שלמעלה</div>
+        <div className="text-[12px] font-light text-muted-foreground">מייל או צינתוק לחבר אחד, בלי לשלוח לכולם</div>
       </div>
       <ul className="divide-y divide-[#eef0f3]">
         {members.map((member) => {
@@ -770,7 +804,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                             : "bg-[#f1f3f6] text-[#6b7280]"
                     )}
                   >
-                    {rsvpLabel(status)}
+                    {rsvpWithVia(status, event.rsvpVia?.[member.id])}
                   </span>
                 </div>
                 <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
@@ -785,16 +819,28 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                   </div>
                 ) : null}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 rounded-full"
-                disabled={!address || busyId !== null}
-                onClick={() => void sendOne(member)}
-              >
-                <Mail data-icon="inline-start" />
-                {busyId === member.id ? "שולח…" : "שליחה"}
-              </Button>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={!address || busy !== null}
+                  onClick={() => void sendOne(member)}
+                >
+                  <Mail data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "mail" ? "שולח…" : "מייל"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={!memberHasPhone(member) || busy !== null}
+                  onClick={() => void callOne(member)}
+                >
+                  <Phone data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "call" ? "מחייג…" : "צינתוק"}
+                </Button>
+              </div>
             </li>
           );
         })}
@@ -804,11 +850,45 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
 }
 
 function NudgePanel({ event }: { event: Gathering }) {
-  const { state, act } = useApp();
+  const { state, act, refresh } = useApp();
   const [saving, setSaving] = useState(false);
+  const [nudging, setNudging] = useState(false);
   if (!state) return null;
   const settings = normalizeNudgeSettings(state.nudge?.settings ?? defaultNudgeSettings());
-  const waiting = state.members.filter((member) => memberAddress(member) && waitingOn(event, member, settings)).length;
+  const waitingMembers = state.members.filter(
+    (member) => reachableForNudge(member) && waitingOn(event, member, settings)
+  );
+  const waiting = waitingMembers.length;
+
+  async function nudgeNow() {
+    if (!waitingMembers.length || nudging) return;
+    setNudging(true);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          memberIds: waitingMembers.map((member) => member.id),
+          variant: "nudge",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "התזכורת לא יצאה");
+        return;
+      }
+      const sent = Number(data.sentCount) || 0;
+      const called = Number(data.callCount) || 0;
+      if (sent && called) toast.success(`נשלחו ${sent} תזכורות, ויצא צינתוק ל־${called}`);
+      else if (sent) toast.success(sent === 1 ? "התזכורת נשלחה" : `נשלחו ${sent} תזכורות`);
+      else if (called) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called}`);
+      else toast.error("אף תזכורת לא יצאה");
+      void refresh();
+    } finally {
+      setNudging(false);
+    }
+  }
 
   async function save(next: NudgeSettings) {
     setSaving(true);
@@ -849,8 +929,8 @@ function NudgePanel({ event }: { event: Gathering }) {
       <div className="grid gap-3.5 border-t border-[#e9ecef] px-4 py-3.5 md:px-5">
         <p className="text-[12.5px] font-light leading-5 text-muted-foreground">
           כל עוד חבר לא ענה אם הוא מגיע, המערכת שולחת לו מייל תזכורת עם הכותרת{" "}
-          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה. מי שענה מפסיק לקבל. לא נשלח
-          בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
+          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה, וגם צינתוק לטלפון השמור. מי שענה
+          מפסיק לקבל. לא נשלח בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
         </p>
         <div className="grid gap-1.5">
           <div className="text-[12px] text-muted-foreground">כל כמה זמן</div>
@@ -894,6 +974,15 @@ function NudgePanel({ event }: { event: Gathering }) {
             onCheckedChange={(on) => void save({ ...settings, includeMaybe: on })}
           />
         </label>
+        <Button
+          variant="outline"
+          className="h-10 justify-self-start rounded-full px-4"
+          disabled={!waitingMembers.length || nudging}
+          onClick={() => void nudgeNow()}
+        >
+          <BellRing data-icon="inline-start" />
+          {nudging ? "שולח…" : "תזכורת עכשיו"}
+        </Button>
         <a
           href={`/api/invitations/preview?eventId=${encodeURIComponent(event.id)}&variant=nudge`}
           target="_blank"
