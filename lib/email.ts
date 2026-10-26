@@ -184,7 +184,7 @@ export function cancellationHtml(opts: {
       : escapeHtml(lecturerName)
     : "";
   const details: [string, string][] = [
-    ["מתי הייתה", `${when.weekday} · ${when.time}`],
+    ["מתי", `${when.weekday} · ${when.time}`],
     ["מקום", event.location ? escapeHtml(event.location) : ""],
     ["מארח", hostName ? escapeHtml(hostName) : ""],
     ["כיבוד", kibudName ? escapeHtml(kibudName) : ""],
