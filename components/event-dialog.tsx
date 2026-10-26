@@ -17,6 +17,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/components/app-provider";
 import { formatHebrewDate } from "@/lib/format";
 import type { Gathering, Member } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+const STATUSES: { id: Gathering["status"]; label: string; hint: string }[] = [
+  { id: "upcoming", label: "קרובה", hint: "מופיעה כחברה הבאה, ואפשר לשלוח הזמנות." },
+  { id: "past", label: "התקיימה", hint: "עוברת ליומן החברות שעברו." },
+  { id: "cancelled", label: "בוטלה", hint: "יורדת מהחברה הקרובה. האישורים של החברים נשמרים." },
+];
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -49,6 +56,10 @@ export function EventDialog({
   const [withTitle, setWithTitle] = useState(Boolean(event?.title?.trim()));
   const [date, setDate] = useState(dateValue(event?.startsAt));
   const [time, setTime] = useState(timeValue(event?.startsAt));
+  const [status, setStatus] = useState<Gathering["status"]>(event?.status ?? "upcoming");
+  const [notify, setNotify] = useState(false);
+  const [cancelNote, setCancelNote] = useState("");
+  const [openedAt, setOpenedAt] = useState(0);
 
   async function onSubmit(formData: FormData) {
     setSaving(true);
@@ -63,9 +74,22 @@ export function EventDialog({
         await act({
           type: "updateEvent",
           eventId: event.id,
-          patch: { title, startsAt, hostId, kibudId, topic, notes },
+          patch: { title, startsAt, hostId, kibudId, topic, notes, status },
         });
-        toast.success("החברה עודכנה");
+        if (status === "cancelled" && notify) {
+          const res = await fetch("/api/invitations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId: event.id, note: cancelNote, variant: "cancel" }),
+          });
+          const data = (await res.json()) as { error?: string; sentCount?: number; failedCount?: number };
+          if (!res.ok) toast.error(data.error || "הודעת הביטול לא נשלחה");
+          else if (data.sentCount && !data.failedCount) toast.success(`החברה סווגה כבוטלה · נשלחו ${data.sentCount} הודעות`);
+          else if (data.sentCount) toast.success(`החברה סווגה כבוטלה · נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
+          else toast.error("החברה סווגה כבוטלה, אבל אף הודעת ביטול לא יצאה");
+        } else {
+          toast.success(status === "cancelled" ? "החברה סווגה כבוטלה" : "החברה עודכנה");
+        }
       } else {
         await act({
           type: "createEvent",
@@ -93,6 +117,12 @@ export function EventDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        if (next && event) {
+          setStatus(event.status);
+          setNotify(false);
+          setCancelNote("");
+          setOpenedAt(Date.now());
+        }
         if (!next && !event) setWithTitle(false);
       }}
     >
@@ -162,6 +192,61 @@ export function EventDialog({
             <Label htmlFor="notes">הערות</Label>
             <Textarea id="notes" name="notes" rows={3} defaultValue={event?.notes} />
           </div>
+          {event ? (
+            <div className="grid gap-2">
+              <Label>סיווג החברה</Label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {STATUSES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={status === item.id}
+                    onClick={() => {
+                      setStatus(item.id);
+                      if (item.id !== "cancelled") setNotify(false);
+                      else if (event.status !== "cancelled") setNotify(true);
+                    }}
+                    className={cn(
+                      "rounded-full border px-2 py-2 text-[13px]",
+                      status === item.id
+                        ? item.id === "cancelled"
+                          ? "border-[#a4453a] bg-[#fdf3ef] text-[#a4453a]"
+                          : "border-[#a9782c] bg-[#f5f0e7] text-[#7d5a22]"
+                        : "border-[#dfe3e8] text-foreground/75"
+                    )}
+                  >
+                    {item.id === "cancelled" ? "✕ בוטלה" : item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[12px] font-light leading-5 text-muted-foreground">
+                {STATUSES.find((item) => item.id === status)?.hint}
+                {status === "upcoming" && openedAt > 0 && new Date(`${date}T${time}`).getTime() < openedAt
+                  ? " התאריך כבר עבר, אז אפשר לסווג אותה כחברה שהתקיימה או כבוטלה."
+                  : ""}
+              </p>
+            </div>
+          ) : null}
+          {event && status === "cancelled" ? (
+            <div className="grid gap-2 rounded-xl bg-[#fdf3ef] px-3 py-3">
+              <label className="flex items-center justify-between gap-3 text-sm">
+                שליחת הודעת ביטול לחברים
+                <Switch checked={notify} onCheckedChange={setNotify} />
+              </label>
+              <p className="text-[12px] font-light leading-5 text-muted-foreground">
+                המייל יוצא עם הכותרת ״✕ בוטלה״ וסימון ברור שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
+              </p>
+              {notify ? (
+                <Textarea
+                  rows={2}
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="מילה קצרה שתופיע בהודעה (לא חובה)"
+                  className="bg-white"
+                />
+              ) : null}
+            </div>
+          ) : null}
           <Button type="submit" disabled={saving} className="mt-2">
             {saving ? "שומר…" : event ? "שמירת שינויים" : "שמירת חברה"}
           </Button>

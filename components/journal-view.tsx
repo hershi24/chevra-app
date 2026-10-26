@@ -49,12 +49,16 @@ function storyCopy(event: Gathering, upcoming: boolean) {
   return { heading, body: lines.join(" ") };
 }
 
-function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" }) {
+function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" | "red" }) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-light",
-        tone === "gold" ? "bg-[#f7eedd] text-[#7a5418]" : "bg-[#eef0f3] text-[#4b5563]"
+        tone === "red"
+          ? "bg-[#fdf3ef] text-[#a4453a]"
+          : tone === "gold"
+            ? "bg-[#f7eedd] text-[#7a5418]"
+            : "bg-[#eef0f3] text-[#4b5563]"
       )}
     >
       {children}
@@ -329,6 +333,7 @@ function JournalEntry({
 }) {
   const href = `/journal/${event.id}`;
   const held = gatheringHeld(event);
+  const cancelled = event.status === "cancelled";
   const isUpcoming = event.status === "upcoming" && !held;
   const { kind } = splitGatheringTitle(event);
   const { heading, body } = storyCopy(event, isUpcoming);
@@ -337,20 +342,33 @@ function JournalEntry({
   const lecturer = memberById(members, event.lecturerId);
   const kibud = memberById(members, event.kibudId);
   const yes = members.filter((m) => event.rsvps[m.id] === "yes");
+  const maybe = members.filter((m) => event.rsvps[m.id] === "maybe").length;
+  const declined = members.filter((m) => event.rsvps[m.id] === "no").length;
+  const waiting = members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending").length;
   const pics = images(event);
   const text = body;
-  const facts = [
-    held
-      ? null
-      : yes.length
-        ? isUpcoming
-          ? `${yes.length} מגיעים`
-          : yes.length === members.length
-            ? `כל ${members.length} החברים הגיעו`
-            : `${yes.length} השתתפו`
-        : null,
-    pics.length ? `${pics.length} תמונות` : null,
-  ].filter(Boolean);
+  const facts = (
+    cancelled
+      ? [
+          yes.length ? `${yes.length} אישרו` : null,
+          maybe ? `${maybe} אולי` : null,
+          declined ? `${declined} לא מגיעים` : null,
+          waiting ? `${waiting} טרם` : null,
+          pics.length ? `${pics.length} תמונות` : null,
+        ]
+      : [
+          held
+            ? null
+            : yes.length
+              ? isUpcoming
+                ? `${yes.length} מגיעים`
+                : yes.length === members.length
+                  ? `כל ${members.length} החברים הגיעו`
+                  : `${yes.length} השתתפו`
+              : null,
+          pics.length ? `${pics.length} תמונות` : null,
+        ]
+  ).filter(Boolean);
 
   return (
     <article
@@ -374,7 +392,7 @@ function JournalEntry({
           {kind ? <Chip tone="gray">{kind}</Chip> : null}
           {gatheringHeld(event) ? <Chip>התקיימה</Chip> : null}
           {isUpcoming && !gatheringHeld(event) ? <Chip>קרובה · {formatTimeHe(event.startsAt)}</Chip> : null}
-          {event.status === "cancelled" ? <Chip tone="gray">בוטלה</Chip> : null}
+          {cancelled ? <Chip tone="red">✕ בוטלה</Chip> : null}
         </div>
         <h3 className="mt-1.5 mb-1 text-[18px] leading-snug font-medium">
           <Link href={href} className="after:absolute after:inset-0 after:rounded-[22px]">

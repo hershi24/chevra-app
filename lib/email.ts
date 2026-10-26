@@ -159,6 +159,92 @@ export function nudgeSubject(member: Member) {
   return `${firstName(member.displayName)}, מחכים רק להחלטה שלך`;
 }
 
+export function cancelSubject(event: { title?: string; topic?: string; startsAt: string }) {
+  return `✕ בוטלה: ${gatheringLabel(event)}`;
+}
+
+export function cancellationHtml(opts: {
+  member: Member;
+  event: Gathering;
+  hostName: string;
+  kibudName?: string;
+  lecturerName?: string;
+  senderName?: string;
+  note?: string;
+  origin: string;
+}) {
+  const { member, event, hostName, kibudName, lecturerName, senderName, note, origin } = opts;
+  const when = jerusalemParts(event.startsAt);
+  const title = gatheringLabel(event);
+  const personal = note?.trim() ? escapeHtml(note.trim()).replaceAll("\n", "<br>") : "";
+  const topic = event.topic?.trim();
+  const lesson = lecturerName
+    ? topic && topic !== title
+      ? `${escapeHtml(topic)} · ${escapeHtml(lecturerName)}`
+      : escapeHtml(lecturerName)
+    : "";
+  const details: [string, string][] = [
+    ["מתי הייתה", `${when.weekday} · ${when.time}`],
+    ["מקום", event.location ? escapeHtml(event.location) : ""],
+    ["מארח", hostName ? escapeHtml(hostName) : ""],
+    ["כיבוד", kibudName ? escapeHtml(kibudName) : ""],
+    ["שיעור", lesson],
+  ];
+  const detailRows = details
+    .filter(([, value]) => value)
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:9px 0 0;width:86px;color:${muted};font-size:12px;vertical-align:top;${A}">${label}</td><td style="padding:9px 0 0;color:${ink};text-decoration:line-through;${A}">${value}</td></tr>`
+    )
+    .join("");
+  const inner = `
+    <div style="text-align:center;${A}">
+      <div style="display:inline-block;width:72px;height:72px;line-height:72px;border-radius:50%;background:#fbeee9;color:#a4453a;font-size:36px;">✕</div>
+      <div style="margin-top:12px;font-size:13px;letter-spacing:.04em;color:#a4453a;${A}">✕ &nbsp; בוטלה &nbsp; ✕</div>
+    </div>
+    ${heading(`${escapeHtml(firstName(member.displayName))}, החברה בוטלה`)}
+    ${paragraph(`החברה ${whenPhrase(event.startsAt)} לא תתקיים. אין צורך להגיע, ואין צורך לענות שוב.`)}
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;background:#fff8f6;border:1px solid #f0d2cb;border-radius:18px;${A}">
+      <tr><td style="padding:18px 20px;${A}">
+        <table role="presentation" dir="rtl" cellpadding="0" cellspacing="0" style="${A}"><tr>
+          <td valign="middle" style="width:64px;">
+            <div style="width:64px;border-radius:16px;background:#fbeee9;color:#a4453a;text-align:center;padding:10px 0 8px;">
+              <div style="font-size:26px;line-height:1;">✕</div>
+              <div style="font-size:11px;margin-top:4px;">בוטלה</div>
+            </div>
+          </td>
+          <td valign="middle" style="padding-right:14px;${A}">
+            <div style="font-size:18px;line-height:1.3;color:${ink};text-decoration:line-through;">${escapeHtml(title)}</div>
+            <div style="font-size:13px;color:#a4453a;margin-top:3px;">${when.weekday} · ${when.day} ב${when.month} · ${formatHebrewDate(event.startsAt)}</div>
+          </td>
+        </tr></table>
+        ${
+          detailRows
+            ? `<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border-top:1px solid #f0d2cb;font-size:14px;line-height:1.6;${A}">${detailRows}</table>`
+            : ""
+        }
+      </td></tr>
+    </table>
+    ${
+      personal
+        ? `<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;${A}">
+      <tr><td style="border-right:3px solid #a4453a;background:#fdf3ef;border-radius:12px;padding:12px 16px;font-size:14px;line-height:1.7;color:#4b4033;${A}">
+        <div style="font-size:11px;color:#a4453a;margin-bottom:2px;">${senderName ? `מילה מ${escapeHtml(firstName(senderName))}` : "מילה מהמארגנים"}</div>
+        ${personal}
+      </td></tr>
+    </table>`
+        : ""
+    }
+    ${paragraph("אם כבר אישרת הגעה, אין צורך לעשות דבר. נעדכן כשתקבע חברה אחרת.")}
+  `;
+  return emailShell({
+    origin,
+    title: "החברה בוטלה",
+    preheader: "החברה לא תתקיים. אין צורך להגיע ואין צורך לענות.",
+    inner,
+  });
+}
+
 function resendReason(status: number, text: string) {
   let message = "";
   try {

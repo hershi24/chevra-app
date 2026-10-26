@@ -1,4 +1,4 @@
-import { invitationHtml, nudgeSubject, sendEmail } from "./email";
+import { cancellationHtml, cancelSubject, invitationHtml, nudgeSubject, sendEmail } from "./email";
 import { gatheringLabel, memberById } from "./format";
 import { signRsvpToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
@@ -31,7 +31,7 @@ type SendOpts = {
   origin: string;
   note?: string;
   senderName?: string;
-  variant: "invite" | "nudge";
+  variant: "invite" | "nudge" | "cancel";
 };
 
 export async function sendGatheringEmail(
@@ -50,21 +50,38 @@ export async function sendGatheringEmail(
     };
   }
   const token = signRsvpToken(member.id, event.id);
-  const html = invitationHtml({
-    member,
-    event,
-    hostName: memberById(state.members, event.hostId)?.displayName ?? "",
-    kibudName: memberById(state.members, event.kibudId)?.displayName,
-    lecturerName: memberById(state.members, event.lecturerId)?.displayName,
-    senderName: opts.senderName,
-    yesUrl: `${opts.origin}/rsvp/${token}?c=yes`,
-    maybeUrl: `${opts.origin}/rsvp/${token}?c=maybe`,
-    noUrl: `${opts.origin}/rsvp/${token}?c=no`,
-    note: opts.note,
-    origin: opts.origin,
-    variant: opts.variant,
-  });
-  const subject = opts.variant === "nudge" ? nudgeSubject(member) : `הזמנה: ${gatheringLabel(event)}`;
+  const html =
+    opts.variant === "cancel"
+      ? cancellationHtml({
+          member,
+          event,
+          hostName: memberById(state.members, event.hostId)?.displayName ?? "",
+          kibudName: memberById(state.members, event.kibudId)?.displayName,
+          lecturerName: memberById(state.members, event.lecturerId)?.displayName,
+          senderName: opts.senderName,
+          note: opts.note,
+          origin: opts.origin,
+        })
+      : invitationHtml({
+          member,
+          event,
+          hostName: memberById(state.members, event.hostId)?.displayName ?? "",
+          kibudName: memberById(state.members, event.kibudId)?.displayName,
+          lecturerName: memberById(state.members, event.lecturerId)?.displayName,
+          senderName: opts.senderName,
+          yesUrl: `${opts.origin}/rsvp/${token}?c=yes`,
+          maybeUrl: `${opts.origin}/rsvp/${token}?c=maybe`,
+          noUrl: `${opts.origin}/rsvp/${token}?c=no`,
+          note: opts.note,
+          origin: opts.origin,
+          variant: opts.variant === "nudge" ? "nudge" : "invite",
+        });
+  const subject =
+    opts.variant === "cancel"
+      ? cancelSubject(event)
+      : opts.variant === "nudge"
+        ? nudgeSubject(member)
+        : `הזמנה: ${gatheringLabel(event)}`;
   const result = await sendEmail({ to: address, subject, html });
   if ("mock" in result) {
     return { to: address, name: member.displayName, status: "failed", error: "אין מפתח Resend בשרת, המייל לא יצא" };
@@ -81,7 +98,7 @@ export function recordDeliveries(
   state: AppState,
   eventId: string,
   rows: { memberId: string; delivery: EmailDelivery }[],
-  variant: "invite" | "nudge",
+  variant: "invite" | "nudge" | "cancel",
   at = new Date().toISOString()
 ) {
   const current = nudgeState(state);
