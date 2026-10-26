@@ -411,7 +411,7 @@ export function JournalDetail({
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-md text-[12px] font-light leading-5 text-muted-foreground">
-                    ההודעה יוצאת עם הכותרת ״✕ בוטלה״ וסימון ברור. בלי כפתורי הגעה ובלי סטטוס של חברים.
+                    שם החברה הוא הכותרת, ומתחתיו בשורה קטנה יותר כתוב שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
                   </p>
                   <Button
                     type="button"
