@@ -49,7 +49,7 @@ function spokenPlace(state: AppState, event: { location?: string; hostId?: strin
   const location = event.location?.trim() ?? "";
   const host = memberById(state.members, event.hostId)?.displayName.trim() ?? "";
   const lines = [];
-  if (location) lines.push(`במקום ${location}`);
+  if (location) lines.push(`במיקום ${location}`);
   if (host && !location.includes(host)) lines.push(`אצל ${host}`);
   return lines.join(", ");
 }
@@ -119,8 +119,8 @@ export function gatheringPrompt(state: AppState) {
   const parts = [
     "שלום",
     `החברה הבאה, ${title}`,
-    `התאריך העברי, ${spokenHebrewDate(event.startsAt)}`,
-    `התאריך הלועזי, ${spokenCivilDate(event.startsAt)}`,
+    `בתאריך העברי, ${spokenHebrewDate(event.startsAt)}`,
+    `בתאריך הלועזי, ${spokenCivilDate(event.startsAt)}`,
     spokenTime(event.startsAt),
   ];
   const place = spokenPlace(state, event);
