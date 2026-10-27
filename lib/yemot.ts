@@ -1,4 +1,4 @@
-import { gatheringLabel } from "./format";
+import { gatheringLabel, hebrewDateParts } from "./format";
 import { memberByPhone, normalizePhone } from "./phone";
 import { setMemberRsvp } from "./rsvp-record";
 import { gatheringHeld, upcomingGathering } from "./selectors";
@@ -22,17 +22,27 @@ function yemotLine(value: string) {
     .trim();
 }
 
-function yemotStamp(iso: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).formatToParts(new Date(iso));
-  const day = parts.find((part) => part.type === "day")?.value ?? "";
-  const month = parts.find((part) => part.type === "month")?.value ?? "";
-  const year = parts.find((part) => part.type === "year")?.value ?? "";
-  return `${day}/${month}/${year}`;
+function jerusalemNoon(iso: string) {
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
+  return `${key}T12:00:00.000Z`;
+}
+
+function spokenHebrewDay(day: string) {
+  const letters = day.replace(/[׳״']/g, "");
+  if (letters.length <= 1) return `${letters}׳`;
+  return `${letters.slice(0, -1)}״${letters.slice(-1)}`;
+}
+
+function spokenHebrewDate(iso: string) {
+  const { day, month } = hebrewDateParts(jerusalemNoon(iso));
+  return `${spokenHebrewDay(day)} ב${month}`;
+}
+
+function spokenCivilDate(iso: string) {
+  const date = new Date(iso);
+  const day = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric" }).format(date);
+  const month = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, month: "long" }).format(date);
+  return `${day} ב${month}`;
 }
 
 function spokenTime(iso: string) {
@@ -47,10 +57,9 @@ function spokenTime(iso: string) {
   return `בשעה ${hour}:${minute}`;
 }
 
-function say(parts: Array<string | { kind: "date" | "dateH"; iso: string }>) {
+function say(parts: string[]) {
   return parts
     .map((part) => {
-      if (typeof part !== "string") return `${part.kind}-${yemotStamp(part.iso)}`;
       const text = yemotLine(part);
       return text ? `t-${text}` : "";
     })
@@ -58,7 +67,7 @@ function say(parts: Array<string | { kind: "date" | "dateH"; iso: string }>) {
     .join(".");
 }
 
-function readMenu(parts: Array<string | { kind: "date" | "dateH"; iso: string }>) {
+function readMenu(parts: string[]) {
   return `read=${say(parts)}=${READ_FIELDS}`;
 }
 
@@ -98,11 +107,11 @@ export function gatheringPrompt(state: AppState) {
   const event = upcomingGathering(state);
   if (!event) return closing("אין כרגע חברה קרובה ביומן, להתראות");
   const title = gatheringLabel(event);
-  const parts: Array<string | { kind: "date" | "dateH"; iso: string }> = [
+  const parts = [
     "שלום",
     `החברה הבאה, ${title}`,
-    { kind: "dateH", iso: event.startsAt },
-    { kind: "date", iso: event.startsAt },
+    `התאריך העברי, ${spokenHebrewDate(event.startsAt)}`,
+    `התאריך הלועזי, ${spokenCivilDate(event.startsAt)}`,
     spokenTime(event.startsAt),
   ];
   if (event.location?.trim()) parts.push(`במקום ${event.location}`);
