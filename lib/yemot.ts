@@ -1,4 +1,4 @@
-import { gatheringLabel, hebrewDateParts } from "./format";
+import { gatheringLabel, hebrewDateParts, memberById } from "./format";
 import { memberByPhone, normalizePhone } from "./phone";
 import { setMemberRsvp } from "./rsvp-record";
 import { gatheringHeld, upcomingGathering } from "./selectors";
@@ -43,6 +43,15 @@ function spokenCivilDate(iso: string) {
   const day = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric" }).format(date);
   const month = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, month: "long" }).format(date);
   return `${day} ב${month}`;
+}
+
+function spokenPlace(state: AppState, event: { location?: string; hostId?: string }) {
+  const location = event.location?.trim() ?? "";
+  const host = memberById(state.members, event.hostId)?.displayName.trim() ?? "";
+  const lines = [];
+  if (location) lines.push(`במקום ${location}`);
+  if (host && !location.includes(host)) lines.push(`אצל ${host}`);
+  return lines.join(", ");
 }
 
 function spokenTime(iso: string) {
@@ -114,7 +123,8 @@ export function gatheringPrompt(state: AppState) {
     `התאריך הלועזי, ${spokenCivilDate(event.startsAt)}`,
     spokenTime(event.startsAt),
   ];
-  if (event.location?.trim()) parts.push(`במקום ${event.location}`);
+  const place = spokenPlace(state, event);
+  if (place) parts.push(place);
   const topic = event.topic?.trim();
   if (topic && topic !== title && !title.includes(topic) && !topic.includes(title)) parts.push(`הנושא, ${topic}`);
   parts.push("הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול");
