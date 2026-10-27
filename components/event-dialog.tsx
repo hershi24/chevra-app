@@ -65,6 +65,7 @@ export function EventDialog({
     try {
       const startsAt = new Date(`${date}T${time}`).toISOString();
       const title = String(formData.get("title") ?? "").trim();
+      const location = String(formData.get("location") ?? "").trim();
       const hostId = String(formData.get("hostId"));
       const kibudId = String(formData.get("kibudId") || "") || undefined;
       const topic = String(formData.get("topic") || "") || undefined;
@@ -73,7 +74,7 @@ export function EventDialog({
         await act({
           type: "updateEvent",
           eventId: event.id,
-          patch: { title, startsAt, hostId, kibudId, topic, notes, status },
+          patch: { title, startsAt, location, hostId, kibudId, topic, notes, status },
         });
         if (status === "cancelled" && notify) {
           const res = await fetch("/api/invitations", {
@@ -94,6 +95,7 @@ export function EventDialog({
           type: "createEvent",
           title,
           startsAt,
+          location,
           hostId,
           kibudId,
           topic,
@@ -173,6 +175,12 @@ export function EventDialog({
               <span className="block text-muted-foreground">{formatHebrewDate(`${date}T${time || "00:00"}`)}</span>
             </p>
           ) : null}
+          <Field
+            label="מיקום"
+            name="location"
+            placeholder="כתובת או שם הבית"
+            defaultValue={event?.location}
+          />
           <SelectField label="מארח" name="hostId" members={members} defaultValue={event?.hostId} />
           <SelectField
             label="אחראי כיבוד"
