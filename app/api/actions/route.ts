@@ -23,6 +23,7 @@ import {
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { boardEnabled, normalizeBoard, resolveBoard } from "@/lib/community-board";
+import { setMemberRsvp } from "@/lib/rsvp-record";
 import { galleryItems, gatheringHeld } from "@/lib/selectors";
 import { normalizeNudgeSettings, nudgeState } from "@/lib/nudge";
 import { emitToMembers } from "@/lib/realtime";
@@ -213,7 +214,7 @@ function applyAction(
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
       if (event.status !== "upcoming" || gatheringHeld(event)) throw new Error("החברה כבר התקיימה");
-      event.rsvps[me.id] = body.status;
+      setMemberRsvp(event, me.id, body.status, "site");
       return;
     }
     case "setAttendance": {
@@ -222,7 +223,7 @@ function applyAction(
       if (!event) throw new Error("החברה לא נמצאה");
       if (!gatheringHeld(event)) throw new Error("החברה עוד לא התקיימה");
       if (!s.members.some((member) => member.id === body.memberId)) throw new Error("החבר לא נמצא");
-      event.rsvps[body.memberId] = body.attended ? "yes" : "no";
+      setMemberRsvp(event, body.memberId, body.attended ? "yes" : "no", "site");
       return;
     }
     case "createEvent": {
@@ -241,6 +242,7 @@ function applyAction(
         notes: body.notes,
         status: "upcoming",
         rsvps,
+        rsvpVia: {},
         media: [],
       };
       s.gatherings.unshift(event);
@@ -568,6 +570,7 @@ function applyAction(
       s.tokens = s.tokens.filter((token) => token.memberId !== member.id);
       for (const event of s.gatherings) {
         delete event.rsvps[member.id];
+        if (event.rsvpVia) delete event.rsvpVia[member.id];
       }
       s.expenses = (s.expenses ?? []).filter((item) => item.memberId !== member.id);
       s.payments = (s.payments ?? []).filter(

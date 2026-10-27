@@ -1,3 +1,4 @@
+import { memberHasPhone } from "./phone";
 import type { AppState, Gathering, Member, NudgeSettings, NudgeState } from "./types";
 
 export const NUDGE_EVERY_OPTIONS = [12, 24, 48, 72];
@@ -35,4 +36,8 @@ export function memberAddress(member: Member) {
 export function waitingOn(event: Gathering, member: Member, settings: NudgeSettings) {
   const status = event.rsvps[member.id] ?? "pending";
   return status === "pending" || (settings.includeMaybe && status === "maybe");
+}
+
+export function reachableForNudge(member: Member) {
+  return Boolean(memberAddress(member) || memberHasPhone(member));
 }

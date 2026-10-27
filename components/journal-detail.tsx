@@ -19,6 +19,7 @@ import {
   journalHeading,
   memberById,
   rsvpLabel,
+  rsvpWithVia,
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
@@ -411,7 +412,7 @@ export function JournalDetail({
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-md text-[12px] font-light leading-5 text-muted-foreground">
-                    ההודעה יוצאת עם הכותרת ״✕ בוטלה״ וסימון ברור. בלי כפתורי הגעה ובלי סטטוס של חברים.
+                    שם החברה הוא הכותרת, ומתחתיו בשורה קטנה יותר כתוב שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
                   </p>
                   <Button
                     type="button"
@@ -725,7 +726,9 @@ export function JournalDetail({
                     <UserAvatar member={member} size="sm" />
                     {member.displayName}
                   </span>
-                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>{rsvpLabel(answer)}</span>
+                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>
+                    {rsvpWithVia(answer, event.rsvpVia?.[member.id])}
+                  </span>
                 </div>
               );
             })}

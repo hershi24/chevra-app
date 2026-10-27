@@ -234,7 +234,7 @@ export function EventDialog({
                 <Switch checked={notify} onCheckedChange={setNotify} />
               </label>
               <p className="text-[12px] font-light leading-5 text-muted-foreground">
-                המייל יוצא עם הכותרת ״✕ בוטלה״ וסימון ברור שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
+                שם החברה הוא הכותרת. מתחתיו, בשורה קטנה יותר, כתוב שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
               </p>
               {notify ? (
                 <Textarea

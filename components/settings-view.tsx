@@ -15,12 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpWithVia } from "@/lib/format";
 import { expensesOpen } from "@/lib/expenses";
 import { can, isAdmin } from "@/lib/permissions";
+import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
-import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, waitingOn } from "@/lib/nudge-rules";
-import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, IvrLog, Member, NudgeSettings } from "@/lib/types";
+import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, reachableForNudge, waitingOn } from "@/lib/nudge-rules";
+import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member, NudgeSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SectionId = "account" | "notify" | "members" | "invites" | "system";
@@ -34,25 +35,6 @@ const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon 
 ];
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
-
-type TzintukCall = { status: "sent" | "failed" | "skipped"; error?: string };
-
-function joinNotes(first: string, second: string) {
-  return second ? `${first} · ${second}` : first;
-}
-
-function callSummary(calls: TzintukCall[] | undefined) {
-  if (!calls?.length) return "";
-  const sent = calls.filter((call) => call.status === "sent").length;
-  const failed = calls.filter((call) => call.status === "failed");
-  if (sent && !failed.length) return sent === 1 ? "הצינתוק יצא" : `צינתוק ל־${sent}`;
-  if (sent) return `צינתוק ל־${sent}, ${failed.length} לא יצאו`;
-  return failed[0]?.error || "הצינתוק לא יצא";
-}
-
-function callLine(log: IvrLog[], eventId: string, memberId: string) {
-  return log.find((row) => row.action === "tzintuk" && row.eventId === eventId && row.memberId === memberId)?.result ?? "";
-}
 
 const PageMode = createContext(false);
 
@@ -563,6 +545,7 @@ function PasswordForm() {
 function InvitesSection() {
   const { state, me, refresh } = useApp();
   const [sending, setSending] = useState(false);
+  const [calling, setCalling] = useState(false);
   const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -576,6 +559,7 @@ function InvitesSection() {
     return address && !address.endsWith("@chevra.local");
   }).length;
   const unreachable = state.members.length - reachable;
+  const withPhone = state.members.filter(memberHasPhone).length;
 
   async function sendInvites() {
     if (!event || sending) return;
@@ -586,13 +570,7 @@ function InvitesSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id, note: inviteNote }),
       });
-      const data = (await res.json()) as {
-        error?: string;
-        deliveries?: EmailDelivery[];
-        sentCount?: number;
-        failedCount?: number;
-        calls?: TzintukCall[];
-      };
+      const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "שליחה נכשלה");
         return;
@@ -600,32 +578,37 @@ function InvitesSection() {
       setDeliveries(data.deliveries ?? []);
       setShowReport(true);
       void refresh();
-      const callNote = callSummary(data.calls);
-      if (data.sentCount && !data.failedCount) toast.success(joinNotes(`נשלחו ${data.sentCount} הזמנות`, callNote));
-      else if (data.sentCount) toast.success(joinNotes(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`, callNote));
-      else if (data.calls?.some((call) => call.status === "sent")) toast.success(callNote);
-      else toast.error(joinNotes("אף מייל לא נשלח", callNote));
+      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הזמנות`);
+      else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
+      else toast.error("אף מייל לא נשלח");
     } finally {
       setSending(false);
     }
   }
 
-  async function pingIvr() {
-    if (!event) return;
-    const res = await fetch("/api/invitations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId: event.id, callOnly: true }),
-    });
-    const data = (await res.json()) as { error?: string; calls?: TzintukCall[] };
-    if (!res.ok) {
-      toast.error(data.error || "הצינתוק לא יצא");
-      return;
+  async function sendTzintukAll() {
+    if (!event || calling) return;
+    setCalling(true);
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      const called = Number(data.callCount) || 0;
+      const failed = Number(data.callFailedCount) || 0;
+      if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
+      else if (called) toast.success(`יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error("הצינתוק לא יצא");
+      void refresh();
+    } finally {
+      setCalling(false);
     }
-    void refresh();
-    const note = callSummary(data.calls);
-    if (data.calls?.some((call) => call.status === "sent")) toast.success(note);
-    else toast.error(note || "הצינתוק לא יצא");
   }
 
   const previewHref = event
@@ -635,8 +618,8 @@ function InvitesSection() {
   return (
     <Section
       id="invites"
-      title="הזמנות במייל"
-      subtitle="כל חבר מקבל מייל אישי עם כפתורי הגעה — בלי להתחבר."
+      title="הזמנות וצינתוק"
+      subtitle="המייל יוצא מכאן עם כפתורי הגעה. הצינתוק יוצא בנפרד לטלפון השמור — 1 מגיע, 2 אולי, 3 לא. ליד כל תשובה כתוב אם אושרה במייל, בטלפון או באתר."
       action={
         previewHref ? (
           <a
@@ -686,9 +669,14 @@ function InvitesSection() {
                 {sending ? "שולח…" : `שליחה ל־${reachable} חברים`}
               </Button>
               {can(me, "triggerIvr") ? (
-                <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => void pingIvr()}>
+                <Button
+                  variant="outline"
+                  className="h-10 rounded-full px-4"
+                  disabled={calling || withPhone === 0}
+                  onClick={() => void sendTzintukAll()}
+                >
                   <Phone data-icon="inline-start" />
-                  צינתוק בלי מייל
+                  {calling ? "מחייג…" : withPhone ? "שליחת צינתוק" : "אין מספרי טלפון"}
                 </Button>
               ) : null}
               {unreachable ? (
@@ -697,8 +685,8 @@ function InvitesSection() {
                 </span>
               ) : null}
               <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
-                במענה נשמעת החברה הבאה, ואז הקשה 1 מגיע, 2 אולי, 3 לא מגיע, והסטטוס מתעדכן כאן. בשלוחה בימות
-                מגדירים <bdi dir="ltr">type=api</bdi> וכתובת <bdi dir="ltr">/api/meeting-response</bdi>.
+                במענה נשמעת החברה הבאה. בשלוחה בימות מגדירים <bdi dir="ltr">type=api</bdi> וכתובת האתר עם{" "}
+                <bdi dir="ltr">/api/meeting-response</bdi>.
               </p>
             </div>
           </div>
@@ -728,7 +716,7 @@ function InvitesSection() {
 
 function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   const { state, refresh } = useApp();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ id: string; kind: "mail" | "call" } | null>(null);
   const [results, setResults] = useState<Record<string, EmailDelivery>>({});
   if (!state) return null;
   const records = state.nudge?.events[event.id] ?? {};
@@ -738,29 +726,48 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   });
 
   async function sendOne(member: Member) {
-    if (busyId) return;
-    setBusyId(member.id);
+    if (busy) return;
+    setBusy({ id: member.id, kind: "mail" });
     try {
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id, memberId: member.id, note }),
       });
-      const data = (await res.json()) as { error?: string; deliveries?: EmailDelivery[]; calls?: TzintukCall[] };
+      const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "השליחה נכשלה");
         return;
       }
-      const delivery = data.deliveries?.[0];
-      const call = data.calls?.[0];
+      const delivery = (data.deliveries as EmailDelivery[] | undefined)?.[0];
       if (delivery) setResults((prev) => ({ ...prev, [member.id]: delivery }));
-      const callNote =
-        call?.status === "sent" ? "הצינתוק יצא" : call?.status === "failed" ? `הצינתוק לא יצא: ${call.error}` : "";
-      if (delivery?.status === "sent") toast.success(joinNotes(`ההזמנה נשלחה ל${member.displayName}`, callNote));
-      else toast.error(joinNotes(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`, callNote));
+      if (delivery?.status === "sent") toast.success(`ההזמנה נשלחה ל${member.displayName}`);
+      else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
       void refresh();
     } finally {
-      setBusyId(null);
+      setBusy(null);
+    }
+  }
+
+  async function callOne(member: Member) {
+    if (busy) return;
+    setBusy({ id: member.id, kind: "call" });
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, memberId: member.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      if (data.callCount) toast.success(`יצא צינתוק ל${member.displayName}`);
+      else toast.error(data.calls?.[0]?.error || `הצינתוק ל${member.displayName} לא יצא`);
+      void refresh();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -768,7 +775,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
     <div className={PANEL}>
       <div className="flex items-baseline justify-between gap-3 border-b border-[#e9ecef] px-4 py-3 md:px-5">
         <div className="text-[15px]">לכל חבר בנפרד</div>
-        <div className="text-[12px] font-light text-muted-foreground">שליחה לחבר אחד, עם המילה האישית שלמעלה</div>
+        <div className="text-[12px] font-light text-muted-foreground">מייל או צינתוק לחבר אחד, בלי לשלוח לכולם</div>
       </div>
       <ul className="divide-y divide-[#eef0f3]">
         {members.map((member) => {
@@ -783,7 +790,6 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 ? record.lastError || "השליחה נכשלה"
                 : "";
           const sentAt = fresh?.status === "sent" ? new Date().toISOString() : record?.lastStatus === "sent" ? record.lastAt : undefined;
-          const dial = callLine(state.ivrLog, event.id, member.id);
           return (
             <li key={member.id} className="flex items-center gap-3 px-4 py-2.5 md:px-5">
               <UserAvatar member={member} size="sm" />
@@ -802,17 +808,12 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                             : "bg-[#f1f3f6] text-[#6b7280]"
                     )}
                   >
-                    {rsvpLabel(status)}
+                    {rsvpWithVia(status, event.rsvpVia?.[member.id])}
                   </span>
                 </div>
                 <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
                   {address ? <span className="[unicode-bidi:plaintext]">{address}</span> : "אין כתובת מייל"}
                 </div>
-                {dial ? (
-                  <div className={cn("mt-0.5 text-[12px] leading-4", dial === "צינתוק יצא" ? "text-[#3d8f62]" : "text-destructive")}>
-                    {dial}
-                  </div>
-                ) : null}
                 {failedReason ? (
                   <div className="mt-0.5 text-[12px] leading-4 text-destructive">נכשל: {failedReason}</div>
                 ) : sentAt ? (
@@ -822,16 +823,28 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                   </div>
                 ) : null}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 rounded-full"
-                disabled={!address || busyId !== null}
-                onClick={() => void sendOne(member)}
-              >
-                <Mail data-icon="inline-start" />
-                {busyId === member.id ? "שולח…" : "שליחה"}
-              </Button>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={!address || busy !== null}
+                  onClick={() => void sendOne(member)}
+                >
+                  <Mail data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "mail" ? "שולח…" : "מייל"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={!memberHasPhone(member) || busy !== null}
+                  onClick={() => void callOne(member)}
+                >
+                  <Phone data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "call" ? "מחייג…" : "צינתוק"}
+                </Button>
+              </div>
             </li>
           );
         })}
@@ -841,11 +854,45 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
 }
 
 function NudgePanel({ event }: { event: Gathering }) {
-  const { state, act } = useApp();
+  const { state, act, refresh } = useApp();
   const [saving, setSaving] = useState(false);
+  const [nudging, setNudging] = useState(false);
   if (!state) return null;
   const settings = normalizeNudgeSettings(state.nudge?.settings ?? defaultNudgeSettings());
-  const waiting = state.members.filter((member) => memberAddress(member) && waitingOn(event, member, settings)).length;
+  const waitingMembers = state.members.filter(
+    (member) => reachableForNudge(member) && waitingOn(event, member, settings)
+  );
+  const waiting = waitingMembers.length;
+
+  async function nudgeNow() {
+    if (!waitingMembers.length || nudging) return;
+    setNudging(true);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          memberIds: waitingMembers.map((member) => member.id),
+          variant: "nudge",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "התזכורת לא יצאה");
+        return;
+      }
+      const sent = Number(data.sentCount) || 0;
+      const called = Number(data.callCount) || 0;
+      if (sent && called) toast.success(`נשלחו ${sent} תזכורות, ויצא צינתוק ל־${called}`);
+      else if (sent) toast.success(sent === 1 ? "התזכורת נשלחה" : `נשלחו ${sent} תזכורות`);
+      else if (called) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called}`);
+      else toast.error("אף תזכורת לא יצאה");
+      void refresh();
+    } finally {
+      setNudging(false);
+    }
+  }
 
   async function save(next: NudgeSettings) {
     setSaving(true);
@@ -886,8 +933,8 @@ function NudgePanel({ event }: { event: Gathering }) {
       <div className="grid gap-3.5 border-t border-[#e9ecef] px-4 py-3.5 md:px-5">
         <p className="text-[12.5px] font-light leading-5 text-muted-foreground">
           כל עוד חבר לא ענה אם הוא מגיע, המערכת שולחת לו מייל תזכורת עם הכותרת{" "}
-          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה. מי שענה מפסיק לקבל. לא נשלח
-          בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
+          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה, וגם צינתוק לטלפון השמור. מי שענה
+          מפסיק לקבל. לא נשלח בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
         </p>
         <div className="grid gap-1.5">
           <div className="text-[12px] text-muted-foreground">כל כמה זמן</div>
@@ -931,6 +978,15 @@ function NudgePanel({ event }: { event: Gathering }) {
             onCheckedChange={(on) => void save({ ...settings, includeMaybe: on })}
           />
         </label>
+        <Button
+          variant="outline"
+          className="h-10 justify-self-start rounded-full px-4"
+          disabled={!waitingMembers.length || nudging}
+          onClick={() => void nudgeNow()}
+        >
+          <BellRing data-icon="inline-start" />
+          {nudging ? "שולח…" : "תזכורת עכשיו"}
+        </Button>
         <a
           href={`/api/invitations/preview?eventId=${encodeURIComponent(event.id)}&variant=nudge`}
           target="_blank"
@@ -1095,7 +1151,7 @@ function SystemPanel() {
           <div className="min-w-0 flex-1">
             <div className="text-[15px]">צינתוק אחרון</div>
             <div className="truncate text-[12.5px] font-light text-muted-foreground">
-              {lastIvr.result} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
+              {ivrResultLabel(lastIvr.result)} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
             </div>
           </div>
         </div>
