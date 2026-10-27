@@ -781,6 +781,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
       <ul className="divide-y divide-[#eef0f3]">
         {members.map((member) => {
           const address = memberAddress(member);
+          const phone = memberHasPhone(member) ? member.phone.trim() : "";
           const status = event.rsvps[member.id] ?? "pending";
           const record = records[member.id];
           const fresh = results[member.id];
@@ -792,7 +793,8 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 : "";
           const sentAt = fresh?.status === "sent" ? new Date().toISOString() : record?.lastStatus === "sent" ? record.lastAt : undefined;
           return (
-            <li key={member.id} className="flex items-center gap-3 px-4 py-2.5 md:px-5">
+            <li key={member.id} className="grid gap-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-5">
+              <div className="flex min-w-0 items-center gap-3">
               <UserAvatar member={member} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -812,8 +814,10 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                     {rsvpWithVia(status, event.rsvpVia?.[member.id])}
                   </span>
                 </div>
-                <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
-                  {address ? <span className="[unicode-bidi:plaintext]">{address}</span> : "אין כתובת מייל"}
+                <div className="truncate text-[12px] font-light text-muted-foreground">
+                  {address ? <span className="[unicode-bidi:plaintext]" dir="ltr">{address}</span> : "אין כתובת מייל"}
+                  <span className="px-1">·</span>
+                  {phone ? <span className="[unicode-bidi:plaintext]" dir="ltr">{phone}</span> : "אין טלפון"}
                 </div>
                 {failedReason ? (
                   <div className="mt-0.5 text-[12px] leading-4 text-destructive">נכשל: {failedReason}</div>
@@ -824,7 +828,8 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                   </div>
                 ) : null}
               </div>
-              <div className="flex shrink-0 gap-1.5">
+              </div>
+              <div className="flex flex-wrap gap-1.5">
                 <Button
                   size="sm"
                   variant="outline"

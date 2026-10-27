@@ -323,11 +323,33 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
   const every = nudge.everyHours === 24 ? "פעם ביום" : nudge.everyHours === 48 ? "כל יומיים" : nudge.everyHours === 72 ? "כל שלושה ימים" : `כל ${nudge.everyHours} שעות`;
 
   async function remind(member: Member) {
-    setBusy(member.id);
+    setBusy(`mail:${member.id}`);
     try {
       reportSend(await postInvites({ eventId: event.id, memberId: member.id, variant: "nudge" }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "השליחה נכשלה");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function callMember(member: Member) {
+    setBusy(`call:${member.id}`);
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, memberId: member.id }),
+      });
+      const data = (await res.json()) as { error?: string; callCount?: number; calls?: { error?: string }[] };
+      if (!res.ok || !data.callCount) {
+        toast.error(data.error || data.calls?.[0]?.error || "הצינתוק לא יצא");
+        return;
+      }
+      toast.success(`יצא צינתוק ל${member.displayName}`);
+      void refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "הצינתוק לא יצא");
     } finally {
       setBusy(null);
     }
@@ -424,15 +446,29 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
                               : "יש טלפון, בלי מייל"}
                     </div>
                   </div>
-                  {reachableForNudge(member) ? (
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => void remind(member)}
-                      className="shrink-0 text-[12.5px] text-[#a9782c] hover:underline disabled:opacity-50"
-                    >
-                      {busy === member.id ? "שולח…" : "תזכורת"}
-                    </button>
+                  {memberAddress(member) || memberHasPhone(member) ? (
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      {memberAddress(member) ? (
+                        <button
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => void remind(member)}
+                          className="text-[12.5px] text-[#a9782c] hover:underline disabled:opacity-50"
+                        >
+                          {busy === `mail:${member.id}` ? "שולח…" : "תזכורת"}
+                        </button>
+                      ) : null}
+                      {memberHasPhone(member) ? (
+                        <button
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => void callMember(member)}
+                          className="text-[12.5px] text-[#a9782c] hover:underline disabled:opacity-50"
+                        >
+                          {busy === `call:${member.id}` ? "מחייג…" : "צינתוק"}
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </li>
               );
