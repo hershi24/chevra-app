@@ -684,6 +684,10 @@ function InvitesSection() {
                   {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
                 </span>
               ) : null}
+              <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
+                במענה נשמעת החברה הבאה. בשלוחה בימות מגדירים <bdi dir="ltr">type=api</bdi> וכתובת האתר עם{" "}
+                <bdi dir="ltr">/api/meeting-response</bdi>.
+              </p>
             </div>
           </div>
           <InviteSide

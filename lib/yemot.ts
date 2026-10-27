@@ -8,22 +8,40 @@ import type { AppState, IvrLog, RsvpStatus } from "./types";
 export const YEMOT_TEMPLATE_ID = "130645";
 export const YEMOT_GOTO_FOLDER = "/3";
 
-export const YEMOT_THANKS =
-  "read=t-תודה רבה, בחירתכם נרשמה בהצלחה. להתראות.=no&hangup=yes";
-
-export const YEMOT_UNKNOWN =
-  "read=t-לא זיהינו את מספר הטלפון השמור באתר. להתראות.=no&hangup=yes";
+// name, reuse, max, min, seconds, playback, block star, block zero, replace,
+// allowed keys, repeats, empty continues, empty value, keyboard lock, confirm.
+const READ_FIELDS = "SelectedResponse,,1,1,10,NO,,,,123,,Ok,None,,no";
 
 const TZ = "Asia/Jerusalem";
 
-function ymSafe(text: string) {
-  return text.replace(/[=&]/g, " ").replace(/\s+/g, " ").trim();
+function yemotLine(value: string) {
+  return value
+    .replace(/[=&.\-–—]/g, " ")
+    .replace(/\s*[·•]\s*/g, ", ")
+    .replace(/\s+,/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function ymRead(text: string, hangup = false) {
-  const body = `read=t-${ymSafe(text)}=${hangup ? "no" : "digits,1,1,3,SelectedResponse,no,no,8"}`;
-  return hangup ? `${body}&hangup=yes` : body;
+function say(parts: string[]) {
+  return parts
+    .map(yemotLine)
+    .filter(Boolean)
+    .map((part) => `t-${part}`)
+    .join(".");
 }
+
+function readMenu(parts: string[]) {
+  return `read=${say(parts)}=${READ_FIELDS}`;
+}
+
+function closing(text: string) {
+  return `id_list_message=${say([text])}&go_to_folder=hangup`;
+}
+
+export const YEMOT_THANKS = closing("תודה רבה, בחירתכם נרשמה בהצלחה, להתראות");
+export const YEMOT_UNKNOWN = closing("לא זיהינו את מספר הטלפון השמור באתר, להתראות");
+export const YEMOT_CLOSED = closing("החברה הקרובה לא פתוחה להצבעה, להתראות");
 
 function jerusalemWhen(iso: string) {
   const date = new Date(iso);
@@ -45,24 +63,28 @@ function countPhrase(count: number, one: string, many: string, none: string) {
 
 export function gatheringPrompt(state: AppState) {
   const event = upcomingGathering(state);
-  if (!event) {
-    return ymRead("אין כרגע חברה קרובה ביומן. להתראות.", true);
-  }
+  if (!event) return closing("אין כרגע חברה קרובה ביומן, להתראות");
   const when = jerusalemWhen(event.startsAt);
   const yes = state.members.filter((member) => event.rsvps[member.id] === "yes").length;
   const maybe = state.members.filter((member) => event.rsvps[member.id] === "maybe").length;
   const no = state.members.filter((member) => event.rsvps[member.id] === "no").length;
   const pending = state.members.filter((member) => (event.rsvps[member.id] ?? "pending") === "pending").length;
   const title = gatheringLabel(event);
-  const text = [
-    `שלום. החברה הבאה, ${title}, תתקיים ב${when.weekday}, ${when.day} ב${when.month}, בשעה ${when.time}.`,
-    `${countPhrase(yes, "חבר אחד כבר אישר הגעה", "כבר אישרו הגעה", "עדיין אף אחד לא אישר הגעה")}.`,
-    `${countPhrase(maybe, "חבר אחד ענה אולי", "ענו אולי", "אף אחד לא ענה אולי")}.`,
-    `${countPhrase(no, "חבר אחד לא מגיע", "לא מגיעים", "אף אחד לא ביטל")}.`,
-    `${countPhrase(pending, "חבר אחד טרם השיב", "טרם השיבו", "כולם כבר ענו")}.`,
-    "הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול.",
-  ].join(" ");
-  return ymRead(text);
+  const parts = [
+    "שלום",
+    `החברה הבאה, ${title}, תתקיים ב${when.weekday}, ${when.day} ב${when.month}, בשעה ${when.time}`,
+  ];
+  if (event.location?.trim()) parts.push(`במקום ${event.location}`);
+  const topic = event.topic?.trim();
+  if (topic && topic !== title && !title.includes(topic) && !topic.includes(title)) parts.push(`הנושא, ${topic}`);
+  parts.push(
+    countPhrase(yes, "חבר אחד כבר אישר הגעה", "כבר אישרו הגעה", "עדיין אף אחד לא אישר הגעה"),
+    countPhrase(maybe, "חבר אחד ענה אולי", "ענו אולי", "אף אחד לא ענה אולי"),
+    countPhrase(no, "חבר אחד לא מגיע", "לא מגיעים", "אף אחד לא ביטל"),
+    countPhrase(pending, "חבר אחד טרם השיב", "טרם השיבו", "כולם כבר ענו"),
+    "הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול",
+  );
+  return readMenu(parts);
 }
 
 const KEYPAD: Record<string, RsvpStatus> = {
@@ -209,9 +231,8 @@ export function callerPhone(params: Record<string, string>) {
 
 export async function handleMeetingResponse(params: Record<string, string>) {
   const lower = lowerParams(params);
-  // Only ApiHangup means the caller dropped. A leftover hangup= query must not cut the prompt.
-  if (lower.apihangup === "yes") {
-    return ymText("hangup=yes");
+  if (lower.hangup === "yes" || lower.apihangup === "yes") {
+    return ymText("noop=hangup");
   }
 
   const phone = callerPhone(params);
@@ -222,7 +243,7 @@ export async function handleMeetingResponse(params: Record<string, string>) {
     try {
       return ymText(gatheringPrompt(await readState()));
     } catch {
-      return ymText(ymRead("שלום. הקישו 1 לאישור הגעה, 2 לאולי, או 3 לביטול."));
+      return ymText(readMenu(["שלום", "הקישו 1 לאישור הגעה, 2 לאולי, או 3 לביטול"]));
     }
   }
 
@@ -256,5 +277,7 @@ export async function handleMeetingResponse(params: Record<string, string>) {
     state.ivrLog.unshift(entry);
   });
 
-  return ymText(result === "unknown_phone" ? YEMOT_UNKNOWN : YEMOT_THANKS);
+  if (result === "unknown_phone") return ymText(YEMOT_UNKNOWN);
+  if (result === "already_held") return ymText(YEMOT_CLOSED);
+  return ymText(YEMOT_THANKS);
 }
