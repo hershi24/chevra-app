@@ -1,5 +1,5 @@
 import type { Gathering, Member } from "./types";
-import { formatHebrewDate, gatheringLabel, rsvpLabel } from "./format";
+import { formatHebrewDate, gatheringHeadline, gatheringLabel, rsvpLabel } from "./format";
 import {
   A,
   emailShell,
@@ -62,11 +62,16 @@ export function invitationHtml(opts: {
   const nudge = opts.variant === "nudge";
   const when = jerusalemParts(event.startsAt);
   const title = gatheringLabel(event);
+  const headline = gatheringHeadline(event);
+  const messageBody = headline.body
+    ? escapeHtml(headline.body).replaceAll("\n", "<br>")
+    : "";
   const personal = note?.trim() ? escapeHtml(note.trim()).replaceAll("\n", "<br>") : "";
   const confirmed = Object.values(event.rsvps).filter((status) => status === "yes").length;
   const topic = event.topic?.trim();
+  const topicShown = Boolean(topic && headline.body.split("\n").includes(topic));
   const lesson = lecturerName
-    ? topic && topic !== title
+    ? topic && topic !== title && !topicShown
       ? `${escapeHtml(topic)} · ${escapeHtml(lecturerName)}`
       : escapeHtml(lecturerName)
     : "";
@@ -112,6 +117,7 @@ export function invitationHtml(opts: {
           </td>
           <td valign="middle" style="padding-right:14px;${A}">
             <div style="font-size:18px;line-height:1.3;color:${ink};">${escapeHtml(title)}</div>
+            ${messageBody ? `<div style="font-size:13px;line-height:1.55;color:${muted};margin-top:4px;">${messageBody}</div>` : ""}
             <div style="font-size:13px;color:${muted};margin-top:3px;">${when.weekday} · ${when.time} · ${formatHebrewDate(event.startsAt)}</div>
           </td>
         </tr></table>

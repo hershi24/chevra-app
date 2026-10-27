@@ -29,7 +29,7 @@ import {
   formatHebrewDate,
   formatRelativeHe,
   formatTimeHe,
-  gatheringTitle,
+  gatheringHeadline,
   memberById,
   rsvpWithVia,
 } from "@/lib/format";
@@ -436,10 +436,7 @@ function HeroEvent({
   const maybe = members.filter((m) => event.rsvps[m.id] === "maybe");
   const pending = members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending");
   const showList = can(me, "viewRsvps");
-  const title = gatheringTitle(event);
-  const topic = event.topic?.trim() || null;
-  const heading = topic || title || "החברה הבאה";
-  const sub = topic && title ? title : null;
+  const { heading, body } = gatheringHeadline(event);
   const date = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long" }).format(
     new Date(event.startsAt)
   );
@@ -476,12 +473,14 @@ function HeroEvent({
           {weekday(event.startsAt)} · {date} · {formatTimeHe(event.startsAt)}
         </p>
         <h2 className="mt-1.5 pe-8 text-[1.5rem] font-normal leading-tight tracking-tight md:text-[1.9rem]">
-          {heading}
+          {heading || "החברה הבאה"}
         </h2>
-        <p className="mt-1 text-[13px] font-light text-muted-foreground">
-          {formatHebrewDate(event.startsAt)}
-          {sub ? ` · ${sub}` : ""}
-        </p>
+        {body ? (
+          <p className="mt-1.5 max-w-xl whitespace-pre-line text-[14px] font-light leading-6 text-foreground/70">
+            {body}
+          </p>
+        ) : null}
+        <p className="mt-1 text-[13px] font-light text-muted-foreground">{formatHebrewDate(event.startsAt)}</p>
 
         {details.length ? (
           <ul className="mt-5 flex flex-col gap-1.5 text-[14px] font-light text-foreground/75 sm:flex-row sm:flex-wrap sm:gap-x-5">

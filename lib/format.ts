@@ -100,12 +100,22 @@ export function splitGatheringTitle(event: { title?: string; topic?: string; sta
   return { kind, heading: rest.join(" · ") };
 }
 
-export function journalHeading(event: { title?: string; topic?: string; startsAt: string }) {
-  const { heading } = splitGatheringTitle(event);
-  const topic = event.topic?.trim();
-  if (!topic) return heading;
-  if (!heading || topic.includes(heading) || heading.includes(topic)) return topic;
-  return `${topic} · ${heading}`;
+function sameGatheringText(a: string, b: string) {
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+export function gatheringHeadline(event: { title?: string; topic?: string; notes?: string }) {
+  const title = event.title?.trim() ?? "";
+  const topic = event.topic?.trim() ?? "";
+  const notes = event.notes?.trim() ?? "";
+  const heading = title || topic || notes;
+  const lines: string[] = [];
+  if (title && topic && !sameGatheringText(title, topic)) lines.push(topic);
+  if (notes && notes !== heading && !sameGatheringText(notes, heading) && !lines.some((line) => sameGatheringText(line, notes))) {
+    lines.push(notes);
+  }
+  return { heading, body: lines.join("\n") };
 }
 
 export function formatRelativeHe(iso: string) {
