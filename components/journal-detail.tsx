@@ -16,7 +16,7 @@ import {
   formatDateHe,
   formatHebrewDate,
   formatTimeHe,
-  journalHeading,
+  gatheringHeadline,
   memberById,
   rsvpLabel,
   rsvpWithVia,
@@ -142,7 +142,7 @@ export function JournalDetail({
   const kibud = memberById(state.members, event.kibudId);
   const currentSummary = summary ?? event.summary ?? "";
   const { kind } = splitGatheringTitle(event);
-  const heading = journalHeading(event);
+  const { heading, body } = gatheringHeadline(event);
   const held = gatheringHeld(event);
   const cancelled = event.status === "cancelled";
   const isUpcoming = event.status === "upcoming" && !held;
@@ -358,6 +358,11 @@ export function JournalDetail({
               .join(" · ")}
           </div>
           <h1 className="mt-2 text-[1.9rem] leading-tight font-medium md:text-[40px]">{heading}</h1>
+          {body ? (
+            <p className="mt-2 line-clamp-3 max-w-3xl whitespace-pre-line text-[15px] font-light leading-6 text-white/85 md:text-[16px]">
+              {body}
+            </p>
+          ) : null}
           {cancelled ? <p className="mt-2 text-[14px] font-medium text-[#f6c7c0]">✕ החברה בוטלה</p> : null}
           {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
@@ -497,8 +502,8 @@ export function JournalDetail({
           </div>
         ) : (
           <div className="mt-8 text-[15px] leading-8 font-light text-muted-foreground">
-            {isUpcoming && event.notes ? (
-              <p className="whitespace-pre-wrap text-[#1f2328]">{event.notes}</p>
+            {body.length > 160 ? (
+              <p className="whitespace-pre-line text-[15px] font-light leading-7 text-[#3f4650]">{body}</p>
             ) : (
               <p>עדיין אין סיכום לחברה זו.</p>
             )}

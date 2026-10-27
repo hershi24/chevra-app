@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import {
   formatDayMonth,
   formatTimeHe,
+  gatheringHeadline,
   gatheringLabel,
   hebrewDateParts,
   memberById,
@@ -34,19 +35,8 @@ function coverImage(event: Gathering) {
 }
 
 function storyCopy(event: Gathering, upcoming: boolean) {
-  const title = event.title?.trim() ?? "";
-  const topic = event.topic?.trim() ?? "";
   const extra = (upcoming ? event.notes : event.summary)?.trim() ?? "";
-  const heading = title || topic || extra;
-  const seen = new Set<string>();
-  if (heading) seen.add(heading);
-  const lines = [topic, extra].filter((line) => {
-    if (!line || seen.has(line)) return false;
-    if (heading && (heading.includes(line) || line.includes(heading))) return false;
-    seen.add(line);
-    return true;
-  });
-  return { heading, body: lines.join(" ") };
+  return gatheringHeadline({ title: event.title, topic: event.topic, notes: extra });
 }
 
 function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" | "red" }) {
@@ -279,7 +269,7 @@ function NextStory({
         ) : null}
         {hostName ? <div className="mt-2.5"><Chip>אצל {hostName}</Chip></div> : null}
         {body ? (
-          <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
+          <p className="mt-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
         ) : null}
         <div className="mt-4 flex items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-2 text-[12px] font-light text-muted-foreground">
@@ -405,7 +395,7 @@ function JournalEntry({
           {kibud ? <Chip>כיבוד: {kibud.displayName}</Chip> : null}
         </div>
         {text ? (
-          <p className="mt-2 mb-3 line-clamp-2 text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{text}</p>
+          <p className="mt-2 mb-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{text}</p>
         ) : (
           <div className="h-3" />
         )}

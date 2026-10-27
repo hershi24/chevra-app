@@ -53,7 +53,6 @@ export function EventDialog({
   const members = state?.members ?? [];
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [withTitle, setWithTitle] = useState(Boolean(event?.title?.trim()));
   const [date, setDate] = useState(dateValue(event?.startsAt));
   const [time, setTime] = useState(timeValue(event?.startsAt));
   const [status, setStatus] = useState<Gathering["status"]>(event?.status ?? "upcoming");
@@ -65,7 +64,7 @@ export function EventDialog({
     setSaving(true);
     try {
       const startsAt = new Date(`${date}T${time}`).toISOString();
-      const title = withTitle ? String(formData.get("title") ?? "").trim() : "";
+      const title = String(formData.get("title") ?? "").trim();
       const hostId = String(formData.get("hostId"));
       const kibudId = String(formData.get("kibudId") || "") || undefined;
       const topic = String(formData.get("topic") || "") || undefined;
@@ -103,7 +102,6 @@ export function EventDialog({
         toast.success("החברה נקבעה");
       }
       setOpen(false);
-      if (!event) setWithTitle(false);
       onCreated?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "שמירה נכשלה");
@@ -123,7 +121,6 @@ export function EventDialog({
           setCancelNote("");
           setOpenedAt(Date.now());
         }
-        if (!next && !event) setWithTitle(false);
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
@@ -132,29 +129,26 @@ export function EventDialog({
           <DialogTitle>{event ? "עריכת חברה" : "קביעת חברה חדשה"}</DialogTitle>
         </DialogHeader>
         <form action={onSubmit} className="grid gap-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3 py-2.5">
-            <div>
-              <Label htmlFor="withTitle" className="text-sm font-normal">
-                כותרת לחברה
-              </Label>
-              <p className="text-[12px] font-light text-muted-foreground">
-                אם מכבים — החברה תוצג לפי תאריך ונושא בלבד.
-              </p>
-            </div>
-            <Switch
-              id="withTitle"
-              checked={withTitle}
-              onCheckedChange={setWithTitle}
+          <Field
+            label="כותרת"
+            name="title"
+            placeholder="למשל: חברותא · פרשת השבוע"
+            defaultValue={event?.title}
+          />
+          <div className="grid gap-1.5">
+            <Label htmlFor="notes">גוף ההודעה</Label>
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              defaultValue={event?.notes}
+              placeholder="הטקסט שיופיע מתחת לכותרת"
+              className="text-[13px] leading-6"
             />
+            <p className="text-[12px] font-light text-muted-foreground">
+              שורה נפרדת מתחת לכותרת, בגודל קטן יותר. בלי כותרת, נושא השיעור מופיע במקומה.
+            </p>
           </div>
-          {withTitle ? (
-            <Field
-              label="כותרת"
-              name="title"
-              placeholder="למשל: חברותא · פרשת השבוע"
-              defaultValue={event?.title}
-            />
-          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <Field
               label="תאריך"
@@ -188,10 +182,6 @@ export function EventDialog({
             defaultValue={event?.kibudId}
           />
           <Field label="נושא השיעור" name="topic" defaultValue={event?.topic} />
-          <div className="grid gap-1.5">
-            <Label htmlFor="notes">הערות</Label>
-            <Textarea id="notes" name="notes" rows={3} defaultValue={event?.notes} />
-          </div>
           {event ? (
             <div className="grid gap-2">
               <Label>סיווג החברה</Label>
