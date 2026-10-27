@@ -602,9 +602,10 @@ function InvitesSection() {
       }
       const called = Number(data.callCount) || 0;
       const failed = Number(data.callFailedCount) || 0;
+      const reason = data.calls?.find((row: { error?: string }) => row.error)?.error;
       if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
-      else if (called) toast.success(`יצא ל־${called}, נכשלו ${failed}`);
-      else toast.error("הצינתוק לא יצא");
+      else if (called) toast.success(reason ? `יצא ל־${called}, נכשלו ${failed}: ${reason}` : `יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error(reason || "הצינתוק לא יצא");
       void refresh();
     } finally {
       setCalling(false);
@@ -685,8 +686,8 @@ function InvitesSection() {
                 </span>
               ) : null}
               <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
-                במענה נשמעת החברה הבאה. בשלוחה בימות מגדירים <bdi dir="ltr">type=api</bdi> וכתובת האתר עם{" "}
-                <bdi dir="ltr">/api/meeting-response</bdi>.
+                במענה נשמע קודם התאריך העברי ואז הלועזי. סיכום ההצבעות נשמע רק אחרי ההקשה. בשלוחה בימות
+                מגדירים <bdi dir="ltr">type=api</bdi> וכתובת <bdi dir="ltr">/api/meeting-response</bdi>.
               </p>
             </div>
           </div>

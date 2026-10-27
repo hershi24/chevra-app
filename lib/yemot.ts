@@ -6,7 +6,6 @@ import { readState, updateState } from "./store";
 import type { AppState, IvrLog, RsvpStatus } from "./types";
 
 export const YEMOT_TEMPLATE_ID = "130645";
-export const YEMOT_GOTO_FOLDER = "/3";
 
 // name, reuse, max, min, seconds, playback, block star, block zero, replace,
 // allowed keys, repeats, empty continues, empty value, keyboard lock, confirm.
@@ -23,15 +22,43 @@ function yemotLine(value: string) {
     .trim();
 }
 
-function say(parts: string[]) {
+function yemotStamp(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date(iso));
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  return `${day}/${month}/${year}`;
+}
+
+function spokenTime(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "";
+  return `בשעה ${hour}:${minute}`;
+}
+
+function say(parts: Array<string | { kind: "date" | "dateH"; iso: string }>) {
   return parts
-    .map(yemotLine)
+    .map((part) => {
+      if (typeof part !== "string") return `${part.kind}-${yemotStamp(part.iso)}`;
+      const text = yemotLine(part);
+      return text ? `t-${text}` : "";
+    })
     .filter(Boolean)
-    .map((part) => `t-${part}`)
     .join(".");
 }
 
-function readMenu(parts: string[]) {
+function readMenu(parts: Array<string | { kind: "date" | "dateH"; iso: string }>) {
   return `read=${say(parts)}=${READ_FIELDS}`;
 }
 
@@ -43,47 +70,45 @@ export const YEMOT_THANKS = closing("תודה רבה, בחירתכם נרשמה 
 export const YEMOT_UNKNOWN = closing("לא זיהינו את מספר הטלפון השמור באתר, להתראות");
 export const YEMOT_CLOSED = closing("החברה הקרובה לא פתוחה להצבעה, להתראות");
 
-function jerusalemWhen(iso: string) {
-  const date = new Date(iso);
-  const pick = (options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat("he-IL", { timeZone: TZ, ...options }).format(date);
-  return {
-    weekday: pick({ weekday: "long" }),
-    day: pick({ day: "numeric" }),
-    month: pick({ month: "long" }),
-    time: pick({ hour: "2-digit", minute: "2-digit", hour12: false }),
-  };
-}
-
 function countPhrase(count: number, one: string, many: string, none: string) {
   if (count === 0) return none;
   if (count === 1) return one;
   return `${count} ${many}`;
 }
 
-export function gatheringPrompt(state: AppState) {
-  const event = upcomingGathering(state);
-  if (!event) return closing("אין כרגע חברה קרובה ביומן, להתראות");
-  const when = jerusalemWhen(event.startsAt);
+function voteLines(state: AppState, event: { rsvps: Record<string, RsvpStatus> }) {
   const yes = state.members.filter((member) => event.rsvps[member.id] === "yes").length;
   const maybe = state.members.filter((member) => event.rsvps[member.id] === "maybe").length;
   const no = state.members.filter((member) => event.rsvps[member.id] === "no").length;
   const pending = state.members.filter((member) => (event.rsvps[member.id] ?? "pending") === "pending").length;
+  return [
+    countPhrase(yes, "חבר אחד אישר הגעה", "אישרו הגעה", "אף אחד לא אישר הגעה"),
+    countPhrase(maybe, "חבר אחד ענה אולי", "ענו אולי", "אף אחד לא ענה אולי"),
+    countPhrase(no, "חבר אחד לא מגיע", "לא מגיעים", "אף אחד לא ביטל"),
+    countPhrase(pending, "חבר אחד טרם השיב", "טרם השיבו", "כולם כבר ענו"),
+  ];
+}
+
+export function voteSummary(state: AppState, event: { rsvps: Record<string, RsvpStatus> }, status: RsvpStatus) {
+  const choice = status === "yes" ? "נרשמתם כמגיע" : status === "maybe" ? "נרשמתם כאולי" : "נרשמתם כלא מגיע";
+  return `id_list_message=${say([`תודה רבה, ${choice}`, ...voteLines(state, event), "להתראות"])}&go_to_folder=hangup`;
+}
+
+export function gatheringPrompt(state: AppState) {
+  const event = upcomingGathering(state);
+  if (!event) return closing("אין כרגע חברה קרובה ביומן, להתראות");
   const title = gatheringLabel(event);
-  const parts = [
+  const parts: Array<string | { kind: "date" | "dateH"; iso: string }> = [
     "שלום",
-    `החברה הבאה, ${title}, תתקיים ב${when.weekday}, ${when.day} ב${when.month}, בשעה ${when.time}`,
+    `החברה הבאה, ${title}`,
+    { kind: "dateH", iso: event.startsAt },
+    { kind: "date", iso: event.startsAt },
+    spokenTime(event.startsAt),
   ];
   if (event.location?.trim()) parts.push(`במקום ${event.location}`);
   const topic = event.topic?.trim();
   if (topic && topic !== title && !title.includes(topic) && !topic.includes(title)) parts.push(`הנושא, ${topic}`);
-  parts.push(
-    countPhrase(yes, "חבר אחד כבר אישר הגעה", "כבר אישרו הגעה", "עדיין אף אחד לא אישר הגעה"),
-    countPhrase(maybe, "חבר אחד ענה אולי", "ענו אולי", "אף אחד לא ענה אולי"),
-    countPhrase(no, "חבר אחד לא מגיע", "לא מגיעים", "אף אחד לא ביטל"),
-    countPhrase(pending, "חבר אחד טרם השיב", "טרם השיבו", "כולם כבר ענו"),
-    "הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול",
-  );
+  parts.push("הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול");
   return readMenu(parts);
 }
 
@@ -93,12 +118,20 @@ const KEYPAD: Record<string, RsvpStatus> = {
   "3": "no",
 };
 
+export const YEMOT_TOKEN_MISSING = "בשרת אין YEMOT_TOKEN. טעינת אסימונים בימות לא שולחת צינתוק בלי הטוקן";
+
 function yemotToken() {
-  return (process.env.YEMOT_TOKEN || process.env.YEMOT_API_TOKEN || "").trim();
+  return (process.env.YEMOT_TOKEN || process.env.YEMOT_API_TOKEN || "")
+    .trim()
+    .replace(/^token=/i, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
 }
 
 function yemotCallUrl() {
-  return (process.env.YEMOT_API_URL || "https://www.call2all.co.il/ym/api/RunTzintuk").replace(/\/$/, "");
+  const configured = process.env.YEMOT_API_URL?.trim();
+  if (!configured || /RunTzintuk\/?$/i.test(configured)) return "https://www.call2all.co.il/ym/api/RunCampaign";
+  return configured.replace(/\/$/, "");
 }
 
 export function yemotConfigured() {
@@ -116,31 +149,37 @@ export async function sendTzintuk(rawPhone: string): Promise<TzintukResult> {
   const phone = normalizePhone(rawPhone);
   if (!phone) return { phone: rawPhone || "", ok: false, skipped: true, error: "אין מספר טלפון" };
   const token = yemotToken();
-  if (!token) return { phone, ok: false, skipped: true, error: "אין אסימון ימות בשרת" };
+  if (!token) return { phone, ok: false, skipped: true, error: YEMOT_TOKEN_MISSING };
 
   const url = new URL(yemotCallUrl());
   url.searchParams.set("token", token);
   url.searchParams.set("templateId", process.env.YEMOT_TEMPLATE_ID?.trim() || YEMOT_TEMPLATE_ID);
   url.searchParams.set("phones", phone);
-  url.searchParams.set("goToFolder", process.env.YEMOT_GOTO_FOLDER?.trim() || YEMOT_GOTO_FOLDER);
 
   try {
     const res = await fetch(url, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(15_000) });
     const text = await res.text().catch(() => "");
-    if (!res.ok) return { phone, ok: false, error: `ימות החזירה ${res.status}` };
-    if (/<html/i.test(text)) return { phone, ok: false, error: "ימות לא קיבלה את בקשת החיוג" };
-    try {
-      const data = JSON.parse(text) as { responseStatus?: string };
-      if (data.responseStatus && data.responseStatus !== "OK") {
-        return { phone, ok: false, error: yemotError(text) };
-      }
-    } catch {
-      // Yemot sometimes answers with an empty body on a successful dial.
-    }
-    return { phone, ok: true };
+    const error = campaignFailure(res.status, text);
+    return error ? { phone, ok: false, error } : { phone, ok: true };
   } catch {
     return { phone, ok: false, error: "לא הצלחנו להתחבר לימות" };
   }
+}
+
+function campaignFailure(status: number, text: string) {
+  if (/<!doctype|<html/i.test(text)) return "ימות לא קיבלה את בקשת החיוג";
+  if (status < 200 || status >= 300) return `ימות החזירה ${status}`;
+  let data: { responseStatus?: string; message?: string; campaignId?: string; pending?: number } | null = null;
+  try {
+    data = JSON.parse(text) as { responseStatus?: string; message?: string; campaignId?: string; pending?: number };
+  } catch {
+    data = null;
+  }
+  if (!data) return yemotError(text);
+  if (data.responseStatus && data.responseStatus !== "OK") return yemotError(text);
+  if (!data.campaignId) return yemotError(text);
+  if (typeof data.pending === "number" && data.pending < 1) return "ימות לא מצאה מספר לחיוג";
+  return null;
 }
 
 function yemotError(text: string) {
@@ -252,7 +291,7 @@ export async function handleMeetingResponse(params: Record<string, string>) {
   let memberId: string | undefined;
   let eventId: string | undefined;
 
-  await updateState((state) => {
+  const saved = await updateState((state) => {
     const member = memberByPhone(state.members, phone);
     memberId = member?.id;
     const event = upcomingGathering(state);
@@ -279,5 +318,7 @@ export async function handleMeetingResponse(params: Record<string, string>) {
 
   if (result === "unknown_phone") return ymText(YEMOT_UNKNOWN);
   if (result === "already_held") return ymText(YEMOT_CLOSED);
-  return ymText(YEMOT_THANKS);
+  const event = eventId ? saved.gatherings.find((item) => item.id === eventId) : undefined;
+  if (!event || (result !== "rsvp_yes" && result !== "rsvp_maybe" && result !== "rsvp_no")) return ymText(YEMOT_THANKS);
+  return ymText(voteSummary(saved, event, status));
 }

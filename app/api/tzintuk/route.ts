@@ -5,7 +5,7 @@ import { can } from "@/lib/permissions";
 import { memberHasPhone } from "@/lib/phone";
 import { readState, updateState } from "@/lib/store";
 import type { IvrLog } from "@/lib/types";
-import { sendTzintuk, yemotConfigured, type TzintukResult } from "@/lib/yemot";
+import { sendTzintuk, YEMOT_TOKEN_MISSING, yemotConfigured, type TzintukResult } from "@/lib/yemot";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "רק מנהל מערכת יכול לשלוח צינתוק" }, { status: 403 });
   }
   if (!yemotConfigured()) {
-    return NextResponse.json({ error: "אין אסימון ימות בשרת, הצינתוק לא יצא" }, { status: 400 });
+    return NextResponse.json({ error: YEMOT_TOKEN_MISSING }, { status: 400 });
   }
 
   const body = (await request.json()) as {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
           action: "tzintuk",
           memberId: call.memberId,
           eventId: event.id,
-          result: call.ok ? "tzintuk_sent" : "tzintuk_failed",
+          result: call.ok ? "tzintuk_sent" : call.error || "tzintuk_failed",
         };
         s.ivrLog.unshift(entry);
       }
@@ -74,5 +74,9 @@ export async function POST(request: Request) {
     // The send report still goes back even if the log could not be stored.
   }
 
-  return NextResponse.json({ calls, callCount, callFailedCount });
+  const error = calls.find((row) => row.error)?.error;
+  if (!callCount) {
+    return NextResponse.json({ error: error || "הצינתוק לא יצא", calls, callCount, callFailedCount }, { status: 400 });
+  }
+  return NextResponse.json({ calls, callCount, callFailedCount, error });
 }

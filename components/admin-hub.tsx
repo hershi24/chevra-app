@@ -342,16 +342,22 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id }),
       });
-      const data = (await res.json()) as { error?: string; callCount?: number; callFailedCount?: number };
+      const data = (await res.json()) as {
+        error?: string;
+        callCount?: number;
+        callFailedCount?: number;
+        calls?: { error?: string }[];
+      };
       if (!res.ok) {
         toast.error(data.error || "הצינתוק לא יצא");
         return;
       }
       const called = Number(data.callCount) || 0;
       const failed = Number(data.callFailedCount) || 0;
+      const reason = data.calls?.find((row) => row.error)?.error || data.error;
       if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
-      else if (called) toast.success(`יצא ל־${called}, נכשלו ${failed}`);
-      else toast.error("הצינתוק לא יצא");
+      else if (called) toast.success(reason ? `יצא ל־${called}, נכשלו ${failed}: ${reason}` : `יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error(reason || "הצינתוק לא יצא");
       void refresh();
     } finally {
       setCalling(false);
