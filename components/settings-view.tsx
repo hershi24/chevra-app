@@ -697,7 +697,7 @@ function InvitesSection() {
                 </span>
               ) : null}
               <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
-                השליחה גם מחייגת צינתוק. בהקשה 1 מגיע, 2 אולי, 3 לא מגיע, והסטטוס מתעדכן כאן.
+                במענה נשמעת החברה הבאה, ואז הקשה 1 מגיע, 2 אולי, 3 לא מגיע, והסטטוס מתעדכן כאן.
               </p>
             </div>
           </div>

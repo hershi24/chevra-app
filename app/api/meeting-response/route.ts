@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import { upcomingGathering, updateState } from "@/lib/store";
-import type { AppState, RsvpStatus } from "@/lib/types";
+import { gatheringLabel } from "@/lib/format";
+import { readState, upcomingGathering, updateState } from "@/lib/store";
+import type { AppState, Gathering, RsvpStatus } from "@/lib/types";
 import { samePhone, yemotPhone } from "@/lib/yemot";
 
 export const runtime = "nodejs";
 
-const PROMPT =
-  "read=t-שלום לכם. להזמנה למפגש הבא: הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול.=digits,1,1,1,SelectedResponse,no,no,1,7";
+const TZ = "Asia/Jerusalem";
+const DIGITS = "=digits,1,1,1,SelectedResponse,no,no,1,7";
 const THANKS = "read=t-תודה רבה, בחירתכם נרשמה בהצלחה. להתראות.=no&hangup=yes";
 const MISSED = "read=t-לא הצלחנו לזהות את המספר. להתראות.=no&hangup=yes";
+const NONE = "read=t-שלום לכם. אין כרגע חברה קרובה להצבעה. להתראות.=no&hangup=yes";
 
 const STATUS: Record<string, RsvpStatus> = {
   "1": "yes",
@@ -29,11 +31,42 @@ function plain(body: string) {
   });
 }
 
+function speakable(value: string) {
+  return value.replace(/[=&]/g, " ").replace(/\s*[·•]\s*/g, ", ").replace(/\s+/g, " ").trim();
+}
+
+function spokenWhen(iso: string) {
+  const date = new Date(iso);
+  const weekday = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, weekday: "long" }).format(date);
+  const clock = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  const dayKey = (value: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(value);
+  const days = Math.round((Date.parse(dayKey(date)) - Date.parse(dayKey(new Date()))) / 86_400_000);
+  const when = days === 0 ? `היום, ${weekday}` : days === 1 ? `מחר, ${weekday}` : weekday;
+  return `${when}, בשעה ${clock}`;
+}
+
+function gatheringPrompt(event: Gathering) {
+  const title = speakable(gatheringLabel(event));
+  const topic = speakable(event.topic ?? "");
+  const topicLine = topic && topic !== title && !title.includes(topic) && !topic.includes(title) ? ` הנושא: ${topic}.` : "";
+  const place = event.location?.trim() ? ` במקום ${speakable(event.location)}.` : "";
+  const text = speakable(
+    `שלום לכם. החברה הבאה: ${title}.${topicLine} ${spokenWhen(event.startsAt)}.${place} הקישו 1 לאישור והגעה, 2 לאולי, או 3 לביטול.`
+  );
+  return `read=t-${text}${DIGITS}`;
+}
+
 async function readParams(request: Request) {
   const params: Record<string, string> = {};
   new URL(request.url).searchParams.forEach((value, key) => {
     params[key] = value;
   });
+  if (request.method === "GET" || request.method === "HEAD") return params;
   const type = request.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
     const json = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -83,10 +116,14 @@ function gatheringFor(state: AppState, phone: string) {
   return upcomingGathering(state);
 }
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const params = await readParams(request);
   const selected = pick(params, ["SelectedResponse"]);
-  if (!selected) return plain(PROMPT);
+  if (!selected) {
+    const state = await readState();
+    const event = upcomingGathering(state);
+    return plain(event ? gatheringPrompt(event) : NONE);
+  }
 
   const status = STATUS[selected];
   const phone = yemotPhone(pick(params, ["ApiPhone", "phone", "Phone"]));
@@ -128,4 +165,12 @@ export async function POST(request: Request) {
   }
 
   return plain(updated ? THANKS : MISSED);
+}
+
+export async function GET(request: Request) {
+  return handle(request);
+}
+
+export async function POST(request: Request) {
+  return handle(request);
 }
