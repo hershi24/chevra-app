@@ -686,7 +686,7 @@ function InvitesSection() {
                 </span>
               ) : null}
               <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
-                במענה נשמע קודם התאריך העברי בלי השנה, ואז הלועזי בלי השנה. סיכום ההצבעות נשמע רק אחרי ההקשה. בשלוחה בימות
+                במענה נשמע התאריך העברי בלי השנה. סיכום ההצבעות נשמע רק אחרי ההקשה. בשלוחה בימות
                 מגדירים <bdi dir="ltr">type=api</bdi> וכתובת <bdi dir="ltr">/api/meeting-response</bdi>.
               </p>
             </div>

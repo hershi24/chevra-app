@@ -38,13 +38,6 @@ function spokenHebrewDate(iso: string) {
   return `${spokenHebrewDay(day)} ב${month}`;
 }
 
-function spokenCivilDate(iso: string) {
-  const date = new Date(iso);
-  const day = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, day: "numeric" }).format(date);
-  const month = new Intl.DateTimeFormat("he-IL", { timeZone: TZ, month: "long" }).format(date);
-  return `${day} ב${month}`;
-}
-
 function spokenTime(iso: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ,
@@ -111,7 +104,6 @@ export function gatheringPrompt(state: AppState) {
     "שלום",
     `החברה הבאה, ${title}`,
     `התאריך העברי, ${spokenHebrewDate(event.startsAt)}`,
-    `התאריך הלועזי, ${spokenCivilDate(event.startsAt)}`,
     spokenTime(event.startsAt),
   ];
   if (event.location?.trim()) parts.push(`במקום ${event.location}`);
