@@ -5,7 +5,7 @@ import { can } from "@/lib/permissions";
 import { memberHasPhone } from "@/lib/phone";
 import { readState, updateState } from "@/lib/store";
 import type { IvrLog } from "@/lib/types";
-import { sendTzintuk, YEMOT_TOKEN_MISSING, yemotConfigured, type TzintukResult } from "@/lib/yemot";
+import { sendExtensionTzintuk, sendTzintuk, YEMOT_TOKEN_MISSING, yemotConfigured, type TzintukResult } from "@/lib/yemot";
 
 export const runtime = "nodejs";
 
@@ -30,16 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "אין חברה קרובה לשלוח אליה צינתוק" }, { status: 404 });
   }
   const picked = body.memberId ? [body.memberId] : Array.isArray(body.memberIds) ? body.memberIds : null;
-  const members = (picked ? state.members.filter((member) => picked.includes(member.id)) : state.members).filter(memberHasPhone);
-  if (!members.length) {
-    return NextResponse.json({ error: picked ? "לחבר הזה אין מספר טלפון" : "אין לחברים מספר טלפון" }, { status: 404 });
-  }
-
   const calls: Array<TzintukResult & { memberId: string; name: string }> = [];
-  for (const member of members) {
-    calls.push({ memberId: member.id, name: member.displayName, ...(await sendTzintuk(member.phone)) });
+  if (!picked) {
+    calls.push({ memberId: "", name: "שלוחה 5", ...(await sendExtensionTzintuk()) });
+  } else {
+    const members = state.members.filter((member) => picked.includes(member.id)).filter(memberHasPhone);
+    if (!members.length) {
+      return NextResponse.json({ error: "לחבר הזה אין מספר טלפון" }, { status: 404 });
+    }
+    for (const member of members) {
+      calls.push({ memberId: member.id, name: member.displayName, ...(await sendTzintuk(member.phone)) });
+    }
   }
-  const callCount = calls.filter((row) => row.ok).length;
+  const callCount = !picked ? (calls[0]?.ok ? calls[0].callCount || 1 : 0) : calls.filter((row) => row.ok).length;
   const callFailedCount = calls.filter((row) => !row.ok && !row.skipped).length;
   const variant = body.variant === "nudge" ? "nudge" : "invite";
   try {

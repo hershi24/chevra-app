@@ -162,6 +162,7 @@ export type TzintukResult = {
   ok: boolean;
   skipped?: boolean;
   error?: string;
+  callCount?: number;
 };
 
 export async function sendTzintuk(rawPhone: string): Promise<TzintukResult> {
@@ -183,6 +184,96 @@ export async function sendTzintuk(rawPhone: string): Promise<TzintukResult> {
   } catch {
     return { phone, ok: false, error: "לא הצלחנו להתחבר לימות" };
   }
+}
+
+const TZINTUK_EXTENSION = "5";
+
+function iniValue(text: string, key: string) {
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    if (trimmed.slice(0, eq).trim() !== key) continue;
+    return trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+  }
+  return "";
+}
+
+function listFromUnknown(value: unknown): string {
+  if (typeof value === "string") return iniValue(value, "list_tzintuk");
+  if (Array.isArray(value)) return listFromUnknown(value.filter((item) => typeof item === "string").join("\n"));
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const direct = record.list_tzintuk;
+    if (typeof direct === "string" && direct.trim()) return direct.trim().replace(/^["']|["']$/g, "");
+    if (record.extIni && record.extIni !== value) return listFromUnknown(record.extIni);
+  }
+  return "";
+}
+
+function asJson(text: string) {
+  try {
+    const data = JSON.parse(text) as Record<string, unknown>;
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function yemotCommand(command: string, params: Record<string, string>) {
+  const url = new URL(`https://www.call2all.co.il/ym/api/${command}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  const res = await fetch(url, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  const text = await res.text().catch(() => "");
+  return { status: res.status, text, data: asJson(text) };
+}
+
+async function extensionTzintukList(token: string) {
+  const file = await yemotCommand("GetTextFile", { token, what: `ivr2:${TZINTUK_EXTENSION}/ext.ini` });
+  const fromFile = typeof file.data?.contents === "string" ? iniValue(file.data.contents, "list_tzintuk") : "";
+  if (fromFile) return { list: fromFile, error: "" };
+  const dir = await yemotCommand("GetIVR2Dir", { token, path: `ivr2:/${TZINTUK_EXTENSION}` });
+  const fromDir = listFromUnknown(dir.data?.extIni ?? dir.data);
+  if (fromDir) return { list: fromDir, error: "" };
+  if (file.data?.responseStatus && file.data.responseStatus !== "OK") return { list: "", error: yemotError(file.text) };
+  return { list: "", error: "בשלוחה 5 לא מוגדרת רשימת צינתוק" };
+}
+
+/** The free ring configured on extension 5. One call covers the whole registered list. */
+export async function sendExtensionTzintuk(): Promise<TzintukResult> {
+  const phone = "שלוחה 5";
+  const token = yemotToken();
+  if (!token) return { phone, ok: false, skipped: true, error: YEMOT_TOKEN_MISSING };
+  try {
+    const { list, error } = await extensionTzintukList(token);
+    if (!list) return { phone, ok: false, error };
+    const res = await fetch("https://www.call2all.co.il/ym/api/RunTzintuk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({ token, phones: "tzl:", tzintukLists: [list] }),
+    });
+    const text = await res.text().catch(() => "");
+    const failure = listTzintukFailure(res.status, text);
+    if (failure) return { phone, ok: false, error: failure };
+    const count = asJson(text)?.callsCount;
+    const callCount = typeof count === "number" ? count : 1;
+    if (callCount < 1) return { phone, ok: false, error: "ברשימת הצינתוק של שלוחה 5 אין נרשמים" };
+    return { phone, ok: true, callCount };
+  } catch {
+    return { phone, ok: false, error: "לא הצלחנו להתחבר לימות" };
+  }
+}
+
+function listTzintukFailure(status: number, text: string) {
+  if (/<!doctype|<html/i.test(text)) return "ימות לא קיבלה את בקשת החיוג";
+  if (status < 200 || status >= 300) return `ימות החזירה ${status}`;
+  const data = asJson(text);
+  if (!data) return yemotError(text);
+  if (data.responseStatus && data.responseStatus !== "OK") return yemotError(text);
+  return null;
 }
 
 function campaignFailure(status: number, text: string) {
