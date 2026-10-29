@@ -23,6 +23,7 @@ import {
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { boardEnabled, normalizeBoard, resolveBoard } from "@/lib/community-board";
+import { normalizeEntrancePromo } from "@/lib/entrance-promo";
 import { setMemberRsvp } from "@/lib/rsvp-record";
 import { galleryItems, gatheringHeld } from "@/lib/selectors";
 import { normalizeNudgeSettings, nudgeState } from "@/lib/nudge";
@@ -841,6 +842,23 @@ function applyAction(
     case "setNudgeSettings": {
       if (!can(me, "sendInvites")) throw new Error("forbidden");
       s.nudge = { settings: normalizeNudgeSettings(body.settings), events: nudgeState(s).events };
+      return;
+    }
+    case "setEntrancePromo": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const next = normalizeEntrancePromo(
+        body.promo,
+        s.settings.entrancePromo,
+        s.members.map((member) => member.id)
+      );
+      if (body.promo && !next) throw new Error("צריך תמונה ותאריך סיום");
+      s.settings.entrancePromo = next;
+      return;
+    }
+    case "dismissEntrancePromo": {
+      const promo = s.settings.entrancePromo;
+      if (!promo || promo.dismissedBy.includes(me.id)) return;
+      promo.dismissedBy.push(me.id);
       return;
     }
     case "setCommunityBoard": {

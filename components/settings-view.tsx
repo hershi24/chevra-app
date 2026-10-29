@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { AdminHub, type HubScreen } from "@/components/admin-hub";
 import { CommunityBoardPanel } from "@/components/community-board-panel";
+import { EntrancePromoPanel } from "@/components/entrance-promo";
 import { boardEnabled } from "@/lib/community-board";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
 import { UserAvatar } from "@/components/user-avatar";
@@ -116,6 +117,7 @@ function AdminSettings() {
           </Section>
         ) : (
           <Section id="system" title="מערכת" subtitle="מתגים כלליים באתר ופרטים טכניים.">
+            <EntrancePromoPanel />
             <SystemPanel />
           </Section>
         )}
@@ -260,6 +262,7 @@ function MemberSettings() {
             {isAdmin(me) ? (
               <Section id="system" title="מערכת" subtitle="רק למנהל המערכת.">
                 <CommunityBoardPanel />
+                <EntrancePromoPanel />
                 <SystemPanel />
               </Section>
             ) : null}

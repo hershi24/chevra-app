@@ -3,6 +3,7 @@ import type {
   BankAccount,
   ChatEmailPrefs,
   CommunityBoard,
+  EntrancePromo,
   Gathering,
   Message,
   PaymentMethod,
@@ -126,4 +127,6 @@ export type ActionBody =
   | { type: "setChatEmailPrefs"; prefs: ChatEmailPrefs }
   | { type: "setCommunityBoard"; board: CommunityBoard }
   | { type: "voteCommunityPoll"; optionId: string }
-  | { type: "setNudgeSettings"; settings: NudgeSettings };
+  | { type: "setNudgeSettings"; settings: NudgeSettings }
+  | { type: "setEntrancePromo"; promo: Pick<EntrancePromo, "imageUrl" | "until"> | null }
+  | { type: "dismissEntrancePromo" };
