@@ -24,7 +24,9 @@ import {
 } from "./supabase-expenses";
 import { loadSiteBoard, syncSiteBoard } from "./supabase-board";
 import { loadSiteNudge, syncSiteNudge } from "./supabase-nudge";
+import { loadSitePromo, syncSitePromo } from "./supabase-promo";
 import { boardEnabled } from "./community-board";
+import { publicEntrancePromo } from "./entrance-promo";
 import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -148,6 +150,8 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     if (board) state.settings.communityBoard = board;
     const nudge = await loadSiteNudge();
     if (nudge) state.nudge = nudge;
+    const promo = await loadSitePromo();
+    if (promo !== undefined) state.settings.entrancePromo = promo;
     markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
@@ -173,6 +177,7 @@ export async function persistQuietly(
         await syncChatEmailPrefs(before, current);
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
+        await syncSitePromo(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -205,6 +210,7 @@ export async function updateState(
         await syncChatEmailPrefs(before, current);
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
+        await syncSitePromo(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -243,7 +249,10 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     gallery: state.gallery ?? [],
     channels: quiet ? [] : channels,
     messages: quiet ? [] : visibleMessages,
-    settings: state.settings,
+    settings: {
+      ...state.settings,
+      entrancePromo: publicEntrancePromo(state.settings.entrancePromo, me.id),
+    },
     expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
     expenseWaivers: state.settings.showExpenses === false ? [] : (state.expenseWaivers ?? []),
     payments: state.settings.showExpenses === false ? [] : (state.payments ?? []),

@@ -196,12 +196,20 @@ export type CommunityBoard = {
   photos?: BoardPhoto[];
 };
 
+export type EntrancePromo = {
+  id: string;
+  imageUrl: string;
+  until: string;
+  dismissedBy: string[];
+};
+
 export type AppSettings = {
   groupName: string;
   backgroundImageId: string | null;
   backgrounds: BackgroundImage[];
   showExpenses?: boolean;
   communityBoard?: CommunityBoard;
+  entrancePromo?: EntrancePromo | null;
 };
 
 export type EmailDelivery = {
