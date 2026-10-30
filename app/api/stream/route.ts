@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { recordVisit } from "@/lib/visits";
 import { onlineMemberIds, subscribe } from "@/lib/realtime";
-import { readState } from "@/lib/store";
+import { persistQuietly, readState, updateState } from "@/lib/store";
+
+function noteVisit(memberId: string, kind: "enter" | "beat" | "leave") {
+  const write =
+    kind === "beat"
+      ? persistQuietly((state) => recordVisit(state, memberId, kind))
+      : updateState((state) => {
+          recordVisit(state, memberId, kind);
+        }, { announce: true });
+  return write.catch((error) => console.error("visit log failed", error));
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +32,23 @@ export async function GET() {
       const send = (data: string) => {
         controller.enqueue(encoder.encode(data));
       };
-      cleanup = subscribe({ send, memberId: me.id });
+      let entered: Promise<unknown> = Promise.resolve();
+      cleanup = subscribe(
+        { send, memberId: me.id },
+        {
+          onFirst: () => {
+            entered = noteVisit(me.id, "enter");
+          },
+          onLast: () => {
+            void noteVisit(me.id, "leave");
+          },
+        }
+      );
+      await entered;
       ping = setInterval(() => {
         try {
           send(`: ping\n\n`);
+          noteVisit(me.id, "beat");
         } catch {
           clearInterval(ping);
           cleanup?.();

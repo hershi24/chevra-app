@@ -26,11 +26,25 @@ function emitPresence() {
   }
 }
 
-export function subscribe(client: Client) {
+function connectionsFor(memberId?: string) {
+  if (!memberId) return 0;
+  let count = 0;
+  for (const client of clients) if (client.memberId === memberId) count += 1;
+  return count;
+}
+
+export function subscribe(
+  client: Client,
+  hooks?: { onFirst?: () => void; onLast?: () => void }
+) {
+  const first = Boolean(client.memberId) && connectionsFor(client.memberId) === 0;
   clients.add(client);
+  if (first) hooks?.onFirst?.();
   emitPresence();
   return () => {
     clients.delete(client);
+    const last = Boolean(client.memberId) && connectionsFor(client.memberId) === 0;
+    if (last) hooks?.onLast?.();
     emitPresence();
   };
 }

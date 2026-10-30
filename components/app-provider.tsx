@@ -153,12 +153,16 @@ export function AppProvider({
       try {
         const data = JSON.parse(event.data) as {
           type?: string;
+          revision?: number;
           ids?: string[];
           message?: Message;
           messageId?: string;
         };
         if ((data.type === "presence" || data.type === "hello") && Array.isArray(data.ids)) {
           setOnlineIds(data.ids);
+          if (data.type === "hello" && typeof data.revision === "number" && data.revision > seenRevision.current) {
+            void refresh();
+          }
           return;
         }
         if (data.type === "typing" || data.type === "seen") {

@@ -260,6 +260,14 @@ export type IvrLog = {
   result: string;
 };
 
+export type SiteVisit = {
+  id: string;
+  memberId: string;
+  startedAt: string;
+  lastSeen: string;
+  endedAt?: string;
+};
+
 export type ChatEmailMode = "off" | "dm" | "custom";
 
 export type ChatEmailPrefs = {
@@ -282,6 +290,7 @@ export type AppState = {
   bankAccounts?: Record<string, BankAccount>;
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
+  visits?: SiteVisit[];
   chatReads?: Record<string, Record<string, string>>;
   chatEmailPrefs?: Record<string, ChatEmailPrefs>;
   nudge?: NudgeState;

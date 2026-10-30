@@ -674,7 +674,7 @@ export function AdminHub({ onOpen }: { onOpen: (screen: HubScreen) => void }) {
           tone="gray"
           title="מערכת"
           status={lastIvr ? `IVR אחרון ${formatRelativeHe(lastIvr.at)}` : "הגדרות כלליות"}
-          detail="מתגים כלליים ופרטים טכניים"
+          detail="כניסות לאתר והמערכת הטלפונית"
           onOpen={() => onOpen("system")}
         />
       </div>
