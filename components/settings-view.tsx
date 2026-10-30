@@ -762,7 +762,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
       const res = await fetch("/api/tzintuk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: event.id, memberId: member.id }),
+        body: JSON.stringify({ eventId: event.id, memberId: member.id, variant: "nudge" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -944,8 +944,9 @@ function NudgePanel({ event }: { event: Gathering }) {
       <div className="grid gap-3.5 border-t border-[#e9ecef] px-4 py-3.5 md:px-5">
         <p className="text-[12.5px] font-light leading-5 text-muted-foreground">
           כל עוד חבר לא ענה אם הוא מגיע, המערכת שולחת לו מייל תזכורת עם הכותרת{" "}
-          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה, וגם צינתוק לטלפון השמור. מי שענה
-          מפסיק לקבל. לא נשלח בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
+          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה, וגם צינתוק אחד דרך שלוחה 5.
+          הצינתוק מצלצל לכל הרשימה שרשומה בשלוחה. מי שענה מפסיק לקבל מייל. לא נשלח בלילה ובשבת, והתזכורות נעצרות שעה
+          לפני החברה.
         </p>
         <div className="grid gap-1.5">
           <div className="text-[12px] text-muted-foreground">כל כמה זמן</div>

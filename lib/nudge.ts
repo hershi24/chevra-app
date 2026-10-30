@@ -2,10 +2,10 @@ import { cancellationHtml, cancelSubject, invitationHtml, nudgeSubject, sendEmai
 import { gatheringLabel, memberById } from "./format";
 import { signRsvpToken } from "./rsvp-link";
 import { readState, updateState } from "./store";
-import type { AppState, EmailDelivery, Gathering, Member, NudgeRecord } from "./types";
+import type { AppState, EmailDelivery, Gathering, IvrLog, Member, NudgeRecord } from "./types";
 
 import { memberHasPhone } from "./phone";
-import { sendTzintuk, yemotConfigured } from "./yemot";
+import { sendExtensionTzintuk, yemotConfigured, type TzintukResult } from "./yemot";
 import { memberAddress, nudgeState, reachableForNudge, waitingOn } from "./nudge-rules";
 
 export * from "./nudge-rules";
@@ -130,6 +130,37 @@ export function mergeNudgeRows(
   return rows;
 }
 
+type NudgeCall = { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string };
+
+/** One free ring on extension 5, counted as a nudge for each waiting member who has a phone. */
+export async function ringNudgeList(members: Member[]): Promise<{ ring: TzintukResult | null; calls: NudgeCall[] }> {
+  const targets = members.filter((member) => memberHasPhone(member));
+  if (!targets.length || !yemotConfigured()) return { ring: null, calls: [] };
+  const ring = await sendExtensionTzintuk();
+  return {
+    ring,
+    calls: targets.map((member) => ({
+      memberId: member.id,
+      phone: member.phone.trim(),
+      ok: ring.ok,
+      skipped: ring.skipped,
+      error: ring.error,
+    })),
+  };
+}
+
+export function logNudgeRing(state: AppState, eventId: string, ring: TzintukResult, at = new Date().toISOString()) {
+  const entry: IvrLog = {
+    id: crypto.randomUUID(),
+    at,
+    phone: ring.phone,
+    action: "tzintuk",
+    eventId,
+    result: ring.ok ? "tzintuk_sent" : ring.error || "tzintuk_failed",
+  };
+  state.ivrLog.unshift(entry);
+}
+
 export function recordDeliveries(
   state: AppState,
   eventId: string,
@@ -220,26 +251,24 @@ async function runOnce(originArg?: string): Promise<NudgeRunResult> {
   const { event, members } = dueMembers(state);
   if (!event || !members.length) return { ran: false, reason: "אין למי לשלוח", deliveries: [] };
   const origin = originArg || backgroundOrigin();
-  const canCall = yemotConfigured();
+  const canCall = yemotConfigured() && members.some((member) => memberHasPhone(member));
   if (!origin && !canCall) return { ran: false, reason: "חסרה כתובת האתר (PUBLIC_SITE_URL)", deliveries: [] };
 
   const rows: { memberId: string; delivery: EmailDelivery }[] = [];
-  const calls: { memberId: string; phone: string; ok: boolean; skipped?: boolean; error?: string }[] = [];
   for (const member of members) {
     if (origin && memberAddress(member)) {
       const delivery = await sendGatheringEmail(state, event, member, { origin, variant: "nudge" });
       rows.push({ memberId: member.id, delivery });
     }
-    if (canCall && memberHasPhone(member)) {
-      calls.push({ memberId: member.id, ...(await sendTzintuk(member.phone)) });
-    }
   }
+  const { ring, calls } = await ringNudgeList(members);
   if (!rows.length && !calls.length) {
     return { ran: false, reason: origin ? "אין למי לשלוח" : "חסרה כתובת האתר (PUBLIC_SITE_URL)", deliveries: [] };
   }
   const combined = mergeNudgeRows(rows, calls, (id) => memberById(state.members, id)?.displayName ?? id);
   await updateState((s) => {
     recordDeliveries(s, event.id, combined, "nudge");
+    if (ring) logNudgeRing(s, event.id, ring);
   });
   return { ran: true, eventId: event.id, deliveries: combined.map((row) => row.delivery) };
 }
