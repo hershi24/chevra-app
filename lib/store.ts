@@ -1,7 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { createSeed } from "./seed";
-import { emitUpdate } from "./realtime";
 import { isSupabaseEnabled } from "./supabase";
 import { canSeeChannel, isGeneralChannel, isRoshChevra } from "./channels";
 import {
@@ -13,7 +12,7 @@ import {
 } from "./supabase-chat";
 import { chatEmailPrefsFor, loadChatEmailPrefs, syncChatEmailPrefs } from "./chat-email-prefs";
 import { ensureMemberSecrets, publicMember } from "./password";
-import { can, isLeader } from "./permissions";
+import { can, isAdmin, isLeader } from "./permissions";
 import { preserveRsvpVia } from "./rsvp-record";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
 import { ensureExpenses } from "./expenses";
@@ -27,6 +26,8 @@ import { loadSiteBoard, syncSiteBoard } from "./supabase-board";
 import { loadSiteNudge, syncSiteNudge } from "./supabase-nudge";
 import { loadSitePromo, syncSitePromo } from "./supabase-promo";
 import { loadSiteKibud, syncSiteKibud } from "./supabase-kibud";
+import { applySiteActivity, loadSiteActivity, syncSiteActivity } from "./supabase-activity";
+import { emitUpdate, onlineMemberIds } from "./realtime";
 import { boardEnabled } from "./community-board";
 import { publicEntrancePromo } from "./entrance-promo";
 import type { AppState, Member, Poll, PublicState } from "./types";
@@ -166,6 +167,8 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     if (promo !== undefined) state.settings.entrancePromo = promo;
     const kibud = await loadSiteKibud();
     if (kibud !== undefined) state.settings.kibudRotation = kibud;
+    const activity = await loadSiteActivity();
+    applySiteActivity(state, activity, new Set(onlineMemberIds()));
     markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
@@ -193,6 +196,7 @@ export async function persistQuietly(
         await syncSiteNudge(before, current);
         await syncSitePromo(before, current);
         await syncSiteKibud(before, current);
+        await syncSiteActivity(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -227,6 +231,7 @@ export async function updateState(
         await syncSiteNudge(before, current);
         await syncSitePromo(before, current);
         await syncSiteKibud(before, current);
+        await syncSiteActivity(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -274,7 +279,8 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     payments: state.settings.showExpenses === false ? [] : (state.payments ?? []),
     bankAccounts: state.settings.showExpenses === false ? {} : (state.bankAccounts ?? {}),
     emailLog: state.emailLog,
-    ivrLog: state.ivrLog,
+    ivrLog: isAdmin(me) ? state.ivrLog : [],
+    visits: isAdmin(me) ? state.visits ?? [] : [],
     nudge: can(me, "sendInvites") ? state.nudge : undefined,
     revision: state.revision,
     me: publicMember(me),

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { ArrowRight, Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
+import { ArrowRight, Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { AdminHub, type HubScreen } from "@/components/admin-hub";
@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpWithVia } from "@/lib/format";
-import { expensesOpen } from "@/lib/expenses";
+import { formatStay, stayLength } from "@/lib/visits";
 import { can, isAdmin } from "@/lib/permissions";
 import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
@@ -117,7 +117,7 @@ function AdminSettings() {
             <CommunityBoardPanel tabbed />
           </Section>
         ) : (
-          <Section id="system" title="מערכת" subtitle="מתגים כלליים באתר ופרטים טכניים.">
+          <Section id="system" title="מערכת" subtitle="כניסות לאתר, המערכת הטלפונית, ופרטים טכניים.">
             <EntrancePromoPanel />
             <KibudPanel />
             <SystemPanel />
@@ -262,7 +262,7 @@ function MemberSettings() {
             {can(me, "sendInvites") ? <InvitesSection /> : null}
 
             {isAdmin(me) ? (
-              <Section id="system" title="מערכת" subtitle="רק למנהל המערכת.">
+              <Section id="system" title="מערכת" subtitle="כניסות לאתר והמערכת הטלפונית.">
                 <CommunityBoardPanel />
                 <EntrancePromoPanel />
                 <KibudPanel />
@@ -1130,44 +1130,78 @@ function InviteSide({
   );
 }
 
+function phoneActionLabel(action: string) {
+  if (action === "tzintuk") return "צינתוק";
+  if (action === "meeting-response") return "שיחה נכנסת";
+  if (action === "ivr_update") return "הקשה בטלפון";
+  return "טלפון";
+}
+
 function SystemPanel() {
-  const { state, act } = useApp();
+  const { state } = useApp();
+  const [now, setNow] = useState(() => Date.now());
+  const anyoneHere = (state?.visits ?? []).some((visit) => !visit.endedAt);
+  useEffect(() => {
+    if (!anyoneHere) return;
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [anyoneHere]);
   if (!state) return null;
-  const visible = expensesOpen(state);
-  const lastIvr = state.ivrLog[0];
+  const visits = [...(state.visits ?? [])].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 40);
+  const calls = [...state.ivrLog].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 40);
   return (
-    <div className={PANEL}>
-      <div className="flex items-center gap-3.5 px-4 py-4 md:px-5">
-        <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
-          <Wallet className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px]">הצגת באו חשבון</div>
-          <div className="text-[12.5px] font-light text-muted-foreground">כיבוי מסתיר את הדף ואת הטאב מכולם</div>
+    <div className="grid gap-4">
+      <div className={PANEL}>
+        <div className="px-4 py-4 md:px-5">
+          <div className="text-[15px]">כניסות לאתר</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">מי נכנס, ומתי יצא. משך הזמן נספר כל עוד האתר פתוח.</div>
         </div>
-        <Switch
-          checked={visible}
-          onCheckedChange={(checked) =>
-            void act({ type: "setExpensesVisible", visible: checked })
-              .then(() => toast.success(checked ? "באו חשבון מוצג" : "באו חשבון מוסתר"))
-              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "העדכון נכשל"))
-          }
-          aria-label="הצגת באו חשבון"
-        />
+        {visits.length ? (
+          <ul className="border-t border-[#e9ecef]">
+            {visits.map((visit) => {
+              const member = memberById(state.members, visit.memberId);
+              const open = !visit.endedAt;
+              return (
+                <li key={visit.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-[#e9ecef] px-4 py-2.5 last:border-b-0 md:px-5">
+                  <span className="text-[14px]">{member?.displayName ?? "חבר"}</span>
+                  <span className={cn("text-[12.5px]", open ? "text-[#3d8f62]" : "text-foreground")}>
+                    {open ? `באתר עכשיו · ${formatStay(stayLength(visit, now))}` : formatStay(stayLength(visit))}
+                  </span>
+                  <span className="w-full text-[12px] font-light text-muted-foreground">{formatDateTimeHe(visit.startedAt)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="border-t border-[#e9ecef] px-4 py-4 text-[13px] font-light text-muted-foreground md:px-5">עדיין אין כניסות רשומות.</p>
+        )}
       </div>
-      {lastIvr ? (
-        <div className="flex items-center gap-3.5 border-t border-[#e9ecef] px-4 py-4 md:px-5">
-          <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f1f3f6] text-[#4b5563]">
-            <Phone className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[15px]">צינתוק אחרון</div>
-            <div className="truncate text-[12.5px] font-light text-muted-foreground">
-              {ivrResultLabel(lastIvr.result)} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
-            </div>
-          </div>
+      <div className={PANEL}>
+        <div className="px-4 py-4 md:px-5">
+          <div className="text-[15px]">מערכת טלפונית</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">צינתוקים, שיחות נכנסות, ותשובות שהוקשו בטלפון.</div>
         </div>
-      ) : null}
+        {calls.length ? (
+          <ul className="border-t border-[#e9ecef]">
+            {calls.map((entry) => {
+              const member = memberById(state.members, entry.memberId);
+              return (
+                <li key={entry.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-[#e9ecef] px-4 py-2.5 last:border-b-0 md:px-5">
+                  <span className="inline-flex min-w-0 items-center gap-2 text-[14px]">
+                    <Phone className="size-3.5 shrink-0 text-[#6b7280]" aria-hidden />
+                    {phoneActionLabel(entry.action)} · {ivrResultLabel(entry.result)}
+                    {member ? ` · ${member.displayName}` : ""}
+                  </span>
+                  <span className="text-[12px] font-light text-muted-foreground">{formatRelativeHe(entry.at)}</span>
+                  <span className="w-full text-[12px] font-light text-muted-foreground [unicode-bidi:plaintext]" dir="ltr">{entry.phone}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="border-t border-[#e9ecef] px-4 py-4 text-[13px] font-light text-muted-foreground md:px-5">עדיין אין שיחות במערכת הטלפונית.</p>
+        )}
+      </div>
     </div>
   );
 }

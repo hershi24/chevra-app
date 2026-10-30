@@ -479,6 +479,7 @@ export function createSeed(): AppState {
     },
     emailLog: [],
     ivrLog: [],
+    visits: [],
     revision: 1,
   };
 }
