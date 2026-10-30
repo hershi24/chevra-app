@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/components/app-provider";
 import { formatHebrewDate } from "@/lib/format";
+import { suggestedKibudId } from "@/lib/kibud";
 import type { Gathering, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -183,11 +184,12 @@ export function EventDialog({
           />
           <SelectField label="מארח" name="hostId" members={members} defaultValue={event?.hostId} />
           <SelectField
-            label="אחראי כיבוד"
+            key={event ? `kibud-${event.id}-${event.kibudId ?? ""}` : `kibud-new-${open}`}
+            label="תורן כיבוד"
             name="kibudId"
             members={members}
             optional
-            defaultValue={event?.kibudId}
+            defaultValue={event ? event.kibudId : open ? suggestedKibudId({ members, gatherings: state?.gatherings ?? [], settings: state?.settings ?? {} }) : undefined}
           />
           <Field label="נושא השיעור" name="topic" defaultValue={event?.topic} />
           {event ? (

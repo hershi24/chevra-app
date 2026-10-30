@@ -210,6 +210,7 @@ export type AppSettings = {
   showExpenses?: boolean;
   communityBoard?: CommunityBoard;
   entrancePromo?: EntrancePromo | null;
+  kibudRotation?: string[];
 };
 
 export type EmailDelivery = {

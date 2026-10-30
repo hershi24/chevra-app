@@ -129,4 +129,5 @@ export type ActionBody =
   | { type: "voteCommunityPoll"; optionId: string }
   | { type: "setNudgeSettings"; settings: NudgeSettings }
   | { type: "setEntrancePromo"; promo: Pick<EntrancePromo, "imageUrl" | "until"> | null }
-  | { type: "dismissEntrancePromo" };
+  | { type: "dismissEntrancePromo" }
+  | { type: "setKibudRotation"; memberIds: string[] };
