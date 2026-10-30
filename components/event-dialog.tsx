@@ -60,6 +60,18 @@ export function EventDialog({
   const [notify, setNotify] = useState(false);
   const [cancelNote, setCancelNote] = useState("");
   const [openedAt, setOpenedAt] = useState(0);
+  const [kibudId, setKibudId] = useState(event?.kibudId ?? "");
+
+  function kibudForOpen() {
+    if (event) return event.kibudId ?? "";
+    return (
+      suggestedKibudId({
+        members,
+        gatherings: state?.gatherings ?? [],
+        settings: state?.settings ?? {},
+      }) ?? ""
+    );
+  }
 
   async function onSubmit(formData: FormData) {
     setSaving(true);
@@ -68,14 +80,14 @@ export function EventDialog({
       const title = String(formData.get("title") ?? "").trim();
       const location = String(formData.get("location") ?? "").trim();
       const hostId = String(formData.get("hostId"));
-      const kibudId = String(formData.get("kibudId") || "") || undefined;
+      const chosenKibud = kibudId || undefined;
       const topic = String(formData.get("topic") || "") || undefined;
       const notes = String(formData.get("notes") || "") || undefined;
       if (event) {
         await act({
           type: "updateEvent",
           eventId: event.id,
-          patch: { title, startsAt, location, hostId, kibudId, topic, notes, status },
+          patch: { title, startsAt, location, hostId, kibudId: chosenKibud, topic, notes, status },
         });
         if (status === "cancelled" && notify) {
           const res = await fetch("/api/invitations", {
@@ -98,7 +110,7 @@ export function EventDialog({
           startsAt,
           location,
           hostId,
-          kibudId,
+          kibudId: chosenKibud,
           topic,
           notes,
         });
@@ -118,11 +130,14 @@ export function EventDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next && event) {
-          setStatus(event.status);
-          setNotify(false);
-          setCancelNote("");
-          setOpenedAt(Date.now());
+        if (next) {
+          setKibudId(kibudForOpen());
+          if (event) {
+            setStatus(event.status);
+            setNotify(false);
+            setCancelNote("");
+            setOpenedAt(Date.now());
+          }
         }
       }}
     >
@@ -184,12 +199,12 @@ export function EventDialog({
           />
           <SelectField label="מארח" name="hostId" members={members} defaultValue={event?.hostId} />
           <SelectField
-            key={event ? `kibud-${event.id}-${event.kibudId ?? ""}` : `kibud-new-${open}`}
             label="תורן כיבוד"
             name="kibudId"
             members={members}
             optional
-            defaultValue={event ? event.kibudId : open ? suggestedKibudId({ members, gatherings: state?.gatherings ?? [], settings: state?.settings ?? {} }) : undefined}
+            value={kibudId}
+            onChange={(e) => setKibudId(e.target.value)}
           />
           <Field label="נושא השיעור" name="topic" defaultValue={event?.topic} />
           {event ? (
@@ -275,12 +290,16 @@ function SelectField({
   members,
   optional,
   defaultValue,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
   members: Member[];
   optional?: boolean;
   defaultValue?: string;
+  value?: string;
+  onChange?: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 }) {
   return (
     <div className="grid gap-1.5">
@@ -289,7 +308,9 @@ function SelectField({
         id={name}
         name={name}
         className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-        defaultValue={defaultValue || (optional ? "" : members[0]?.id)}
+        {...(value !== undefined
+          ? { value, onChange }
+          : { defaultValue: defaultValue || (optional ? "" : members[0]?.id) })}
       >
         {optional ? <option value="">ללא</option> : null}
         {members.map((member) => (

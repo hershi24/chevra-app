@@ -16,6 +16,7 @@ import {
   memberById,
   splitGatheringTitle,
 } from "@/lib/format";
+import { kibudTurn } from "@/lib/kibud";
 import { can, isAdmin } from "@/lib/permissions";
 import { gatheringHeld } from "@/lib/selectors";
 import type { Gathering, Member } from "@/lib/types";
@@ -137,6 +138,7 @@ export function JournalView() {
   }
 
   const hostName = next ? memberById(state.members, next.hostId)?.displayName : null;
+  const turn = next ? kibudTurn(state, next) : null;
 
   return (
     <div className="-mx-5 -mt-6 -mb-28 min-h-dvh bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:min-h-[calc(100dvh-4.5rem)] md:-mb-16 md:px-8 md:pt-10 md:pb-16">
@@ -165,6 +167,8 @@ export function JournalView() {
           members={state.members}
           me={me}
           hostName={hostName ?? null}
+          kibudName={turn?.duty?.displayName}
+          nextName={turn?.next?.displayName}
           rsvping={rsvping}
           onRsvp={() => void comeTo(next)}
         />
@@ -229,6 +233,8 @@ function NextStory({
   members,
   me,
   hostName,
+  kibudName,
+  nextName,
   rsvping,
   onRsvp,
 }: {
@@ -236,6 +242,8 @@ function NextStory({
   members: Member[];
   me: Member;
   hostName: string | null;
+  kibudName?: string;
+  nextName?: string;
   rsvping: boolean;
   onRsvp: () => void;
 }) {
@@ -269,7 +277,13 @@ function NextStory({
             <NavigateLink location={location} />
           </p>
         ) : null}
-        {hostName ? <div className="mt-2.5"><Chip>אצל {hostName}</Chip></div> : null}
+        {hostName || kibudName || nextName ? (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {hostName ? <Chip>אצל {hostName}</Chip> : null}
+            {kibudName ? <Chip>תורן כיבוד: {kibudName}</Chip> : null}
+            {nextName ? <Chip>הבא בתור: {nextName}</Chip> : null}
+          </div>
+        ) : null}
         {body ? (
           <p className="mt-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
         ) : null}
