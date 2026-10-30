@@ -21,6 +21,7 @@ import {
   type MessageRow,
   type ReactionRow,
 } from "@/lib/chat-message";
+import { preserveRsvpVia } from "@/lib/rsvp-record";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 
@@ -102,7 +103,8 @@ export function AppProvider({
       (message) => pendingIds.current.has(message.id) && !serverIds.has(message.id)
     );
     const merged = extras.length ? { ...data, messages: [...data.messages, ...extras] } : data;
-    return withPendingRsvps(merged, pendingRsvps.current, rsvpTicket.current);
+    const kept = prev ? { ...merged, gatherings: preserveRsvpVia(prev.gatherings, merged.gatherings) } : merged;
+    return withPendingRsvps(kept, pendingRsvps.current, rsvpTicket.current);
   }, []);
 
   const refresh = useCallback(async () => {

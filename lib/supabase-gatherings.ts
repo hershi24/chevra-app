@@ -309,6 +309,7 @@ async function replaceRsvps(event: Gathering, previous?: Gathering) {
   if (rows.length) {
     const { error } = await db.from("rsvps").upsert(rows);
     if (error && isMissingViaColumn(error)) {
+      console.error("rsvps.via column missing. Run supabase/migrations/20261026120000_rsvp_via.sql");
       const retry = await db.from("rsvps").upsert(
         rows.map((row) => ({
           gathering_id: row.gathering_id,
