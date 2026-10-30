@@ -142,9 +142,7 @@ export function CommunityHome() {
                           </span>
                         ) : null}
                         {host ? <span>מארח: {host.displayName}</span> : null}
-                        {turn?.duty || turn?.suggested ? (
-                          <span>תורן כיבוד: {(turn.duty ?? turn.suggested)!.displayName}</span>
-                        ) : null}
+                        {turn?.duty ? <span>תורן כיבוד: {turn.duty.displayName}</span> : null}
                         {turn?.next ? <span>הבא בתור: {turn.next.displayName}</span> : null}
                       </div>
                     </div>

@@ -3,7 +3,8 @@
 import { ChevronDown, ChevronUp, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
-import { kibudOrder } from "@/lib/kibud";
+import { kibudOrder, kibudTurn } from "@/lib/kibud";
+import { upcomingGathering } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
@@ -12,6 +13,7 @@ export function KibudPanel() {
   const { state, act } = useApp();
   if (!state) return null;
   const order = kibudOrder(state);
+  const turn = kibudTurn(state, upcomingGathering(state));
   const included = new Set(order);
   const waiting = state.members.filter((member) => !included.has(member.id));
 
@@ -52,7 +54,11 @@ export function KibudPanel() {
           return (
             <li key={id} className="flex items-center gap-2 border-b border-[#e9ecef] px-4 py-2.5 last:border-b-0 md:px-5">
               <span className="w-5 text-[12px] tabular-nums text-muted-foreground">{index + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-[14px]">{member.displayName}</span>
+              <span className="min-w-0 flex-1 truncate text-[14px]">
+                {member.displayName}
+                {turn.duty?.id === member.id ? <span className="ms-2 text-[12px] font-light text-[#7d5a22]">תורן עכשיו</span> : null}
+                {turn.next?.id === member.id ? <span className="ms-2 text-[12px] font-light text-muted-foreground">הבא בתור</span> : null}
+              </span>
               <button type="button" className="grid size-8 place-items-center rounded-full text-[#6b7280] hover:bg-black/[0.04]" aria-label="למעלה" onClick={() => move(index, -1)}>
                 <ChevronUp className="size-4" />
               </button>

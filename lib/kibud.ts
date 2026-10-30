@@ -13,6 +13,14 @@ export function kibudOrder(state: RosterState) {
   return (state.settings.kibudRotation ?? []).filter((id, index, list) => known.has(id) && list.indexOf(id) === index);
 }
 
+function inOrder(state: RosterState, order: string[], event?: Gathering | null) {
+  return state.gatherings
+    .filter((item) => item.status !== "cancelled" && item.kibudId && order.includes(item.kibudId))
+    .filter((item) => !event || item.id !== event.id)
+    .filter((item) => !event || +new Date(item.startsAt) <= +new Date(event.startsAt))
+    .sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt))[0];
+}
+
 function lastAssigned(state: RosterState, order: string[]) {
   return state.gatherings
     .filter((event) => event.status !== "cancelled" && event.kibudId && order.includes(event.kibudId))
@@ -40,10 +48,7 @@ export function kibudTurn(state: RosterState, event?: Gathering | null) {
   const upcoming = upcomingGathering(state);
   const onDeck = Boolean(event && upcoming?.id === event.id);
   if (!order.length || !onDeck) return { duty, next: undefined as Member | undefined, suggested: undefined as Member | undefined };
-  if (duty && order.includes(duty.id)) {
-    const next = memberById(state.members, after(order, duty.id));
-    return { duty, next: next?.id === duty.id ? undefined : next, suggested: undefined };
-  }
-  if (duty) return { duty, next: undefined, suggested: undefined };
-  return { duty: undefined, next: undefined, suggested: memberById(state.members, after(order, lastAssigned(state, order)?.kibudId)) };
+  const anchor = duty && order.includes(duty.id) ? duty.id : inOrder(state, order, event)?.kibudId;
+  const next = memberById(state.members, after(order, anchor));
+  return { duty, next: next && next.id !== duty?.id ? next : undefined, suggested: undefined };
 }

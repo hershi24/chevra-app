@@ -433,7 +433,7 @@ function HeroEvent({
   const [listOpen, setListOpen] = useState(false);
   const host = memberById(members, event.hostId);
   const lecturer = memberById(members, event.lecturerId);
-  const kibud = turn.duty ?? turn.suggested;
+  const kibud = turn.duty;
   const held = gatheringHeld(event);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
@@ -496,9 +496,9 @@ function HeroEvent({
               </li>
             ) : null}
             {details.map((d) => (
-              <li key={d.text} className="flex min-w-0 items-center gap-2">
+              <li key={d.text} className="flex max-w-full items-center gap-2">
                 <d.icon className="size-4 shrink-0 text-primary/60" aria-hidden />
-                <span className="truncate">{d.text}</span>
+                <span>{d.text}</span>
               </li>
             ))}
           </ul>
