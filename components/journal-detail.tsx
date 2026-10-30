@@ -7,6 +7,8 @@ import { ArrowLeft, ArrowRight, Mic, Pencil, Play, Plus, Trash2, X } from "lucid
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { EventDialog } from "@/components/event-dialog";
+import { NavigateLink } from "@/components/navigate-link";
+import { kibudTurn } from "@/lib/kibud";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
@@ -140,6 +142,7 @@ export function JournalDetail({
   const host = memberById(state.members, event.hostId);
   const lecturer = memberById(state.members, event.lecturerId);
   const kibud = memberById(state.members, event.kibudId);
+  const nextKibud = kibudTurn(state, event).next;
   const currentSummary = summary ?? event.summary ?? "";
   const { kind } = splitGatheringTitle(event);
   const { heading, body } = gatheringHeadline(event);
@@ -366,7 +369,12 @@ export function JournalDetail({
           {cancelled ? <p className="mt-2 text-[14px] font-medium text-[#f6c7c0]">✕ החברה בוטלה</p> : null}
           {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
-            {event.location ? <span>{event.location}</span> : null}
+            {event.location ? (
+              <span className="inline-flex items-center gap-2">
+                {event.location}
+                <NavigateLink location={event.location} className="bg-white/15 text-white ring-1 ring-white/40" />
+              </span>
+            ) : null}
             {cancelled ? <span>{answerTally}</span> : null}
             {!cancelled && coming.length ? <span>{coming.length} {held ? "השתתפו" : "מגיעים"}</span> : null}
             {visual.length ? <span>{visual.length} תמונות וסרטונים</span> : null}
@@ -379,8 +387,11 @@ export function JournalDetail({
           <div className="grid gap-3 sm:grid-cols-3">
             <Credit label="מארח" member={host} />
             <Credit label="מעביר השיעור" member={lecturer} />
-            <Credit label="כיבוד" member={kibud} />
+            <Credit label="תורן כיבוד" member={kibud} />
           </div>
+        ) : null}
+        {nextKibud ? (
+          <p className="mt-3 text-[13px] font-light text-muted-foreground">הבא בתור לכיבוד: {nextKibud.displayName}</p>
         ) : null}
 
         {cancelled ? (

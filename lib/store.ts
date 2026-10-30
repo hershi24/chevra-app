@@ -25,6 +25,7 @@ import {
 import { loadSiteBoard, syncSiteBoard } from "./supabase-board";
 import { loadSiteNudge, syncSiteNudge } from "./supabase-nudge";
 import { loadSitePromo, syncSitePromo } from "./supabase-promo";
+import { loadSiteKibud, syncSiteKibud } from "./supabase-kibud";
 import { boardEnabled } from "./community-board";
 import { publicEntrancePromo } from "./entrance-promo";
 import type { AppState, Member, Poll, PublicState } from "./types";
@@ -152,6 +153,8 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     if (nudge) state.nudge = nudge;
     const promo = await loadSitePromo();
     if (promo !== undefined) state.settings.entrancePromo = promo;
+    const kibud = await loadSiteKibud();
+    if (kibud !== undefined) state.settings.kibudRotation = kibud;
     markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
@@ -178,6 +181,7 @@ export async function persistQuietly(
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
         await syncSitePromo(before, current);
+        await syncSiteKibud(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -211,6 +215,7 @@ export async function updateState(
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
         await syncSitePromo(before, current);
+        await syncSiteKibud(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");

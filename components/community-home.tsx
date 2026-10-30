@@ -8,6 +8,8 @@ import { BoardFileCard } from "@/components/board-file-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { resolveBoard, visibleHomePhotos } from "@/lib/community-board";
 import { formatHebrewDate, formatTimeHe, gatheringHeadline, gatheringLabel, memberById } from "@/lib/format";
+import { kibudTurn } from "@/lib/kibud";
+import { NavigateLink } from "@/components/navigate-link";
 import { upcomingGathering } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,7 @@ export function CommunityHome() {
   const notices = board.notices;
   const photos = visibleHomePhotos(board, state);
   const host = next ? memberById(state.members, next.hostId) : null;
+  const turn = next ? kibudTurn(state, next) : null;
   const nextHeadline = next ? gatheringHeadline(next) : null;
   const mine = pick ?? board.poll.options.find((option) => option.voterIds.includes(me.id))?.id ?? null;
 
@@ -135,9 +138,14 @@ export function CommunityHome() {
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin className="size-3.5 text-primary" />
                             {next.location}
+                            <NavigateLink location={next.location} />
                           </span>
                         ) : null}
                         {host ? <span>מארח: {host.displayName}</span> : null}
+                        {turn?.duty || turn?.suggested ? (
+                          <span>תורן כיבוד: {(turn.duty ?? turn.suggested)!.displayName}</span>
+                        ) : null}
+                        {turn?.next ? <span>הבא בתור: {turn.next.displayName}</span> : null}
                       </div>
                     </div>
                     <p className="mt-3 shrink-0 text-[1.45rem] font-medium tabular-nums text-primary md:text-[1.8rem] lg:mt-0 lg:text-[2.4rem] lg:leading-none">

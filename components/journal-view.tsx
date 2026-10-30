@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, MapPin, Mic, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EventDialog } from "@/components/event-dialog";
+import { NavigateLink } from "@/components/navigate-link";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   formatDayMonth,
@@ -265,6 +266,7 @@ function NextStory({
           <p className="mt-2 flex items-center gap-1.5 text-[13px] font-light text-[#4b5563]">
             <MapPin className="size-3.5 shrink-0 text-[#b8862f]" aria-hidden />
             <span className="truncate">{location}</span>
+            <NavigateLink location={location} />
           </p>
         ) : null}
         {hostName ? <div className="mt-2.5"><Chip>אצל {hostName}</Chip></div> : null}
@@ -392,7 +394,7 @@ function JournalEntry({
         <div className="flex flex-wrap gap-1.5">
           {host ? <Chip>מארח: {host.displayName}</Chip> : null}
           {lecturer ? <Chip>שיעור: {lecturer.displayName}</Chip> : null}
-          {kibud ? <Chip>כיבוד: {kibud.displayName}</Chip> : null}
+          {kibud ? <Chip>תורן כיבוד: {kibud.displayName}</Chip> : null}
         </div>
         {text ? (
           <p className="mt-2 mb-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{text}</p>

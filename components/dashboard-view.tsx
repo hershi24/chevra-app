@@ -25,6 +25,8 @@ import { EventDialog } from "@/components/event-dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { expensesOpen, formatAgorot, settlement } from "@/lib/expenses";
+import { kibudTurn } from "@/lib/kibud";
+import { NavigateLink } from "@/components/navigate-link";
 import {
   formatHebrewDate,
   formatRelativeHe,
@@ -237,7 +239,7 @@ function Dashboard({
       <div className="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="flex min-w-0 flex-col gap-6 md:gap-8">
           {event ? (
-            <HeroEvent event={event} members={state.members} me={me} onRsvp={onRsvp} />
+            <HeroEvent event={event} members={state.members} me={me} turn={kibudTurn(state, event)} onRsvp={onRsvp} />
           ) : (
             <section className={cn(CARD, "px-6 py-12")}>
               <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
@@ -419,17 +421,19 @@ function HeroEvent({
   event,
   members,
   me,
+  turn,
   onRsvp,
 }: {
   event: Gathering;
   members: Member[];
   me: Member;
+  turn: { duty?: Member; next?: Member; suggested?: Member };
   onRsvp: (status: RsvpStatus) => Promise<void>;
 }) {
   const [listOpen, setListOpen] = useState(false);
   const host = memberById(members, event.hostId);
-  const kibud = memberById(members, event.kibudId);
   const lecturer = memberById(members, event.lecturerId);
+  const kibud = turn.duty ?? turn.suggested;
   const held = gatheringHeld(event);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
@@ -441,9 +445,9 @@ function HeroEvent({
     new Date(event.startsAt)
   );
   const details = [
-    event.location ? { icon: MapPin, text: event.location } : null,
     host ? { icon: Home, text: `אצל ${host.displayName}` } : null,
-    kibud ? { icon: UtensilsCrossed, text: `כיבוד: ${kibud.displayName}` } : null,
+    kibud ? { icon: UtensilsCrossed, text: `תורן כיבוד: ${kibud.displayName}` } : null,
+    turn.next ? { icon: UtensilsCrossed, text: `הבא בתור: ${turn.next.displayName}` } : null,
     lecturer ? { icon: BookOpen, text: `שיעור: ${lecturer.displayName}` } : null,
   ].filter((d): d is { icon: LucideIcon; text: string } => Boolean(d));
 
@@ -482,8 +486,15 @@ function HeroEvent({
         ) : null}
         <p className="mt-1 text-[13px] font-light text-muted-foreground">{formatHebrewDate(event.startsAt)}</p>
 
-        {details.length ? (
+        {event.location || details.length ? (
           <ul className="mt-5 flex flex-col gap-1.5 text-[14px] font-light text-foreground/75 sm:flex-row sm:flex-wrap sm:gap-x-5">
+            {event.location ? (
+              <li className="flex min-w-0 items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-primary/60" aria-hidden />
+                <span className="truncate">{event.location}</span>
+                <NavigateLink location={event.location} />
+              </li>
+            ) : null}
             {details.map((d) => (
               <li key={d.text} className="flex min-w-0 items-center gap-2">
                 <d.icon className="size-4 shrink-0 text-primary/60" aria-hidden />

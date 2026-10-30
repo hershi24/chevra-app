@@ -861,6 +861,16 @@ function applyAction(
       promo.dismissedBy.push(me.id);
       return;
     }
+    case "setKibudRotation": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const known = new Set(s.members.map((member) => member.id));
+      const memberIds: string[] = [];
+      for (const id of body.memberIds) {
+        if (known.has(id) && !memberIds.includes(id)) memberIds.push(id);
+      }
+      s.settings.kibudRotation = memberIds;
+      return;
+    }
     case "setCommunityBoard": {
       if (!isAdmin(me)) throw new Error("forbidden");
       const previous = resolveBoard(s);
