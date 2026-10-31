@@ -14,6 +14,7 @@ export type Member = {
   phone: string;
   email: string;
   avatarColor: string;
+  avatarUrl?: string;
   initials: string;
   passwordHash?: string;
   mustChangePassword?: boolean;

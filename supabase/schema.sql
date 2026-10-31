@@ -19,6 +19,7 @@ create table public.members (
   phone text,
   email text,
   avatar_color text not null default '#0F766E',
+  avatar_url text,
   initials text not null,
   password_hash text,
   must_change_password boolean not null default true,
