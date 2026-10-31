@@ -403,23 +403,23 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
         <div className="mt-5">
           <RsvpBar event={event} members={state.members} />
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Button className="h-10 rounded-full px-5" onClick={() => onOpen("invites")}>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <Button className="col-span-2 h-11 rounded-full sm:col-span-1" onClick={() => onOpen("invites")}>
             <Send data-icon="inline-start" />
             שליחת הזמנות
           </Button>
-          <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => onOpen("invites")}>
+          <Button variant="outline" className="h-11 rounded-full px-3" onClick={() => onOpen("invites")}>
             <Users data-icon="inline-start" />
-            לכל חבר בנפרד
+            לכל חבר
           </Button>
           <Button
             variant="outline"
-            className="h-10 rounded-full px-4"
+            className="h-11 rounded-full px-3"
             disabled={calling || withPhone === 0}
             onClick={() => void sendTzintukAll()}
           >
             <Phone data-icon="inline-start" />
-            {calling ? "מחייג…" : "שליחת צינתוק"}
+            {calling ? "מחייג…" : "צינתוק לכולם"}
           </Button>
         </div>
       </div>
@@ -447,14 +447,15 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
                     </div>
                   </div>
                   {memberAddress(member) || memberHasPhone(member) ? (
-                    <div className="flex shrink-0 items-center gap-2.5">
+                    <div className="grid shrink-0 gap-1">
                       {memberAddress(member) ? (
                         <button
                           type="button"
                           disabled={busy !== null}
                           onClick={() => void remind(member)}
-                          className="text-[12.5px] text-[#a9782c] hover:underline disabled:opacity-50"
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-[#e7dfd2] bg-white px-2.5 text-[12px] text-[#a9782c] disabled:opacity-50"
                         >
+                          <Mail className="size-3.5" />
                           {busy === `mail:${member.id}` ? "שולח…" : "תזכורת"}
                         </button>
                       ) : null}
@@ -463,8 +464,9 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
                           type="button"
                           disabled={busy !== null}
                           onClick={() => void callMember(member)}
-                          className="text-[12.5px] text-[#a9782c] hover:underline disabled:opacity-50"
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-[#e7dfd2] bg-white px-2.5 text-[12px] text-[#4b5563] disabled:opacity-50"
                         >
+                          <Phone className="size-3.5" />
                           {busy === `call:${member.id}` ? "מחייג…" : "צינתוק"}
                         </button>
                       ) : null}

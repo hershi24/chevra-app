@@ -666,11 +666,11 @@ function InvitesSection() {
                 className="resize-none rounded-xl bg-white text-sm text-foreground"
               />
             </label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <Button
                 onClick={() => void sendInvites()}
                 disabled={sending || reachable === 0}
-                className="h-10 flex-1 rounded-full px-5 md:flex-none"
+                className="h-11 rounded-full"
               >
                 <Mail data-icon="inline-start" />
                 {sending ? "שולח…" : `שליחה ל־${reachable} חברים`}
@@ -678,23 +678,23 @@ function InvitesSection() {
               {can(me, "triggerIvr") ? (
                 <Button
                   variant="outline"
-                  className="h-10 rounded-full px-4"
+                  className="h-11 rounded-full"
                   disabled={calling || withPhone === 0}
                   onClick={() => void sendTzintukAll()}
                 >
                   <Phone data-icon="inline-start" />
-                  {calling ? "מחייג…" : withPhone ? "שליחת צינתוק" : "אין מספרי טלפון"}
+                  {calling ? "מחייג…" : withPhone ? "צינתוק לכולם" : "אין מספרי טלפון"}
                 </Button>
               ) : null}
-              {unreachable ? (
-                <span className="w-full text-[12px] font-light text-[#9aa1ab] md:ms-auto md:w-auto">
-                  {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
-                </span>
-              ) : null}
-              <p className="w-full text-[12px] font-light leading-5 text-muted-foreground">
-                שליחת צינתוק מפעילה את הרשימה של שלוחה 5, אותו צינתוק שיוצא בכניסה לשלוחה. צינתוק לחבר אחד נשאר שיחה אל המספר שלו.
-              </p>
             </div>
+            {unreachable ? (
+              <p className="text-[12px] font-light text-[#9aa1ab]">
+                {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
+              </p>
+            ) : null}
+            <p className="text-[12px] font-light leading-5 text-muted-foreground">
+              צינתוק לכולם מצלצל לרשימה של שלוחה 5. תזכורת לחבר אחד יוצאת רק במייל. צינתוק לחבר אחד מצלצל רק למספר שלו.
+            </p>
           </div>
           <InviteSide
             event={event}
@@ -834,11 +834,11 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 ) : null}
               </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="rounded-full"
+                  className="h-9 rounded-full"
                   disabled={!address || busy !== null}
                   onClick={() => void sendOne(member)}
                 >
@@ -848,7 +848,7 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="rounded-full"
+                  className="h-9 rounded-full"
                   disabled={!memberHasPhone(member) || busy !== null}
                   onClick={() => void callOne(member)}
                 >
@@ -992,7 +992,7 @@ function NudgePanel({ event }: { event: Gathering }) {
         </label>
         <Button
           variant="outline"
-          className="h-10 justify-self-start rounded-full px-4"
+          className="h-11 rounded-full"
           disabled={!waitingMembers.length || nudging}
           onClick={() => void nudgeNow()}
         >
