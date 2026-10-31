@@ -48,7 +48,10 @@ export async function POST(request: Request) {
     });
     rows.push({ memberId: member.id, delivery });
   }
-  const { ring, calls } = variant === "nudge" ? await ringNudgeList(members) : { ring: null, calls: [] };
+  const targeted = Boolean(body.memberId) || (Array.isArray(body.memberIds) && body.memberIds.length > 0);
+  const singleReminder = variant === "nudge" && targeted && members.length === 1;
+  const { ring, calls } =
+    variant === "nudge" && !singleReminder ? await ringNudgeList(members) : { ring: null, calls: [] };
   const deliveries = rows.map((row) => row.delivery);
 
   const sentCount = deliveries.filter((row) => row.status === "sent").length;

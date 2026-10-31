@@ -618,7 +618,7 @@ export function ChatView({ channelId }: { channelId?: string }) {
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {onlineLabel(
-                    active.memberIds.filter((id) => onlineIds.includes(id)).length
+                    active.memberIds.filter((id) => id !== me.id && onlineIds.includes(id)).length
                   )}
                 </div>
               </div>
@@ -1659,6 +1659,7 @@ function sameMinute(a: string, b: string) {
 }
 
 function onlineLabel(count: number) {
+  if (count === 0) return "אין מחוברים כעת";
   if (count === 1) return "מחובר אחד כעת";
   return `${count} מחוברים כעת`;
 }

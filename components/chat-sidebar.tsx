@@ -294,7 +294,11 @@ export function ChatSidebar({
             <h1 className="text-[1.3rem] font-normal tracking-tight">צ׳אט החבורה</h1>
             <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-light text-muted-foreground">
               <span className={cn("size-[7px] rounded-full", onlineOthers ? "bg-[#3ba55d]" : "bg-black/20")} />
-              {onlineOthers === 1 ? "מחובר אחד עכשיו" : `${onlineOthers} מחוברים עכשיו`}
+              {onlineOthers === 0
+                ? "אין מחוברים עכשיו"
+                : onlineOthers === 1
+                  ? "מחובר אחד עכשיו"
+                  : `${onlineOthers} מחוברים עכשיו`}
             </p>
           </div>
         </div>
