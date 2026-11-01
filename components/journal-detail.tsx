@@ -729,13 +729,13 @@ export function JournalDetail({
         </div>
       ) : null}
 
-      {!held && can(me, "viewRsvps") ? (
+      {((!held && can(me, "viewRsvps")) || (event.status === "upcoming" && isAdmin(me))) ? (
         <div className="mt-9 px-5 md:px-8">
           <h3 className={cn("text-[15px] font-medium", cancelled ? "mb-1" : "mb-3")}>
             {cancelled ? "מה ענו לפני הביטול" : "אישורי הגעה"}
           </h3>
           {cancelled ? <p className="mb-3 text-[13px] font-light text-muted-foreground">{answerTally}</p> : null}
-          {isUpcoming && isAdmin(me) ? (
+          {event.status === "upcoming" && isAdmin(me) ? (
             <p className="mb-3 text-[13px] font-light text-muted-foreground">
               מי שאמר בעל פה אפשר לעדכן כאן. ליד התשובה ייכתב «ידנית».
             </p>
@@ -743,7 +743,7 @@ export function JournalDetail({
           <div className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => {
               const answer = event.rsvps[member.id] ?? "pending";
-              const editable = isUpcoming && isAdmin(me);
+              const editable = event.status === "upcoming" && isAdmin(me);
               return (
                 <div
                   key={member.id}
