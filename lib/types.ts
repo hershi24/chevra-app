@@ -2,7 +2,7 @@ export type Role = "admin" | "leader" | "member";
 
 export type RsvpStatus = "yes" | "no" | "maybe" | "pending";
 
-export type RsvpVia = "email" | "phone" | "site";
+export type RsvpVia = "email" | "phone" | "site" | "app" | "admin";
 
 export type MediaType = "image" | "video" | "audio";
 
