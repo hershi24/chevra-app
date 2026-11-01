@@ -215,7 +215,21 @@ function applyAction(
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
       if (event.status !== "upcoming" || gatheringHeld(event)) throw new Error("החברה כבר התקיימה");
-      setMemberRsvp(event, me.id, body.status, "site");
+      setMemberRsvp(event, me.id, body.status, body.via === "app" ? "app" : "site");
+      return;
+    }
+    case "setMemberRsvp": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const event = s.gatherings.find((g) => g.id === body.eventId);
+      if (!event) throw new Error("החברה לא נמצאה");
+      if (event.status !== "upcoming") throw new Error("אפשר לעדכן רק חברה שעוד לא התקיימה");
+      if (!s.members.some((member) => member.id === body.memberId)) throw new Error("החבר לא נמצא");
+      if (body.status === "pending") {
+        event.rsvps[body.memberId] = "pending";
+        if (event.rsvpVia) delete event.rsvpVia[body.memberId];
+        return;
+      }
+      setMemberRsvp(event, body.memberId, body.status, "admin");
       return;
     }
     case "setAttendance": {

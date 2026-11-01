@@ -146,6 +146,8 @@ export function rsvpViaLabel(via?: RsvpVia) {
   if (via === "email") return "במייל";
   if (via === "phone") return "בטלפון";
   if (via === "site") return "באתר";
+  if (via === "app") return "באפליקציה";
+  if (via === "admin") return "ידנית";
   return "";
 }
 

@@ -12,7 +12,8 @@ import type {
 } from "./types";
 
 export type ActionBody =
-  | { type: "rsvp"; eventId: string; status: RsvpStatus }
+  | { type: "rsvp"; eventId: string; status: RsvpStatus; via?: "app" | "site" }
+  | { type: "setMemberRsvp"; eventId: string; memberId: string; status: RsvpStatus }
   | { type: "setAttendance"; eventId: string; memberId: string; attended: boolean }
   | {
       type: "createEvent";
