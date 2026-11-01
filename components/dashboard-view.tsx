@@ -22,6 +22,7 @@ import { CommunityHome } from "@/components/community-home";
 import { boardEnabled } from "@/lib/community-board";
 import { Countdown } from "@/components/countdown";
 import { EventDialog } from "@/components/event-dialog";
+import { MemberRsvpEditor } from "@/components/member-rsvp-editor";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { expensesOpen, formatAgorot, settlement } from "@/lib/expenses";
@@ -33,9 +34,10 @@ import {
   formatTimeHe,
   gatheringHeadline,
   memberById,
+  rsvpViaLabel,
   rsvpWithVia,
 } from "@/lib/format";
-import { can } from "@/lib/permissions";
+import { can, isAdmin } from "@/lib/permissions";
 import { dmName, galleryItems, gatheringHeld, upcomingGathering } from "@/lib/selectors";
 import type { Gathering, Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -572,20 +574,27 @@ function HeroEvent({
               <ChevronDown className={cn("size-3.5 transition", listOpen && "rotate-180")} aria-hidden />
             </button>
             {listOpen ? (
-              <ul className="mt-3 space-y-2.5">
-                {members.map((member) => (
-                  <li key={member.id} className="flex min-w-0 items-center gap-2">
-                    <UserAvatar member={member} size="sm" />
-                    <span className="min-w-0 truncate text-[13px] font-light">{member.displayName}</span>
-                    <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
-                      {rsvpWithVia(event.rsvps[member.id] ?? "pending", event.rsvpVia?.[member.id])}
-                    </span>
-                    <StatusDot
-                      status={event.rsvps[member.id] ?? "pending"}
-                      via={event.rsvpVia?.[member.id]}
-                    />
-                  </li>
-                ))}
+              <ul className="mt-3 space-y-3">
+                {members.map((member) => {
+                  const answer = event.rsvps[member.id] ?? "pending";
+                  const via = event.rsvpVia?.[member.id];
+                  const editable = isAdmin(me) && event.status === "upcoming";
+                  return (
+                    <li key={member.id} className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserAvatar member={member} size="sm" />
+                        <span className="min-w-0 truncate text-[13px] font-light">{member.displayName}</span>
+                        <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
+                          {editable ? rsvpViaLabel(via) : rsvpWithVia(answer, via)}
+                        </span>
+                        <StatusDot status={answer} via={via} />
+                      </div>
+                      {editable ? (
+                        <MemberRsvpEditor eventId={event.id} memberId={member.id} status={answer} className="mt-1.5" />
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
           </div>
