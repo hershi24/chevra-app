@@ -13,6 +13,19 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/meinchevra.apk",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/vnd.android.package-archive",
+          },
+          {
+            key: "Content-Disposition",
+            value: "attachment; filename=\"meinchevra.apk\"",
+          },
+        ],
+      },
     ];
   },
 };
