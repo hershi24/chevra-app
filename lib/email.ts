@@ -1,5 +1,5 @@
-import type { Gathering, Member } from "./types";
-import { formatHebrewDate, gatheringHeadline, gatheringLabel, rsvpLabel } from "./format";
+import type { Gathering, Member, RsvpStatus } from "./types";
+import { formatHebrewDate, gatheringHeadline, gatheringLabel, rsvpLabel, rsvpViaLabel } from "./format";
 import {
   A,
   emailShell,
@@ -169,6 +169,10 @@ export function cancelSubject(event: { title?: string; topic?: string; startsAt:
   return `✕ בוטלה: ${gatheringLabel(event)}`;
 }
 
+export function attendanceSummarySubject(event: { title?: string; topic?: string; startsAt: string }) {
+  return `סיכום הגעה: ${gatheringLabel(event)}`;
+}
+
 export function cancellationHtml(opts: {
   member: Member;
   event: Gathering;
@@ -227,6 +231,67 @@ export function cancellationHtml(opts: {
     origin,
     title: cancelSubject(event),
     preheader: message,
+    inner,
+  });
+}
+
+const SUMMARY_GROUPS: { status: RsvpStatus; label: string; color: string; empty: string }[] = [
+  { status: "yes", label: "מגיעים", color: green, empty: "אף אחד עוד לא אישר" },
+  { status: "maybe", label: "אולי", color: gold, empty: "אין" },
+  { status: "no", label: "לא מגיעים", color: "#a4453a", empty: "אין" },
+  { status: "pending", label: "טרם השיבו", color: muted, empty: "כולם ענו" },
+];
+
+export function attendanceSummaryHtml(opts: {
+  leader: Member;
+  event: Gathering;
+  members: Member[];
+  origin: string;
+  hostName?: string;
+}) {
+  const { leader, event, members, origin, hostName } = opts;
+  const when = jerusalemParts(event.startsAt);
+  const title = gatheringLabel(event);
+  const counts = Object.fromEntries(
+    SUMMARY_GROUPS.map((group) => [
+      group.status,
+      members.filter((member) => (event.rsvps[member.id] ?? "pending") === group.status).length,
+    ])
+  ) as Record<RsvpStatus, number>;
+  const tally = `${counts.yes} מגיעים, ${counts.maybe} אולי, ${counts.no} לא מגיעים, ו־${counts.pending} עוד לא ענו.`;
+  const place = [event.location?.trim(), hostName ? `אצל ${hostName}` : ""].filter(Boolean).join(" · ");
+  const groups = SUMMARY_GROUPS.map((group) => {
+    const rows = members.filter((member) => (event.rsvps[member.id] ?? "pending") === group.status);
+    const names = rows.length
+      ? rows
+          .map((member) => {
+            const via = rsvpViaLabel(event.rsvpVia?.[member.id]);
+            return `${escapeHtml(member.displayName)}${via ? ` <span style="color:${muted};">· ${escapeHtml(via)}</span>` : ""}`;
+          })
+          .join("<br>")
+      : `<span style="color:${muted};">${group.empty}</span>`;
+    return `<div style="margin-top:16px;${A}">
+      <div style="font-size:13px;color:${group.color};">${group.label} · ${rows.length}</div>
+      <div style="margin-top:4px;font-size:15px;line-height:1.75;color:${ink};">${names}</div>
+    </div>`;
+  }).join("");
+  const journalUrl = `${origin}/journal/${encodeURIComponent(event.id)}`;
+  const inner = `
+    ${kicker("סיכום לראש החברה")}
+    ${heading(escapeHtml(title))}
+    ${paragraph(`${escapeHtml(firstName(leader.displayName))}, ${tally}`)}
+    <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:${muted};${A}">${when.weekday} · ${when.time} · ${formatHebrewDate(event.startsAt)}${place ? ` · ${escapeHtml(place)}` : ""}</p>
+    ${groups}
+    <table role="presentation" dir="rtl" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+      <tr><td style="border-radius:999px;background:${gold};">
+        <a href="${journalUrl}" style="display:inline-block;padding:12px 22px;color:#ffffff;text-decoration:none;font-size:15px;">פתיחת החברה ביומן</a>
+      </td></tr>
+    </table>
+  `;
+  return emailShell({
+    origin,
+    title: attendanceSummarySubject(event),
+    preheader: tally,
     inner,
   });
 }
