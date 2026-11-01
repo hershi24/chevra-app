@@ -63,3 +63,4 @@ next-env.d.ts
 *.apk
 *.aab
 *.apk.idsig
+!/public/meinchevra.apk
