@@ -121,7 +121,7 @@ export function MemberAdmin() {
   const hidden = filtered.length - shown.length;
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       <div className={PANEL}>
         <div className="flex flex-wrap items-center gap-2.5 border-b border-[#e9ecef] p-3 md:p-3.5">
           <div className="relative min-w-0 basis-full md:flex-1 md:basis-auto">
@@ -146,7 +146,7 @@ export function MemberAdmin() {
 
         {adding ? <AddMemberForm onDone={() => setAdding(false)} /> : null}
 
-        <div className="flex gap-1.5 overflow-x-auto px-3 pt-3 [scrollbar-width:none] md:flex-wrap md:px-3.5">
+        <div className="flex flex-wrap gap-1.5 px-3 pt-3 md:px-3.5">
           {filters.map((item) => (
             <button
               key={item.id}

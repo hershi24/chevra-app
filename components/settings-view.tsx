@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users, Wallet } from "lucide-react";
+import { ArrowRight, Bell, BellRing, Eye, Hash, KeyRound, LogOut, Mail, Megaphone, Phone, SlidersHorizontal, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { AdminHub, type HubScreen } from "@/components/admin-hub";
 import { CommunityBoardPanel } from "@/components/community-board-panel";
+import { EntrancePromoPanel } from "@/components/entrance-promo";
+import { KibudPanel } from "@/components/kibud-panel";
 import { boardEnabled } from "@/lib/community-board";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
 import { UserAvatar } from "@/components/user-avatar";
@@ -13,11 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, memberById, roleLabel, rsvpLabel } from "@/lib/format";
-import { expensesOpen } from "@/lib/expenses";
+import { formatDateTimeHe, formatRelativeHe, formatTimeHe, gatheringLabel, ivrResultLabel, memberById, roleLabel, rsvpWithVia } from "@/lib/format";
+import { formatStay, stayLength } from "@/lib/visits";
 import { can, isAdmin } from "@/lib/permissions";
+import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
-import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, waitingOn } from "@/lib/nudge-rules";
+import { NUDGE_EVERY_OPTIONS, defaultNudgeSettings, memberAddress, normalizeNudgeSettings, reachableForNudge, waitingOn } from "@/lib/nudge-rules";
 import type { ChatEmailMode, ChatEmailPrefs, EmailDelivery, Gathering, Member, NudgeSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +38,97 @@ const SECTIONS: { id: SectionId; label: string; short: string; icon: LucideIcon 
 
 const PANEL = "overflow-hidden rounded-[1.4rem] border border-[#d5dbe3] bg-[#fbfcfd]";
 
+const PageMode = createContext(false);
+
+const SCREENS: HubScreen[] = ["account", "members", "invites", "board", "system"];
+
 export function SettingsView() {
+  const { me } = useApp();
+  if (me && isAdmin(me)) return <AdminSettings />;
+  return <MemberSettings />;
+}
+
+function AdminSettings() {
+  const { state, me, logout, onlineIds } = useApp();
+  const router = useRouter();
+  const params = useSearchParams();
+  const raw = params.get("s");
+  const screen = SCREENS.includes(raw as HubScreen) ? (raw as HubScreen) : null;
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!screen && (hash === "#password" || hash === "#settings-notify")) {
+      router.replace(`/settings?s=account${hash}`);
+      return;
+    }
+    if (hash) {
+      const target = document.getElementById(hash.slice(1));
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+    }
+    window.scrollTo({ top: 0 });
+  }, [screen, router]);
+
+  if (!state || !me) return null;
+  const open = (next: HubScreen) => router.push(`/settings?s=${next}`);
+  if (!screen) return <AdminHub onOpen={open} />;
+
+  return (
+    <PageMode.Provider value>
+      <div className="grid min-w-0 gap-5 [&>*]:min-w-0">
+        <button
+          type="button"
+          onClick={() => router.push("/settings")}
+          className="inline-flex items-center gap-1.5 justify-self-start text-[13px] text-[#a9782c] hover:underline"
+        >
+          <ArrowRight className="size-4" />
+          חזרה לניהול החבורה
+        </button>
+        {screen === "account" ? (
+          <div className="grid gap-10 [&>*]:min-w-0">
+            <Section id="account" title="החשבון שלי" subtitle="איך החברים רואים אותך, והסיסמה לכניסה.">
+              <AccountPanel member={me} online={onlineIds.includes(me.id)} onLogout={() => void logout()} />
+            </Section>
+            {boardEnabled(state) ? null : (
+              <Section
+                id="notify"
+                title="התראות במייל"
+                subtitle="אילו הודעות בצ׳אט יגיעו אליך גם למייל, עם כפתור השבה ישיר."
+                small
+              >
+                <ChatEmailPanel />
+              </Section>
+            )}
+          </div>
+        ) : screen === "members" ? (
+          <Section
+            id="members"
+            title="חברי החבורה"
+            subtitle={`${state.members.length} חברים · ${onlineCountLabel(onlineIds.length)}`}
+          >
+            <MemberAdmin />
+          </Section>
+        ) : screen === "invites" ? (
+          <InvitesSection />
+        ) : screen === "board" ? (
+          <Section id="system" title="לוח הבית" subtitle="מה החברים רואים בדף הבית: מודעות, זמנים, דפי לימוד, סקר ותמונות.">
+            <CommunityBoardPanel tabbed />
+          </Section>
+        ) : (
+          <Section id="system" title="מערכת" subtitle="כניסות לאתר, המערכת הטלפונית, ופרטים טכניים.">
+            <EntrancePromoPanel />
+            <KibudPanel />
+            <SystemPanel />
+          </Section>
+        )}
+      </div>
+    </PageMode.Provider>
+  );
+}
+
+function MemberSettings() {
   const { state, me, logout, onlineIds } = useApp();
   const [active, setActive] = useState<SectionId>("account");
   const pinnedUntil = useRef(0);
@@ -167,8 +262,10 @@ export function SettingsView() {
             {can(me, "sendInvites") ? <InvitesSection /> : null}
 
             {isAdmin(me) ? (
-              <Section id="system" title="מערכת" subtitle="רק למנהל המערכת.">
+              <Section id="system" title="מערכת" subtitle="כניסות לאתר והמערכת הטלפונית.">
                 <CommunityBoardPanel />
+                <EntrancePromoPanel />
+                <KibudPanel />
                 <SystemPanel />
               </Section>
             ) : null}
@@ -190,19 +287,26 @@ function Section({
   title,
   subtitle,
   action,
+  small,
   children,
 }: {
   id: SectionId;
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  small?: boolean;
   children: ReactNode;
 }) {
+  const page = useContext(PageMode) && !small;
   return (
-    <section id={`settings-${id}`} className="scroll-mt-16 md:scroll-mt-24">
-      <div className="mb-3.5 flex items-end justify-between gap-3">
+    <section id={`settings-${id}`} className="min-w-0 scroll-mt-16 md:scroll-mt-24">
+      <div className={cn("flex items-end justify-between gap-3", page ? "mb-5" : "mb-3.5")}>
         <div>
-          <h2 className="text-[1.2rem] font-normal">{title}</h2>
+          {page ? (
+            <h1 className="text-[1.65rem] font-medium tracking-tight md:text-[2rem]">{title}</h1>
+          ) : (
+            <h2 className="text-[1.2rem] font-normal">{title}</h2>
+          )}
           {subtitle ? <p className="mt-0.5 text-[13px] font-light text-muted-foreground">{subtitle}</p> : null}
         </div>
         {action}
@@ -447,6 +551,7 @@ function PasswordForm() {
 function InvitesSection() {
   const { state, me, refresh } = useApp();
   const [sending, setSending] = useState(false);
+  const [calling, setCalling] = useState(false);
   const [inviteNote, setInviteNote] = useState("");
   const [deliveries, setDeliveries] = useState<EmailDelivery[] | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -460,6 +565,7 @@ function InvitesSection() {
     return address && !address.endsWith("@chevra.local");
   }).length;
   const unreachable = state.members.length - reachable;
+  const withPhone = state.members.filter(memberHasPhone).length;
 
   async function sendInvites() {
     if (!event || sending) return;
@@ -486,19 +592,30 @@ function InvitesSection() {
     }
   }
 
-  async function pingIvr() {
-    if (!me) return;
-    const res = await fetch("/api/ivr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: me.phone, digits: "1", action: "tzintuk", eventId: event?.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.error || "IVR נכשל");
-      return;
+  async function sendTzintukAll() {
+    if (!event || calling) return;
+    setCalling(true);
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      const called = Number(data.callCount) || 0;
+      const failed = Number(data.callFailedCount) || 0;
+      const reason = data.calls?.find((row: { error?: string }) => row.error)?.error;
+      if (called && !failed) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called} חברים`);
+      else if (called) toast.success(reason ? `יצא ל־${called}, נכשלו ${failed}: ${reason}` : `יצא ל־${called}, נכשלו ${failed}`);
+      else toast.error(reason || "הצינתוק לא יצא");
+      void refresh();
+    } finally {
+      setCalling(false);
     }
-    toast.success("צילצול / עדכון IVR נרשם");
   }
 
   const previewHref = event
@@ -508,8 +625,8 @@ function InvitesSection() {
   return (
     <Section
       id="invites"
-      title="הזמנות במייל"
-      subtitle="כל חבר מקבל מייל אישי עם כפתורי הגעה — בלי להתחבר."
+      title="הזמנות וצינתוק"
+      subtitle="המייל יוצא מכאן עם כפתורי הגעה. שליחת צינתוק מפעילה את שלוחה 5, לרשימה שרשומה שם. ליד כל תשובה כתוב אם אושרה במייל, בטלפון או באתר."
       action={
         previewHref ? (
           <a
@@ -549,27 +666,35 @@ function InvitesSection() {
                 className="resize-none rounded-xl bg-white text-sm text-foreground"
               />
             </label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <Button
                 onClick={() => void sendInvites()}
                 disabled={sending || reachable === 0}
-                className="h-10 flex-1 rounded-full px-5 md:flex-none"
+                className="h-11 rounded-full"
               >
                 <Mail data-icon="inline-start" />
                 {sending ? "שולח…" : `שליחה ל־${reachable} חברים`}
               </Button>
               {can(me, "triggerIvr") ? (
-                <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => void pingIvr()}>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-full"
+                  disabled={calling || withPhone === 0}
+                  onClick={() => void sendTzintukAll()}
+                >
                   <Phone data-icon="inline-start" />
-                  צינתוק IVR
+                  {calling ? "מחייג…" : withPhone ? "צינתוק לכולם" : "אין מספרי טלפון"}
                 </Button>
               ) : null}
-              {unreachable ? (
-                <span className="w-full text-[12px] font-light text-[#9aa1ab] md:ms-auto md:w-auto">
-                  {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
-                </span>
-              ) : null}
             </div>
+            {unreachable ? (
+              <p className="text-[12px] font-light text-[#9aa1ab]">
+                {unreachable === 1 ? "חבר אחד בלי מייל אמיתי לא יקבל" : `${unreachable} חברים בלי מייל אמיתי לא יקבלו`}
+              </p>
+            ) : null}
+            <p className="text-[12px] font-light leading-5 text-muted-foreground">
+              צינתוק לכולם מצלצל לרשימה של שלוחה 5. תזכורת לחבר אחד יוצאת רק במייל. צינתוק לחבר אחד מצלצל רק למספר שלו.
+            </p>
           </div>
           <InviteSide
             event={event}
@@ -597,7 +722,7 @@ function InvitesSection() {
 
 function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   const { state, refresh } = useApp();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ id: string; kind: "mail" | "call" } | null>(null);
   const [results, setResults] = useState<Record<string, EmailDelivery>>({});
   if (!state) return null;
   const records = state.nudge?.events[event.id] ?? {};
@@ -607,8 +732,8 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
   });
 
   async function sendOne(member: Member) {
-    if (busyId) return;
-    setBusyId(member.id);
+    if (busy) return;
+    setBusy({ id: member.id, kind: "mail" });
     try {
       const res = await fetch("/api/invitations", {
         method: "POST",
@@ -626,7 +751,29 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
       else toast.error(`לא נשלח ל${member.displayName}: ${delivery?.error || "השליחה נכשלה"}`);
       void refresh();
     } finally {
-      setBusyId(null);
+      setBusy(null);
+    }
+  }
+
+  async function callOne(member: Member) {
+    if (busy) return;
+    setBusy({ id: member.id, kind: "call" });
+    try {
+      const res = await fetch("/api/tzintuk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, memberId: member.id, variant: "nudge" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "הצינתוק לא יצא");
+        return;
+      }
+      if (data.callCount) toast.success(`יצא צינתוק ל${member.displayName}`);
+      else toast.error(data.calls?.[0]?.error || `הצינתוק ל${member.displayName} לא יצא`);
+      void refresh();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -634,11 +781,12 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
     <div className={PANEL}>
       <div className="flex items-baseline justify-between gap-3 border-b border-[#e9ecef] px-4 py-3 md:px-5">
         <div className="text-[15px]">לכל חבר בנפרד</div>
-        <div className="text-[12px] font-light text-muted-foreground">שליחה לחבר אחד, עם המילה האישית שלמעלה</div>
+        <div className="text-[12px] font-light text-muted-foreground">מייל או צינתוק לחבר אחד, בלי לשלוח לכולם</div>
       </div>
       <ul className="divide-y divide-[#eef0f3]">
         {members.map((member) => {
           const address = memberAddress(member);
+          const phone = memberHasPhone(member) ? member.phone.trim() : "";
           const status = event.rsvps[member.id] ?? "pending";
           const record = records[member.id];
           const fresh = results[member.id];
@@ -650,7 +798,8 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                 : "";
           const sentAt = fresh?.status === "sent" ? new Date().toISOString() : record?.lastStatus === "sent" ? record.lastAt : undefined;
           return (
-            <li key={member.id} className="flex items-center gap-3 px-4 py-2.5 md:px-5">
+            <li key={member.id} className="grid gap-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-5">
+              <div className="flex min-w-0 items-center gap-3">
               <UserAvatar member={member} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -667,11 +816,13 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                             : "bg-[#f1f3f6] text-[#6b7280]"
                     )}
                   >
-                    {rsvpLabel(status)}
+                    {rsvpWithVia(status, event.rsvpVia?.[member.id])}
                   </span>
                 </div>
-                <div className="truncate text-[12px] font-light text-muted-foreground" dir={address ? "ltr" : undefined}>
-                  {address ? <span className="[unicode-bidi:plaintext]">{address}</span> : "אין כתובת מייל"}
+                <div className="truncate text-[12px] font-light text-muted-foreground">
+                  {address ? <span className="[unicode-bidi:plaintext]" dir="ltr">{address}</span> : "אין כתובת מייל"}
+                  <span className="px-1">·</span>
+                  {phone ? <span className="[unicode-bidi:plaintext]" dir="ltr">{phone}</span> : "אין טלפון"}
                 </div>
                 {failedReason ? (
                   <div className="mt-0.5 text-[12px] leading-4 text-destructive">נכשל: {failedReason}</div>
@@ -682,16 +833,29 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                   </div>
                 ) : null}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 rounded-full"
-                disabled={!address || busyId !== null}
-                onClick={() => void sendOne(member)}
-              >
-                <Mail data-icon="inline-start" />
-                {busyId === member.id ? "שולח…" : "שליחה"}
-              </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 rounded-full"
+                  disabled={!address || busy !== null}
+                  onClick={() => void sendOne(member)}
+                >
+                  <Mail data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "mail" ? "שולח…" : "מייל"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 rounded-full"
+                  disabled={!memberHasPhone(member) || busy !== null}
+                  onClick={() => void callOne(member)}
+                >
+                  <Phone data-icon="inline-start" />
+                  {busy?.id === member.id && busy.kind === "call" ? "מחייג…" : "צינתוק"}
+                </Button>
+              </div>
             </li>
           );
         })}
@@ -701,11 +865,45 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
 }
 
 function NudgePanel({ event }: { event: Gathering }) {
-  const { state, act } = useApp();
+  const { state, act, refresh } = useApp();
   const [saving, setSaving] = useState(false);
+  const [nudging, setNudging] = useState(false);
   if (!state) return null;
   const settings = normalizeNudgeSettings(state.nudge?.settings ?? defaultNudgeSettings());
-  const waiting = state.members.filter((member) => memberAddress(member) && waitingOn(event, member, settings)).length;
+  const waitingMembers = state.members.filter(
+    (member) => reachableForNudge(member) && waitingOn(event, member, settings)
+  );
+  const waiting = waitingMembers.length;
+
+  async function nudgeNow() {
+    if (!waitingMembers.length || nudging) return;
+    setNudging(true);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          memberIds: waitingMembers.map((member) => member.id),
+          variant: "nudge",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "התזכורת לא יצאה");
+        return;
+      }
+      const sent = Number(data.sentCount) || 0;
+      const called = Number(data.callCount) || 0;
+      if (sent && called) toast.success(`נשלחו ${sent} תזכורות, ויצא צינתוק ל־${called}`);
+      else if (sent) toast.success(sent === 1 ? "התזכורת נשלחה" : `נשלחו ${sent} תזכורות`);
+      else if (called) toast.success(called === 1 ? "יצא צינתוק" : `יצא צינתוק ל־${called}`);
+      else toast.error("אף תזכורת לא יצאה");
+      void refresh();
+    } finally {
+      setNudging(false);
+    }
+  }
 
   async function save(next: NudgeSettings) {
     setSaving(true);
@@ -746,8 +944,9 @@ function NudgePanel({ event }: { event: Gathering }) {
       <div className="grid gap-3.5 border-t border-[#e9ecef] px-4 py-3.5 md:px-5">
         <p className="text-[12.5px] font-light leading-5 text-muted-foreground">
           כל עוד חבר לא ענה אם הוא מגיע, המערכת שולחת לו מייל תזכורת עם הכותרת{" "}
-          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה. מי שענה מפסיק לקבל. לא נשלח
-          בלילה ובשבת, והתזכורות נעצרות שעה לפני החברה.
+          <span className="text-foreground">״מחכים רק להחלטה שלך״</span> וכפתורי תשובה, וגם צינתוק אחד דרך שלוחה 5.
+          הצינתוק מצלצל לכל הרשימה שרשומה בשלוחה. מי שענה מפסיק לקבל מייל. לא נשלח בלילה ובשבת, והתזכורות נעצרות שעה
+          לפני החברה.
         </p>
         <div className="grid gap-1.5">
           <div className="text-[12px] text-muted-foreground">כל כמה זמן</div>
@@ -791,6 +990,15 @@ function NudgePanel({ event }: { event: Gathering }) {
             onCheckedChange={(on) => void save({ ...settings, includeMaybe: on })}
           />
         </label>
+        <Button
+          variant="outline"
+          className="h-11 rounded-full"
+          disabled={!waitingMembers.length || nudging}
+          onClick={() => void nudgeNow()}
+        >
+          <BellRing data-icon="inline-start" />
+          {nudging ? "שולח…" : "תזכורת עכשיו"}
+        </Button>
         <a
           href={`/api/invitations/preview?eventId=${encodeURIComponent(event.id)}&variant=nudge`}
           target="_blank"
@@ -922,44 +1130,78 @@ function InviteSide({
   );
 }
 
+function phoneActionLabel(action: string) {
+  if (action === "tzintuk") return "צינתוק";
+  if (action === "meeting-response") return "שיחה נכנסת";
+  if (action === "ivr_update") return "הקשה בטלפון";
+  return "טלפון";
+}
+
 function SystemPanel() {
-  const { state, act } = useApp();
+  const { state } = useApp();
+  const [now, setNow] = useState(() => Date.now());
+  const anyoneHere = (state?.visits ?? []).some((visit) => !visit.endedAt);
+  useEffect(() => {
+    if (!anyoneHere) return;
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [anyoneHere]);
   if (!state) return null;
-  const visible = expensesOpen(state);
-  const lastIvr = state.ivrLog[0];
+  const visits = [...(state.visits ?? [])].sort((a, b) => +new Date(b.startedAt) - +new Date(a.startedAt)).slice(0, 40);
+  const calls = [...state.ivrLog].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 40);
   return (
-    <div className={PANEL}>
-      <div className="flex items-center gap-3.5 px-4 py-4 md:px-5">
-        <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f5f0e7] text-primary">
-          <Wallet className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px]">הצגת באו חשבון</div>
-          <div className="text-[12.5px] font-light text-muted-foreground">כיבוי מסתיר את הדף ואת הטאב מכולם</div>
+    <div className="grid gap-4">
+      <div className={PANEL}>
+        <div className="px-4 py-4 md:px-5">
+          <div className="text-[15px]">כניסות לאתר</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">מי נכנס, ומתי יצא. משך הזמן נספר כל עוד האתר פתוח.</div>
         </div>
-        <Switch
-          checked={visible}
-          onCheckedChange={(checked) =>
-            void act({ type: "setExpensesVisible", visible: checked })
-              .then(() => toast.success(checked ? "באו חשבון מוצג" : "באו חשבון מוסתר"))
-              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "העדכון נכשל"))
-          }
-          aria-label="הצגת באו חשבון"
-        />
+        {visits.length ? (
+          <ul className="border-t border-[#e9ecef]">
+            {visits.map((visit) => {
+              const member = memberById(state.members, visit.memberId);
+              const open = !visit.endedAt;
+              return (
+                <li key={visit.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-[#e9ecef] px-4 py-2.5 last:border-b-0 md:px-5">
+                  <span className="text-[14px]">{member?.displayName ?? "חבר"}</span>
+                  <span className={cn("text-[12.5px]", open ? "text-[#3d8f62]" : "text-foreground")}>
+                    {open ? `באתר עכשיו · ${formatStay(stayLength(visit, now))}` : formatStay(stayLength(visit))}
+                  </span>
+                  <span className="w-full text-[12px] font-light text-muted-foreground">{formatDateTimeHe(visit.startedAt)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="border-t border-[#e9ecef] px-4 py-4 text-[13px] font-light text-muted-foreground md:px-5">עדיין אין כניסות רשומות.</p>
+        )}
       </div>
-      {lastIvr ? (
-        <div className="flex items-center gap-3.5 border-t border-[#e9ecef] px-4 py-4 md:px-5">
-          <span className="grid size-[38px] shrink-0 place-items-center rounded-xl bg-[#f1f3f6] text-[#4b5563]">
-            <Phone className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[15px]">IVR אחרון</div>
-            <div className="truncate text-[12.5px] font-light text-muted-foreground">
-              {lastIvr.result} · <span dir="ltr">{lastIvr.phone}</span> · {formatRelativeHe(lastIvr.at)}
-            </div>
-          </div>
+      <div className={PANEL}>
+        <div className="px-4 py-4 md:px-5">
+          <div className="text-[15px]">מערכת טלפונית</div>
+          <div className="text-[12.5px] font-light text-muted-foreground">צינתוקים, שיחות נכנסות, ותשובות שהוקשו בטלפון.</div>
         </div>
-      ) : null}
+        {calls.length ? (
+          <ul className="border-t border-[#e9ecef]">
+            {calls.map((entry) => {
+              const member = memberById(state.members, entry.memberId);
+              return (
+                <li key={entry.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-[#e9ecef] px-4 py-2.5 last:border-b-0 md:px-5">
+                  <span className="inline-flex min-w-0 items-center gap-2 text-[14px]">
+                    <Phone className="size-3.5 shrink-0 text-[#6b7280]" aria-hidden />
+                    {phoneActionLabel(entry.action)} · {ivrResultLabel(entry.result)}
+                    {member ? ` · ${member.displayName}` : ""}
+                  </span>
+                  <span className="text-[12px] font-light text-muted-foreground">{formatRelativeHe(entry.at)}</span>
+                  <span className="w-full text-[12px] font-light text-muted-foreground [unicode-bidi:plaintext]" dir="ltr">{entry.phone}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="border-t border-[#e9ecef] px-4 py-4 text-[13px] font-light text-muted-foreground md:px-5">עדיין אין שיחות במערכת הטלפונית.</p>
+        )}
+      </div>
     </div>
   );
 }

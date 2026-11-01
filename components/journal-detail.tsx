@@ -7,6 +7,8 @@ import { ArrowLeft, ArrowRight, Mic, Pencil, Play, Plus, Trash2, X } from "lucid
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { EventDialog } from "@/components/event-dialog";
+import { NavigateLink } from "@/components/navigate-link";
+import { kibudTurn } from "@/lib/kibud";
 import { MediaProgressOverlay } from "@/components/media-progress";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
@@ -16,9 +18,10 @@ import {
   formatDateHe,
   formatHebrewDate,
   formatTimeHe,
-  journalHeading,
+  gatheringHeadline,
   memberById,
   rsvpLabel,
+  rsvpWithVia,
   splitGatheringTitle,
 } from "@/lib/format";
 import { can, isAdmin } from "@/lib/permissions";
@@ -35,6 +38,13 @@ type PendingMedia = {
   remainingSeconds: number | null;
   name: string;
 };
+
+function rsvpTone(status: RsvpStatus) {
+  if (status === "yes") return "text-[#1f6b3a]";
+  if (status === "no") return "text-[#a4453a]";
+  if (status === "maybe") return "text-[#8a5f1c]";
+  return "font-light text-muted-foreground";
+}
 
 const rsvpChoices: { status: RsvpStatus; label: string }[] = [
   { status: "yes", label: "מגיע" },
@@ -93,6 +103,8 @@ export function JournalDetail({
   const [showAll, setShowAll] = useState(false);
   const [viewer, setViewer] = useState<number | null>(null);
   const [rsvping, setRsvping] = useState(false);
+  const [cancelNote, setCancelNote] = useState("");
+  const [sendingCancel, setSendingCancel] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef<HTMLDivElement>(null);
 
@@ -130,16 +142,27 @@ export function JournalDetail({
   const host = memberById(state.members, event.hostId);
   const lecturer = memberById(state.members, event.lecturerId);
   const kibud = memberById(state.members, event.kibudId);
+  const nextKibud = kibudTurn(state, event).next;
   const currentSummary = summary ?? event.summary ?? "";
   const { kind } = splitGatheringTitle(event);
-  const heading = journalHeading(event);
+  const { heading, body } = gatheringHeadline(event);
   const held = gatheringHeld(event);
+  const cancelled = event.status === "cancelled";
   const isUpcoming = event.status === "upcoming" && !held;
   const cover =
     event.media.find((m) => m.type === "image" && m.url.startsWith("http")) ??
     event.media.find((m) => m.type === "image");
   const audios = event.media.filter((m) => m.type === "audio");
   const coming = state.members.filter((m) => event.rsvps[m.id] === "yes");
+  const maybeComing = state.members.filter((m) => event.rsvps[m.id] === "maybe");
+  const declined = state.members.filter((m) => event.rsvps[m.id] === "no");
+  const waiting = state.members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending");
+  const answerTally = [
+    `${coming.length} אישרו`,
+    `${maybeComing.length} אולי`,
+    `${declined.length} לא מגיעים`,
+    `${waiting.length} טרם`,
+  ].join(" · ");
   const mine = event.rsvps[me.id] ?? "pending";
   const photographers = [
     ...new Set(event.media.map((m) => memberById(state.members, m.uploadedBy)?.displayName).filter(Boolean)),
@@ -150,6 +173,37 @@ export function JournalDetail({
   const older = ordered[position - 1];
   const mosaic = visual.slice(0, 5);
   const canEditSummary = can(me, "uploadSummary");
+
+  async function sendCancellation() {
+    const current = event;
+    if (!current || sendingCancel) return;
+    setSendingCancel(true);
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: current.id, note: cancelNote, variant: "cancel" }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        sentCount?: number;
+        failedCount?: number;
+        deliveries?: { status: string; error?: string }[];
+      };
+      if (!res.ok) {
+        toast.error(data.error || "הודעת הביטול לא נשלחה");
+        return;
+      }
+      const reason = data.deliveries?.find((row) => row.status === "failed")?.error;
+      if (data.sentCount && !data.failedCount) toast.success(`נשלחו ${data.sentCount} הודעות ביטול`);
+      else if (data.sentCount) toast.success(`נשלחו ${data.sentCount}, נכשלו ${data.failedCount}`);
+      else toast.error(reason || "אף הודעת ביטול לא יצאה");
+    } catch {
+      toast.error("הודעת הביטול לא נשלחה");
+    } finally {
+      setSendingCancel(false);
+    }
+  }
 
   const gathering = event;
   const user = me;
@@ -307,12 +361,23 @@ export function JournalDetail({
               .join(" · ")}
           </div>
           <h1 className="mt-2 text-[1.9rem] leading-tight font-medium md:text-[40px]">{heading}</h1>
+          {body ? (
+            <p className="mt-2 line-clamp-3 max-w-3xl whitespace-pre-line text-[15px] font-light leading-6 text-white/85 md:text-[16px]">
+              {body}
+            </p>
+          ) : null}
+          {cancelled ? <p className="mt-2 text-[14px] font-medium text-[#f6c7c0]">✕ החברה בוטלה</p> : null}
           {held ? <p className="mt-2 text-[14px] font-medium text-[#f1d9a8]">התקיימה</p> : null}
           <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1 text-[14px] font-light opacity-90">
-            {event.location ? <span>{event.location}</span> : null}
-            {coming.length ? <span>{coming.length} {held ? "השתתפו" : "מגיעים"}</span> : null}
+            {event.location ? (
+              <span className="inline-flex items-center gap-2">
+                {event.location}
+                <NavigateLink location={event.location} className="bg-white/15 text-white ring-1 ring-white/40" />
+              </span>
+            ) : null}
+            {cancelled ? <span>{answerTally}</span> : null}
+            {!cancelled && coming.length ? <span>{coming.length} {held ? "השתתפו" : "מגיעים"}</span> : null}
             {visual.length ? <span>{visual.length} תמונות וסרטונים</span> : null}
-            {event.status === "cancelled" ? <span>בוטלה</span> : null}
           </div>
         </div>
       </section>
@@ -322,7 +387,61 @@ export function JournalDetail({
           <div className="grid gap-3 sm:grid-cols-3">
             <Credit label="מארח" member={host} />
             <Credit label="מעביר השיעור" member={lecturer} />
-            <Credit label="כיבוד" member={kibud} />
+            <Credit label="תורן כיבוד" member={kibud} />
+          </div>
+        ) : null}
+        {nextKibud ? (
+          <p className="mt-3 text-[13px] font-light text-muted-foreground">הבא בתור לכיבוד: {nextKibud.displayName}</p>
+        ) : null}
+
+        {cancelled ? (
+          <div className="mt-6 rounded-[22px] bg-[#fdf3ef] p-4 ring-1 ring-[#f0d2cb] md:px-5">
+            <div className="flex items-start gap-3">
+              <span
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-[#a4453a] text-[22px] leading-none text-white"
+                aria-hidden
+              >
+                ✕
+              </span>
+              <div className="min-w-0">
+                <b className="block text-[15px] font-medium text-[#a4453a]">החברה בוטלה</b>
+                <p className="mt-1 text-[13.5px] font-light leading-6 text-[#4b4033]">
+                  החברה לא תתקיים. מה שכל חבר ענה נשמר ומופיע כאן, כמו לפני הביטול.
+                </p>
+                {coming.length ? (
+                  <p className="mt-2 text-[13.5px] leading-6 text-[#1f2328]">
+                    אישרו לפני הביטול: {coming.map((member) => member.displayName).join(", ")}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[13.5px] font-light leading-6 text-[#4b4033]">אף אחד לא אישר הגעה לפני הביטול.</p>
+                )}
+              </div>
+            </div>
+            {can(me, "sendInvites") ? (
+              <div className="mt-4 grid gap-2 border-t border-[#f0d2cb] pt-4">
+                <Textarea
+                  rows={2}
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="מילה קצרה שתופיע בהודעת הביטול (לא חובה)"
+                  className="bg-white"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="max-w-md text-[12px] font-light leading-5 text-muted-foreground">
+                    שם החברה הוא הכותרת, ומתחתיו בשורה קטנה יותר כתוב שהחברה לא תתקיים. בלי כפתורי הגעה ובלי סטטוס של חברים.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-full bg-[#a4453a] text-white hover:bg-[#8d3a31]"
+                    disabled={sendingCancel}
+                    onClick={() => void sendCancellation()}
+                  >
+                    {sendingCancel ? "שולח…" : "שליחת הודעת ביטול"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -394,8 +513,8 @@ export function JournalDetail({
           </div>
         ) : (
           <div className="mt-8 text-[15px] leading-8 font-light text-muted-foreground">
-            {isUpcoming && event.notes ? (
-              <p className="whitespace-pre-wrap text-[#1f2328]">{event.notes}</p>
+            {body.length > 160 ? (
+              <p className="whitespace-pre-line text-[15px] font-light leading-7 text-[#3f4650]">{body}</p>
             ) : (
               <p>עדיין אין סיכום לחברה זו.</p>
             )}
@@ -610,19 +729,25 @@ export function JournalDetail({
 
       {!held && can(me, "viewRsvps") ? (
         <div className="mt-9 px-5 md:px-8">
-          <h3 className="mb-3 text-[15px] font-medium">אישורי הגעה</h3>
+          <h3 className={cn("text-[15px] font-medium", cancelled ? "mb-1" : "mb-3")}>
+            {cancelled ? "מה ענו לפני הביטול" : "אישורי הגעה"}
+          </h3>
+          {cancelled ? <p className="mb-3 text-[13px] font-light text-muted-foreground">{answerTally}</p> : null}
           <div className="grid gap-2 sm:grid-cols-2">
-            {state.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-[14px]">
-                <span className="flex items-center gap-2">
-                  <UserAvatar member={member} size="sm" />
-                  {member.displayName}
-                </span>
-                <span className="text-xs font-light text-muted-foreground">
-                  {rsvpLabel(event.rsvps[member.id] ?? "pending")}
-                </span>
-              </div>
-            ))}
+            {state.members.map((member) => {
+              const answer = event.rsvps[member.id] ?? "pending";
+              return (
+                <div key={member.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-[14px]">
+                  <span className="flex items-center gap-2">
+                    <UserAvatar member={member} size="sm" />
+                    {member.displayName}
+                  </span>
+                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>
+                    {rsvpWithVia(answer, event.rsvpVia?.[member.id])}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}

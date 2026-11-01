@@ -22,6 +22,7 @@ function memberRow(member: Member) {
     phone: member.phone || null,
     email: member.email || null,
     avatar_color: member.avatarColor,
+    avatar_url: member.avatarUrl || null,
     initials: member.initials,
     password_hash: member.passwordHash ?? null,
     must_change_password: Boolean(member.mustChangePassword),
@@ -65,6 +66,7 @@ export async function loadMembersFromSupabase(): Promise<Member[] | null> {
     phone: (row.phone as string | null) ?? "",
     email: (row.email as string | null) ?? "",
     avatarColor: (row.avatar_color as string) || "#0F766E",
+    avatarUrl: typeof row.avatar_url === "string" && row.avatar_url ? row.avatar_url : undefined,
     initials: (row.initials as string) || "?",
     passwordHash: (row.password_hash as string | null) || undefined,
     mustChangePassword: (row.must_change_password as boolean | null) ?? undefined,
@@ -74,11 +76,20 @@ export async function loadMembersFromSupabase(): Promise<Member[] | null> {
 export async function upsertMembers(members: Member[]) {
   const db = getServiceSupabase();
   if (!db || !members.length) return;
-  const rows = members.map(memberRow);
-  const { error } = await db.from("members").upsert(rows);
+  let rows: Record<string, unknown>[] = members.map(memberRow);
+  let { error } = await db.from("members").upsert(rows);
   if (!error) return;
-  if (!/password_hash|must_change_password|column/i.test(error.message)) throw error;
-  const stripped = rows.map(({ password_hash: _hash, must_change_password: _flag, ...rest }) => rest);
+  let message = error.message ?? "";
+  if (!/password_hash|must_change_password|avatar_url|column/i.test(message)) throw error;
+  if (/avatar_url/i.test(message)) {
+    rows = rows.map(({ avatar_url: _url, ...rest }) => rest);
+    const retry = await db.from("members").upsert(rows);
+    if (!retry.error) return;
+    message = retry.error.message ?? "";
+    error = retry.error;
+  }
+  if (!/password_hash|must_change_password|column/i.test(message)) throw error;
+  const stripped = rows.map(({ password_hash: _hash, must_change_password: _flag, avatar_url: _url, ...rest }) => rest);
   const retry = await db.from("members").upsert(stripped);
   if (retry.error) throw retry.error;
 }
@@ -185,15 +196,13 @@ export async function syncChatDiff(before: AppState, after: AppState) {
         prev.username !== member.username ||
         prev.phone !== member.phone ||
         prev.email !== member.email ||
+        prev.avatarUrl !== member.avatarUrl ||
         prev.passwordHash !== member.passwordHash ||
         prev.mustChangePassword !== member.mustChangePassword)
     );
   });
   const membersToUpsert = [...newMembers, ...changedMembers];
-  if (membersToUpsert.length) {
-    const { error } = await db.from("members").upsert(membersToUpsert.map(memberRow));
-    if (error) throw error;
-  }
+  if (membersToUpsert.length) await upsertMembers(membersToUpsert);
 
   const removedMembers = before.members.filter(
     (member) => !after.members.some((item) => item.id === member.id)

@@ -7,7 +7,9 @@ import { useApp } from "@/components/app-provider";
 import { BoardFileCard } from "@/components/board-file-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { resolveBoard, visibleHomePhotos } from "@/lib/community-board";
-import { formatHebrewDate, formatTimeHe, gatheringLabel, memberById } from "@/lib/format";
+import { formatHebrewDate, formatTimeHe, gatheringHeadline, gatheringLabel, memberById } from "@/lib/format";
+import { kibudTurn } from "@/lib/kibud";
+import { NavigateLink } from "@/components/navigate-link";
 import { upcomingGathering } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,8 @@ export function CommunityHome() {
   const notices = board.notices;
   const photos = visibleHomePhotos(board, state);
   const host = next ? memberById(state.members, next.hostId) : null;
+  const turn = next ? kibudTurn(state, next) : null;
+  const nextHeadline = next ? gatheringHeadline(next) : null;
   const mine = pick ?? board.poll.options.find((option) => option.voterIds.includes(me.id))?.id ?? null;
 
   async function vote(optionId: string) {
@@ -121,17 +125,25 @@ export function CommunityHome() {
                   <div className="lg:flex lg:items-end lg:justify-between lg:gap-10">
                     <div className="min-w-0">
                       <h2 className="mt-2 text-[1.7rem] leading-tight font-medium md:text-[2.1rem]">
-                        {gatheringLabel(next)}
+                        {nextHeadline?.heading || (next ? gatheringLabel(next) : "")}
                       </h2>
+                      {nextHeadline?.body ? (
+                        <p className="mt-1.5 max-w-xl whitespace-pre-line text-[15px] font-light leading-6 text-[#4b5563]">
+                          {nextHeadline.body}
+                        </p>
+                      ) : null}
                       <p className="mt-1.5 text-[15px] font-light text-[#3f4650]">{formatHebrewDate(next.startsAt)}</p>
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px] font-light text-[#4b5563]">
                         {next.location ? (
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin className="size-3.5 text-primary" />
                             {next.location}
+                            <NavigateLink location={next.location} />
                           </span>
                         ) : null}
                         {host ? <span>מארח: {host.displayName}</span> : null}
+                        {turn?.duty ? <span>תורן כיבוד: {turn.duty.displayName}</span> : null}
+                        {turn?.next ? <span>הבא בתור: {turn.next.displayName}</span> : null}
                       </div>
                     </div>
                     <p className="mt-3 shrink-0 text-[1.45rem] font-medium tabular-nums text-primary md:text-[1.8rem] lg:mt-0 lg:text-[2.4rem] lg:leading-none">

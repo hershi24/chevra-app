@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { cancelSubject } from "@/lib/email";
 import { gatheringLabel } from "@/lib/format";
-import { recordDeliveries, rememberOrigin, sendGatheringEmail } from "@/lib/nudge";
+import { logNudgeRing, mergeNudgeRows, recordDeliveries, rememberOrigin, ringNudgeList, sendGatheringEmail } from "@/lib/nudge";
 import { can } from "@/lib/permissions";
 import { inviteOrigin } from "@/lib/request-origin";
 import { readState, updateState } from "@/lib/store";
@@ -15,17 +16,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "רק מנהל מערכת יכול לשלוח הזמנות" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { eventId?: string; note?: string; memberId?: string };
+  const body = (await request.json()) as {
+    eventId?: string;
+    note?: string;
+    memberId?: string;
+    memberIds?: string[];
+    variant?: "invite" | "nudge" | "cancel";
+  };
+  const variant = body.variant === "nudge" || body.variant === "cancel" ? body.variant : "invite";
   const note = body.note?.trim().slice(0, 1000) ?? "";
   const state = await readState();
   const event = state.gatherings.find((g) => g.id === body.eventId);
   if (!event) {
     return NextResponse.json({ error: "החברה לא נמצאה" }, { status: 404 });
   }
-  const members = body.memberId
-    ? state.members.filter((member) => member.id === body.memberId)
-    : state.members;
-  if (body.memberId && !members.length) {
+  const picked = body.memberId ? [body.memberId] : Array.isArray(body.memberIds) ? body.memberIds : null;
+  const members = picked ? state.members.filter((member) => picked.includes(member.id)) : state.members;
+  if (picked && !members.length) {
     return NextResponse.json({ error: "החבר לא נמצא" }, { status: 404 });
   }
 
@@ -37,29 +44,48 @@ export async function POST(request: Request) {
       origin,
       note,
       senderName: me.displayName,
-      variant: "invite",
+      variant,
     });
     rows.push({ memberId: member.id, delivery });
   }
+  const targeted = Boolean(body.memberId) || (Array.isArray(body.memberIds) && body.memberIds.length > 0);
+  const singleReminder = variant === "nudge" && targeted && members.length === 1;
+  const { ring, calls } =
+    variant === "nudge" && !singleReminder ? await ringNudgeList(members) : { ring: null, calls: [] };
   const deliveries = rows.map((row) => row.delivery);
 
   const sentCount = deliveries.filter((row) => row.status === "sent").length;
   const failedCount = deliveries.filter((row) => row.status === "failed").length;
+  const callCount = ring?.ok ? ring.callCount || calls.length : 0;
+  const callFailedCount = ring && !ring.ok && !ring.skipped ? 1 : 0;
   try {
     await updateState((s) => {
-      recordDeliveries(s, event.id, rows, "invite");
+      recordDeliveries(
+        s,
+        event.id,
+        variant === "nudge"
+          ? mergeNudgeRows(rows, calls, (id) => s.members.find((member) => member.id === id)?.displayName ?? id)
+          : rows,
+        variant
+      );
       s.emailLog.unshift({
         id: crypto.randomUUID(),
         eventId: event.id,
         sentAt: new Date().toISOString(),
         recipients: deliveries.filter((row) => row.status === "sent").map((row) => row.to),
-        subject: `הזמנה: ${gatheringLabel(event)}`,
+        subject:
+          variant === "cancel"
+            ? cancelSubject(event)
+            : variant === "nudge"
+              ? "מחכים רק להחלטה שלך"
+              : `הזמנה: ${gatheringLabel(event)}`,
         deliveries,
       });
+      if (ring) logNudgeRing(s, event.id, ring);
     });
   } catch {
     // The send report still goes back even if the log could not be stored.
   }
 
-  return NextResponse.json({ deliveries, sentCount, failedCount });
+  return NextResponse.json({ deliveries, sentCount, failedCount, callCount, callFailedCount });
 }

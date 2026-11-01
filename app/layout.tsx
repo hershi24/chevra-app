@@ -3,6 +3,7 @@ import { boardEnabled } from "@/lib/community-board";
 import { readState } from "@/lib/store";
 import { Noto_Color_Emoji, Noto_Sans_Hebrew, Secular_One } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { PwaRegister } from "@/components/pwa-register";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -74,6 +75,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <TooltipProvider>
             {children}
+            <PwaRegister />
             <Toaster dir="rtl" position="top-center" />
           </TooltipProvider>
         </ThemeProvider>

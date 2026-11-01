@@ -4,6 +4,7 @@ import { getQuickSession, getSessionUser } from "@/lib/auth";
 import { canSeeChannel, ensureGuideChannels, isGeneralChannel, isRoshChevra } from "@/lib/channels";
 import { notifyChatEmail } from "@/lib/chat-email";
 import { normalizeChatEmailPrefs } from "@/lib/chat-email-prefs";
+import { cleanEmail } from "@/lib/email";
 import { deliverExpenseMail, expenseNoticeHtml } from "@/lib/expense-email";
 import { DEFAULT_PASSWORD, hashPassword, verifyPassword } from "@/lib/password";
 import { canAccessPoll, castVote } from "@/lib/poll";
@@ -22,6 +23,8 @@ import {
 } from "@/lib/expenses";
 import { can, canDeleteMedia, canDeleteMessage, isAdmin, isLeader } from "@/lib/permissions";
 import { boardEnabled, normalizeBoard, resolveBoard } from "@/lib/community-board";
+import { normalizeEntrancePromo } from "@/lib/entrance-promo";
+import { setMemberRsvp } from "@/lib/rsvp-record";
 import { galleryItems, gatheringHeld } from "@/lib/selectors";
 import { normalizeNudgeSettings, nudgeState } from "@/lib/nudge";
 import { emitToMembers } from "@/lib/realtime";
@@ -212,7 +215,7 @@ function applyAction(
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
       if (event.status !== "upcoming" || gatheringHeld(event)) throw new Error("החברה כבר התקיימה");
-      event.rsvps[me.id] = body.status;
+      setMemberRsvp(event, me.id, body.status, "site");
       return;
     }
     case "setAttendance": {
@@ -221,7 +224,7 @@ function applyAction(
       if (!event) throw new Error("החברה לא נמצאה");
       if (!gatheringHeld(event)) throw new Error("החברה עוד לא התקיימה");
       if (!s.members.some((member) => member.id === body.memberId)) throw new Error("החבר לא נמצא");
-      event.rsvps[body.memberId] = body.attended ? "yes" : "no";
+      setMemberRsvp(event, body.memberId, body.attended ? "yes" : "no", "site");
       return;
     }
     case "createEvent": {
@@ -240,6 +243,7 @@ function applyAction(
         notes: body.notes,
         status: "upcoming",
         rsvps,
+        rsvpVia: {},
         media: [],
       };
       s.gatherings.unshift(event);
@@ -256,7 +260,9 @@ function applyAction(
       if (!can(me, "editEvent")) throw new Error("forbidden");
       const event = s.gatherings.find((g) => g.id === body.eventId);
       if (!event) throw new Error("החברה לא נמצאה");
-      Object.assign(event, body.patch);
+      const { status, ...rest } = body.patch;
+      Object.assign(event, rest);
+      if (status === "upcoming" || status === "past" || status === "cancelled") event.status = status;
       return;
     }
     case "cancelEvent": {
@@ -506,7 +512,7 @@ function applyAction(
         displayName: body.displayName.trim(),
         role: body.role ?? "member",
         phone: body.phone?.trim() || "",
-        email: body.email?.trim() || `${body.username.trim()}@chevra.local`,
+        email: cleanEmail(body.email) || `${body.username.trim()}@chevra.local`,
         avatarColor: ["#0F766E", "#B45309", "#1D4ED8", "#7C3AED"][s.members.length % 4],
         initials: initialsFrom(body.displayName),
         passwordHash: hashPassword(DEFAULT_PASSWORD),
@@ -539,7 +545,7 @@ function applyAction(
         member.initials = initialsFrom(displayName);
       }
       if (body.patch.phone !== undefined) member.phone = body.patch.phone.trim();
-      if (body.patch.email !== undefined) member.email = body.patch.email.trim();
+      if (body.patch.email !== undefined) member.email = cleanEmail(body.patch.email);
       if (body.patch.role !== undefined) {
         applyRole(s, me, member, body.patch.role);
       }
@@ -565,6 +571,7 @@ function applyAction(
       s.tokens = s.tokens.filter((token) => token.memberId !== member.id);
       for (const event of s.gatherings) {
         delete event.rsvps[member.id];
+        if (event.rsvpVia) delete event.rsvpVia[member.id];
       }
       s.expenses = (s.expenses ?? []).filter((item) => item.memberId !== member.id);
       s.payments = (s.payments ?? []).filter(
@@ -835,6 +842,33 @@ function applyAction(
     case "setNudgeSettings": {
       if (!can(me, "sendInvites")) throw new Error("forbidden");
       s.nudge = { settings: normalizeNudgeSettings(body.settings), events: nudgeState(s).events };
+      return;
+    }
+    case "setEntrancePromo": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const next = normalizeEntrancePromo(
+        body.promo,
+        s.settings.entrancePromo,
+        s.members.map((member) => member.id)
+      );
+      if (body.promo && !next) throw new Error("צריך תמונה ותאריך סיום");
+      s.settings.entrancePromo = next;
+      return;
+    }
+    case "dismissEntrancePromo": {
+      const promo = s.settings.entrancePromo;
+      if (!promo || promo.dismissedBy.includes(me.id)) return;
+      promo.dismissedBy.push(me.id);
+      return;
+    }
+    case "setKibudRotation": {
+      if (!isAdmin(me)) throw new Error("forbidden");
+      const known = new Set(s.members.map((member) => member.id));
+      const memberIds: string[] = [];
+      for (const id of body.memberIds) {
+        if (known.has(id) && !memberIds.includes(id)) memberIds.push(id);
+      }
+      s.settings.kibudRotation = memberIds;
       return;
     }
     case "setCommunityBoard": {

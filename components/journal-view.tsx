@@ -5,15 +5,18 @@ import Link from "next/link";
 import { Check, MapPin, Mic, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EventDialog } from "@/components/event-dialog";
+import { NavigateLink } from "@/components/navigate-link";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   formatDayMonth,
   formatTimeHe,
+  gatheringHeadline,
   gatheringLabel,
   hebrewDateParts,
   memberById,
   splitGatheringTitle,
 } from "@/lib/format";
+import { kibudTurn } from "@/lib/kibud";
 import { can, isAdmin } from "@/lib/permissions";
 import { gatheringHeld } from "@/lib/selectors";
 import type { Gathering, Member } from "@/lib/types";
@@ -34,27 +37,20 @@ function coverImage(event: Gathering) {
 }
 
 function storyCopy(event: Gathering, upcoming: boolean) {
-  const title = event.title?.trim() ?? "";
-  const topic = event.topic?.trim() ?? "";
   const extra = (upcoming ? event.notes : event.summary)?.trim() ?? "";
-  const heading = title || topic || extra;
-  const seen = new Set<string>();
-  if (heading) seen.add(heading);
-  const lines = [topic, extra].filter((line) => {
-    if (!line || seen.has(line)) return false;
-    if (heading && (heading.includes(line) || line.includes(heading))) return false;
-    seen.add(line);
-    return true;
-  });
-  return { heading, body: lines.join(" ") };
+  return gatheringHeadline({ title: event.title, topic: event.topic, notes: extra });
 }
 
-function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" }) {
+function Chip({ children, tone = "gold" }: { children: React.ReactNode; tone?: "gold" | "gray" | "red" }) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-light",
-        tone === "gold" ? "bg-[#f7eedd] text-[#7a5418]" : "bg-[#eef0f3] text-[#4b5563]"
+        tone === "red"
+          ? "bg-[#fdf3ef] text-[#a4453a]"
+          : tone === "gold"
+            ? "bg-[#f7eedd] text-[#7a5418]"
+            : "bg-[#eef0f3] text-[#4b5563]"
       )}
     >
       {children}
@@ -142,6 +138,7 @@ export function JournalView() {
   }
 
   const hostName = next ? memberById(state.members, next.hostId)?.displayName : null;
+  const turn = next ? kibudTurn(state, next) : null;
 
   return (
     <div className="-mx-5 -mt-6 -mb-28 min-h-dvh bg-[#faf8f4] px-5 pt-6 pb-28 md:-mx-8 md:-mt-10 md:min-h-[calc(100dvh-4.5rem)] md:-mb-16 md:px-8 md:pt-10 md:pb-16">
@@ -170,6 +167,8 @@ export function JournalView() {
           members={state.members}
           me={me}
           hostName={hostName ?? null}
+          kibudName={turn?.duty?.displayName}
+          nextName={turn?.next?.displayName}
           rsvping={rsvping}
           onRsvp={() => void comeTo(next)}
         />
@@ -234,6 +233,8 @@ function NextStory({
   members,
   me,
   hostName,
+  kibudName,
+  nextName,
   rsvping,
   onRsvp,
 }: {
@@ -241,6 +242,8 @@ function NextStory({
   members: Member[];
   me: Member;
   hostName: string | null;
+  kibudName?: string;
+  nextName?: string;
   rsvping: boolean;
   onRsvp: () => void;
 }) {
@@ -271,11 +274,18 @@ function NextStory({
           <p className="mt-2 flex items-center gap-1.5 text-[13px] font-light text-[#4b5563]">
             <MapPin className="size-3.5 shrink-0 text-[#b8862f]" aria-hidden />
             <span className="truncate">{location}</span>
+            <NavigateLink location={location} />
           </p>
         ) : null}
-        {hostName ? <div className="mt-2.5"><Chip>אצל {hostName}</Chip></div> : null}
+        {hostName || kibudName || nextName ? (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {hostName ? <Chip>אצל {hostName}</Chip> : null}
+            {kibudName ? <Chip>תורן כיבוד: {kibudName}</Chip> : null}
+            {nextName ? <Chip>הבא בתור: {nextName}</Chip> : null}
+          </div>
+        ) : null}
         {body ? (
-          <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
+          <p className="mt-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{body}</p>
         ) : null}
         <div className="mt-4 flex items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-2 text-[12px] font-light text-muted-foreground">
@@ -329,6 +339,7 @@ function JournalEntry({
 }) {
   const href = `/journal/${event.id}`;
   const held = gatheringHeld(event);
+  const cancelled = event.status === "cancelled";
   const isUpcoming = event.status === "upcoming" && !held;
   const { kind } = splitGatheringTitle(event);
   const { heading, body } = storyCopy(event, isUpcoming);
@@ -337,20 +348,33 @@ function JournalEntry({
   const lecturer = memberById(members, event.lecturerId);
   const kibud = memberById(members, event.kibudId);
   const yes = members.filter((m) => event.rsvps[m.id] === "yes");
+  const maybe = members.filter((m) => event.rsvps[m.id] === "maybe").length;
+  const declined = members.filter((m) => event.rsvps[m.id] === "no").length;
+  const waiting = members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending").length;
   const pics = images(event);
   const text = body;
-  const facts = [
-    held
-      ? null
-      : yes.length
-        ? isUpcoming
-          ? `${yes.length} מגיעים`
-          : yes.length === members.length
-            ? `כל ${members.length} החברים הגיעו`
-            : `${yes.length} השתתפו`
-        : null,
-    pics.length ? `${pics.length} תמונות` : null,
-  ].filter(Boolean);
+  const facts = (
+    cancelled
+      ? [
+          yes.length ? `${yes.length} אישרו` : null,
+          maybe ? `${maybe} אולי` : null,
+          declined ? `${declined} לא מגיעים` : null,
+          waiting ? `${waiting} טרם` : null,
+          pics.length ? `${pics.length} תמונות` : null,
+        ]
+      : [
+          held
+            ? null
+            : yes.length
+              ? isUpcoming
+                ? `${yes.length} מגיעים`
+                : yes.length === members.length
+                  ? `כל ${members.length} החברים הגיעו`
+                  : `${yes.length} השתתפו`
+              : null,
+          pics.length ? `${pics.length} תמונות` : null,
+        ]
+  ).filter(Boolean);
 
   return (
     <article
@@ -374,7 +398,7 @@ function JournalEntry({
           {kind ? <Chip tone="gray">{kind}</Chip> : null}
           {gatheringHeld(event) ? <Chip>התקיימה</Chip> : null}
           {isUpcoming && !gatheringHeld(event) ? <Chip>קרובה · {formatTimeHe(event.startsAt)}</Chip> : null}
-          {event.status === "cancelled" ? <Chip tone="gray">בוטלה</Chip> : null}
+          {cancelled ? <Chip tone="red">✕ בוטלה</Chip> : null}
         </div>
         <h3 className="mt-1.5 mb-1 text-[18px] leading-snug font-medium">
           <Link href={href} className="after:absolute after:inset-0 after:rounded-[22px]">
@@ -384,10 +408,10 @@ function JournalEntry({
         <div className="flex flex-wrap gap-1.5">
           {host ? <Chip>מארח: {host.displayName}</Chip> : null}
           {lecturer ? <Chip>שיעור: {lecturer.displayName}</Chip> : null}
-          {kibud ? <Chip>כיבוד: {kibud.displayName}</Chip> : null}
+          {kibud ? <Chip>תורן כיבוד: {kibud.displayName}</Chip> : null}
         </div>
         {text ? (
-          <p className="mt-2 mb-3 line-clamp-2 text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{text}</p>
+          <p className="mt-2 mb-3 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[1.75] font-light text-[#4b5563]">{text}</p>
         ) : (
           <div className="h-3" />
         )}

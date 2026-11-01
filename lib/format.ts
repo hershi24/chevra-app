@@ -1,4 +1,4 @@
-import type { Member, Role, RsvpStatus } from "./types";
+import type { Member, Role, RsvpStatus, RsvpVia } from "./types";
 
 export function formatDateHe(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -100,12 +100,22 @@ export function splitGatheringTitle(event: { title?: string; topic?: string; sta
   return { kind, heading: rest.join(" · ") };
 }
 
-export function journalHeading(event: { title?: string; topic?: string; startsAt: string }) {
-  const { heading } = splitGatheringTitle(event);
-  const topic = event.topic?.trim();
-  if (!topic) return heading;
-  if (!heading || topic.includes(heading) || heading.includes(topic)) return topic;
-  return `${topic} · ${heading}`;
+function sameGatheringText(a: string, b: string) {
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+export function gatheringHeadline(event: { title?: string; topic?: string; notes?: string }) {
+  const title = event.title?.trim() ?? "";
+  const topic = event.topic?.trim() ?? "";
+  const notes = event.notes?.trim() ?? "";
+  const heading = title || topic || notes;
+  const lines: string[] = [];
+  if (title && topic && !sameGatheringText(title, topic)) lines.push(topic);
+  if (notes && notes !== heading && !sameGatheringText(notes, heading) && !lines.some((line) => sameGatheringText(line, notes))) {
+    lines.push(notes);
+  }
+  return { heading, body: lines.join("\n") };
 }
 
 export function formatRelativeHe(iso: string) {
@@ -130,6 +140,31 @@ export function rsvpLabel(status: RsvpStatus) {
   if (status === "no") return "לא מגיע";
   if (status === "maybe") return "אולי";
   return "טרם השיב";
+}
+
+export function rsvpViaLabel(via?: RsvpVia) {
+  if (via === "email") return "במייל";
+  if (via === "phone") return "בטלפון";
+  if (via === "site") return "באתר";
+  return "";
+}
+
+export function rsvpWithVia(status: RsvpStatus, via?: RsvpVia) {
+  const source = status === "pending" ? "" : rsvpViaLabel(via);
+  return source ? `${rsvpLabel(status)} · ${source}` : rsvpLabel(status);
+}
+
+export function ivrResultLabel(result: string) {
+  if (result === "tzintuk_sent") return "יצא צינתוק";
+  if (result === "tzintuk_failed") return "הצינתוק לא יצא";
+  if (result === "tzintuk_queued") return "צינתוק נרשם";
+  if (result === "rsvp_yes") return "מגיע";
+  if (result === "rsvp_maybe") return "אולי";
+  if (result === "rsvp_no") return "לא מגיע";
+  if (result === "unknown_phone") return "מספר לא מזוהה";
+  if (result === "already_held") return "החברה כבר לא פתוחה";
+  if (result === "invalid_choice") return "הקשה לא נקלט";
+  return result;
 }
 
 export function memberById(members: Member[], id?: string) {

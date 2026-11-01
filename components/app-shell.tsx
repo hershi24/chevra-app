@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-provider";
 import type { PublicState } from "@/lib/types";
+import { EntrancePromoOverlay } from "@/components/entrance-promo";
 import { PasswordNotice } from "@/components/password-notice";
 import { BackgroundLayer } from "@/components/background-layer";
 import { UserAvatar } from "@/components/user-avatar";
@@ -186,6 +187,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       </header>
 
       <PasswordNotice />
+      {pathname === "/" ? <EntrancePromoOverlay /> : null}
 
       <main
         className={cn(

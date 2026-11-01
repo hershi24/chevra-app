@@ -19,6 +19,7 @@ create table public.members (
   phone text,
   email text,
   avatar_color text not null default '#0F766E',
+  avatar_url text,
   initials text not null,
   password_hash text,
   must_change_password boolean not null default true,
@@ -46,6 +47,7 @@ create table public.rsvps (
   gathering_id text references public.gatherings(id) on delete cascade,
   member_id text references public.members(id) on delete cascade,
   status public.rsvp_status not null default 'pending',
+  via text,
   updated_at timestamptz not null default now(),
   primary key (gathering_id, member_id)
 );
@@ -232,3 +234,30 @@ create table if not exists public.site_nudge (
 alter table public.site_nudge enable row level security;
 
 insert into public.site_nudge (id) values (1) on conflict do nothing;
+
+create table if not exists public.site_promo (
+  id int primary key default 1 check (id = 1),
+  data jsonb not null default '{}'::jsonb
+);
+
+alter table public.site_promo enable row level security;
+
+insert into public.site_promo (id) values (1) on conflict do nothing;
+
+create table if not exists public.site_kibud (
+  id int primary key default 1 check (id = 1),
+  data jsonb not null default '{}'::jsonb
+);
+
+alter table public.site_kibud enable row level security;
+
+insert into public.site_kibud (id) values (1) on conflict do nothing;
+
+create table if not exists public.site_activity (
+  id int primary key default 1 check (id = 1),
+  data jsonb not null default '{}'::jsonb
+);
+
+alter table public.site_activity enable row level security;
+
+insert into public.site_activity (id) values (1) on conflict do nothing;

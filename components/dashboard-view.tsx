@@ -25,17 +25,19 @@ import { EventDialog } from "@/components/event-dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { expensesOpen, formatAgorot, settlement } from "@/lib/expenses";
+import { kibudTurn } from "@/lib/kibud";
+import { NavigateLink } from "@/components/navigate-link";
 import {
   formatHebrewDate,
   formatRelativeHe,
   formatTimeHe,
-  gatheringTitle,
+  gatheringHeadline,
   memberById,
-  rsvpLabel,
+  rsvpWithVia,
 } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { dmName, galleryItems, gatheringHeld, upcomingGathering } from "@/lib/selectors";
-import type { Gathering, Member, Message, PublicState, RsvpStatus } from "@/lib/types";
+import type { Gathering, Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SEEN_KEY = "chevra-dashboard-seen";
@@ -234,12 +236,12 @@ function Dashboard({
         </div>
       </header>
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_23rem]">
-        <div className="flex min-w-0 flex-col gap-6 md:gap-8">
+      <div className="grid items-stretch gap-6 md:gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:h-full">
           {event ? (
-            <HeroEvent event={event} members={state.members} me={me} onRsvp={onRsvp} />
+            <HeroEvent event={event} members={state.members} me={me} turn={kibudTurn(state, event)} onRsvp={onRsvp} />
           ) : (
-            <section className={cn(CARD, "px-6 py-12")}>
+            <section className={cn(CARD, "h-full px-6 py-12")}>
               <p className="text-muted-foreground">אין חברה קרובה ביומן כרגע.</p>
               {canCreate ? (
                 <div className="mt-4">
@@ -252,75 +254,78 @@ function Dashboard({
               )}
             </section>
           )}
-
-          <nav
-            className={cn(
-              "grid grid-cols-2 gap-px overflow-hidden rounded-[1.25rem] border border-[#dfe3e9] bg-[#e7eaee] lg:hidden",
-              quick.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
-            )}
-          >
-            {quick.map((item, index) => (
-              <QuickLink
-                key={item.href}
-                {...item}
-                className={cn(quick.length % 2 === 1 && index === quick.length - 1 && "col-span-2 md:col-span-1")}
-              />
-            ))}
-          </nav>
-
-          <div className="min-w-0 lg:rounded-[1.5rem] lg:border lg:border-[#d5dbe3] lg:bg-[#fbfcfd] lg:px-6 lg:py-5 lg:shadow-[0_10px_28px_rgba(80,90,105,0.05)]">
-            <SectionHead title="מה חדש בצ׳אט" href="/chat" link="לצ׳אט" />
-            {latestMessages.length ? (
-              <ul className="divide-y divide-[#e7eaee]">
-                {latestMessages.slice(0, 3).map((msg) => {
-                  const author = memberById(state.members, msg.authorId);
-                  return (
-                    <li key={msg.id}>
-                      <Link href="/chat" className="flex items-center gap-3 py-3">
-                        <UserAvatar member={author} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2 text-[13px]">
-                            <span className="truncate font-normal">{author?.displayName}</span>
-                            <span className="shrink-0 text-[11px] font-light text-muted-foreground">
-                              {channelLabel(msg.channelId)}
-                            </span>
-                            <span className="ms-auto shrink-0 text-[11px] font-light text-muted-foreground">
-                              {formatRelativeHe(msg.createdAt)}
-                            </span>
-                          </div>
-                          <p className="font-chat truncate text-[13px] font-normal text-foreground/65">
-                            {messagePreview(msg)}
-                          </p>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="py-3 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
-            )}
-          </div>
-
-          {lastWithPhotos ? (
-            <div className="lg:hidden">
-              <LastGathering event={lastWithPhotos} />
-            </div>
-          ) : null}
         </div>
 
-        <aside className="hidden min-w-0 flex-col gap-6 lg:sticky lg:top-24 lg:flex">
-          <nav className={cn(CARD, "flex flex-col divide-y divide-[#e7eaee] overflow-hidden")}>
-            {quick.map((item) => (
-              <QuickLink key={item.href} {...item} className="px-5 py-4" />
-            ))}
-          </nav>
-          {lastWithPhotos ? (
-            <div className={cn(CARD, "px-5 py-5")}>
-              <LastGathering event={lastWithPhotos} />
-            </div>
-          ) : null}
-        </aside>
+        <nav
+          className={cn(
+            CARD,
+            "hidden h-full min-h-0 flex-col divide-y divide-[#e7eaee] overflow-hidden lg:col-start-2 lg:row-start-1 lg:flex"
+          )}
+        >
+          {quick.map((item) => (
+            <QuickLink key={item.href} {...item} className="flex-1 px-5 py-4" />
+          ))}
+        </nav>
+
+        <nav
+          className={cn(
+            "grid grid-cols-2 gap-px overflow-hidden rounded-[1.25rem] border border-[#dfe3e9] bg-[#e7eaee] lg:hidden",
+            quick.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
+          )}
+        >
+          {quick.map((item, index) => (
+            <QuickLink
+              key={item.href}
+              {...item}
+              className={cn(quick.length % 2 === 1 && index === quick.length - 1 && "col-span-2 md:col-span-1")}
+            />
+          ))}
+        </nav>
+
+        <div className="h-full min-w-0 lg:col-start-1 lg:row-start-2 lg:rounded-[1.5rem] lg:border lg:border-[#d5dbe3] lg:bg-[#fbfcfd] lg:px-6 lg:py-5 lg:shadow-[0_10px_28px_rgba(80,90,105,0.05)]">
+          <SectionHead title="מה חדש בצ׳אט" href="/chat" link="לצ׳אט" />
+          {latestMessages.length ? (
+            <ul className="divide-y divide-[#e7eaee]">
+              {latestMessages.slice(0, 3).map((msg) => {
+                const author = memberById(state.members, msg.authorId);
+                return (
+                  <li key={msg.id}>
+                    <Link href="/chat" className="flex items-center gap-3 py-3">
+                      <UserAvatar member={author} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2 text-[13px]">
+                          <span className="truncate font-normal">{author?.displayName}</span>
+                          <span className="shrink-0 text-[11px] font-light text-muted-foreground">
+                            {channelLabel(msg.channelId)}
+                          </span>
+                          <span className="ms-auto shrink-0 text-[11px] font-light text-muted-foreground">
+                            {formatRelativeHe(msg.createdAt)}
+                          </span>
+                        </div>
+                        <p className="font-chat truncate text-[13px] font-normal text-foreground/65">
+                          {messagePreview(msg)}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="py-3 text-sm font-light text-muted-foreground">עוד אין הודעות בצ׳אט.</p>
+          )}
+        </div>
+
+        {lastWithPhotos ? (
+          <div className="lg:hidden">
+            <LastGathering event={lastWithPhotos} />
+          </div>
+        ) : null}
+        {lastWithPhotos ? (
+          <div className={cn(CARD, "hidden h-full px-5 py-5 lg:col-start-2 lg:row-start-2 lg:block")}>
+            <LastGathering event={lastWithPhotos} />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -419,39 +424,38 @@ function HeroEvent({
   event,
   members,
   me,
+  turn,
   onRsvp,
 }: {
   event: Gathering;
   members: Member[];
   me: Member;
+  turn: { duty?: Member; next?: Member; suggested?: Member };
   onRsvp: (status: RsvpStatus) => Promise<void>;
 }) {
   const [listOpen, setListOpen] = useState(false);
   const host = memberById(members, event.hostId);
-  const kibud = memberById(members, event.kibudId);
   const lecturer = memberById(members, event.lecturerId);
+  const kibud = turn.duty;
   const held = gatheringHeld(event);
   const mine = event.rsvps[me.id] ?? "pending";
   const coming = members.filter((m) => event.rsvps[m.id] === "yes");
   const maybe = members.filter((m) => event.rsvps[m.id] === "maybe");
   const pending = members.filter((m) => (event.rsvps[m.id] ?? "pending") === "pending");
   const showList = can(me, "viewRsvps");
-  const title = gatheringTitle(event);
-  const topic = event.topic?.trim() || null;
-  const heading = topic || title || "החברה הבאה";
-  const sub = topic && title ? title : null;
+  const { heading, body } = gatheringHeadline(event);
   const date = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long" }).format(
     new Date(event.startsAt)
   );
   const details = [
-    event.location ? { icon: MapPin, text: event.location } : null,
     host ? { icon: Home, text: `אצל ${host.displayName}` } : null,
-    kibud ? { icon: UtensilsCrossed, text: `כיבוד: ${kibud.displayName}` } : null,
+    kibud ? { icon: UtensilsCrossed, text: `תורן כיבוד: ${kibud.displayName}` } : null,
+    turn.next ? { icon: UtensilsCrossed, text: `הבא בתור: ${turn.next.displayName}` } : null,
     lecturer ? { icon: BookOpen, text: `שיעור: ${lecturer.displayName}` } : null,
   ].filter((d): d is { icon: LucideIcon; text: string } => Boolean(d));
 
   return (
-    <section className={cn(CARD, "grid min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}>
+    <section className={cn(CARD, "grid h-full min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}>
       <div className="relative min-w-0 px-5 py-6 md:px-8 md:py-8">
         {can(me, "editEvent") ? (
           <div className="absolute end-3 top-3 md:end-5 md:top-5">
@@ -476,19 +480,28 @@ function HeroEvent({
           {weekday(event.startsAt)} · {date} · {formatTimeHe(event.startsAt)}
         </p>
         <h2 className="mt-1.5 pe-8 text-[1.5rem] font-normal leading-tight tracking-tight md:text-[1.9rem]">
-          {heading}
+          {heading || "החברה הבאה"}
         </h2>
-        <p className="mt-1 text-[13px] font-light text-muted-foreground">
-          {formatHebrewDate(event.startsAt)}
-          {sub ? ` · ${sub}` : ""}
-        </p>
+        {body ? (
+          <p className="mt-1.5 max-w-xl whitespace-pre-line text-[14px] font-light leading-6 text-foreground/70">
+            {body}
+          </p>
+        ) : null}
+        <p className="mt-1 text-[13px] font-light text-muted-foreground">{formatHebrewDate(event.startsAt)}</p>
 
-        {details.length ? (
+        {event.location || details.length ? (
           <ul className="mt-5 flex flex-col gap-1.5 text-[14px] font-light text-foreground/75 sm:flex-row sm:flex-wrap sm:gap-x-5">
+            {event.location ? (
+              <li className="flex min-w-0 items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-primary/60" aria-hidden />
+                <span className="truncate">{event.location}</span>
+                <NavigateLink location={event.location} />
+              </li>
+            ) : null}
             {details.map((d) => (
-              <li key={d.text} className="flex min-w-0 items-center gap-2">
+              <li key={d.text} className="flex max-w-full items-center gap-2">
                 <d.icon className="size-4 shrink-0 text-primary/60" aria-hidden />
-                <span className="truncate">{d.text}</span>
+                <span>{d.text}</span>
               </li>
             ))}
           </ul>
@@ -565,9 +578,12 @@ function HeroEvent({
                     <UserAvatar member={member} size="sm" />
                     <span className="min-w-0 truncate text-[13px] font-light">{member.displayName}</span>
                     <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
-                      {rsvpLabel(event.rsvps[member.id] ?? "pending")}
+                      {rsvpWithVia(event.rsvps[member.id] ?? "pending", event.rsvpVia?.[member.id])}
                     </span>
-                    <StatusDot status={event.rsvps[member.id] ?? "pending"} />
+                    <StatusDot
+                      status={event.rsvps[member.id] ?? "pending"}
+                      via={event.rsvpVia?.[member.id]}
+                    />
                   </li>
                 ))}
               </ul>
@@ -632,10 +648,10 @@ function RsvpButton({
   );
 }
 
-function StatusDot({ status }: { status: RsvpStatus }) {
+function StatusDot({ status, via }: { status: RsvpStatus; via?: RsvpVia }) {
   return (
     <span
-      title={rsvpLabel(status)}
+      title={rsvpWithVia(status, via)}
       className={cn(
         "size-1.5 shrink-0 rounded-full",
         status === "yes" && "bg-[#3d8f62]",

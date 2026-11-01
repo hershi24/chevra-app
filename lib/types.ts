@@ -2,6 +2,8 @@ export type Role = "admin" | "leader" | "member";
 
 export type RsvpStatus = "yes" | "no" | "maybe" | "pending";
 
+export type RsvpVia = "email" | "phone" | "site";
+
 export type MediaType = "image" | "video" | "audio";
 
 export type Member = {
@@ -12,6 +14,7 @@ export type Member = {
   phone: string;
   email: string;
   avatarColor: string;
+  avatarUrl?: string;
   initials: string;
   passwordHash?: string;
   mustChangePassword?: boolean;
@@ -40,6 +43,7 @@ export type Gathering = {
   audioUrl?: string;
   status: "upcoming" | "past" | "cancelled";
   rsvps: Record<string, RsvpStatus>;
+  rsvpVia?: Record<string, RsvpVia>;
   attendedIds?: string[];
   media: EventMedia[];
 };
@@ -193,12 +197,21 @@ export type CommunityBoard = {
   photos?: BoardPhoto[];
 };
 
+export type EntrancePromo = {
+  id: string;
+  imageUrl: string;
+  until: string;
+  dismissedBy: string[];
+};
+
 export type AppSettings = {
   groupName: string;
   backgroundImageId: string | null;
   backgrounds: BackgroundImage[];
   showExpenses?: boolean;
   communityBoard?: CommunityBoard;
+  entrancePromo?: EntrancePromo | null;
+  kibudRotation?: string[];
 };
 
 export type EmailDelivery = {
@@ -248,6 +261,14 @@ export type IvrLog = {
   result: string;
 };
 
+export type SiteVisit = {
+  id: string;
+  memberId: string;
+  startedAt: string;
+  lastSeen: string;
+  endedAt?: string;
+};
+
 export type ChatEmailMode = "off" | "dm" | "custom";
 
 export type ChatEmailPrefs = {
@@ -270,6 +291,7 @@ export type AppState = {
   bankAccounts?: Record<string, BankAccount>;
   emailLog: EmailLog[];
   ivrLog: IvrLog[];
+  visits?: SiteVisit[];
   chatReads?: Record<string, Record<string, string>>;
   chatEmailPrefs?: Record<string, ChatEmailPrefs>;
   nudge?: NudgeState;

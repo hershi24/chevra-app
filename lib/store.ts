@@ -1,7 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { createSeed } from "./seed";
-import { emitUpdate } from "./realtime";
 import { isSupabaseEnabled } from "./supabase";
 import { canSeeChannel, isGeneralChannel, isRoshChevra } from "./channels";
 import {
@@ -13,7 +12,8 @@ import {
 } from "./supabase-chat";
 import { chatEmailPrefsFor, loadChatEmailPrefs, syncChatEmailPrefs } from "./chat-email-prefs";
 import { ensureMemberSecrets, publicMember } from "./password";
-import { can, isLeader } from "./permissions";
+import { can, isAdmin, isLeader } from "./permissions";
+import { preserveRsvpVia } from "./rsvp-record";
 import { loadGatheringsFromSupabase, loadTokensFromSupabase, syncGatheringsDiff } from "./supabase-gatherings";
 import { ensureExpenses } from "./expenses";
 import {
@@ -24,7 +24,12 @@ import {
 } from "./supabase-expenses";
 import { loadSiteBoard, syncSiteBoard } from "./supabase-board";
 import { loadSiteNudge, syncSiteNudge } from "./supabase-nudge";
+import { loadSitePromo, syncSitePromo } from "./supabase-promo";
+import { loadSiteKibud, syncSiteKibud } from "./supabase-kibud";
+import { applySiteActivity, loadSiteActivity, syncSiteActivity } from "./supabase-activity";
+import { emitUpdate, onlineMemberIds } from "./realtime";
 import { boardEnabled } from "./community-board";
+import { publicEntrancePromo } from "./entrance-promo";
 import type { AppState, Member, Poll, PublicState } from "./types";
 
 const FILE = process.env.VERCEL
@@ -117,7 +122,17 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     if (cloud) {
       state.gallery = cloud.gallery;
       if (cloud.gatherings.length) {
-        state.gatherings = cloud.gatherings;
+        const merged = preserveRsvpVia(state.gatherings, cloud.gatherings);
+        const restored = merged.some((event, index) => event !== cloud.gatherings[index]);
+        state.gatherings = merged;
+        if (restored) {
+          await persist(state);
+          try {
+            await syncGatheringsDiff({ ...state, gatherings: cloud.gatherings }, state);
+          } catch (error) {
+            console.error("RSVP source write-back failed", error);
+          }
+        }
       } else {
         const seedIds = new Set(["g-next", "g-past-1", "g-past-2", "g-past-3"]);
         const custom = state.gatherings.filter((event) => !seedIds.has(event.id));
@@ -148,6 +163,12 @@ async function mergeFromCloud(state: AppState): Promise<AppState> {
     if (board) state.settings.communityBoard = board;
     const nudge = await loadSiteNudge();
     if (nudge) state.nudge = nudge;
+    const promo = await loadSitePromo();
+    if (promo !== undefined) state.settings.entrancePromo = promo;
+    const kibud = await loadSiteKibud();
+    if (kibud !== undefined) state.settings.kibudRotation = kibud;
+    const activity = await loadSiteActivity();
+    applySiteActivity(state, activity, new Set(onlineMemberIds()));
     markCloudFresh(state);
   } catch (error) {
     console.error("Supabase chat read failed", error);
@@ -173,6 +194,9 @@ export async function persistQuietly(
         await syncChatEmailPrefs(before, current);
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
+        await syncSitePromo(before, current);
+        await syncSiteKibud(before, current);
+        await syncSiteActivity(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
       }
@@ -205,6 +229,9 @@ export async function updateState(
         await syncChatEmailPrefs(before, current);
         await syncSiteBoard(before, current);
         await syncSiteNudge(before, current);
+        await syncSitePromo(before, current);
+        await syncSiteKibud(before, current);
+        await syncSiteActivity(before, current);
       } catch (error) {
         console.error("Supabase chat write failed", error);
         throw new Error("השמירה בענן נכשלה. נסו שוב.");
@@ -243,13 +270,17 @@ export function toPublicState(state: AppState, me: Member): PublicState {
     gallery: state.gallery ?? [],
     channels: quiet ? [] : channels,
     messages: quiet ? [] : visibleMessages,
-    settings: state.settings,
+    settings: {
+      ...state.settings,
+      entrancePromo: publicEntrancePromo(state.settings.entrancePromo, me.id),
+    },
     expenses: state.settings.showExpenses === false ? [] : (state.expenses ?? []),
     expenseWaivers: state.settings.showExpenses === false ? [] : (state.expenseWaivers ?? []),
     payments: state.settings.showExpenses === false ? [] : (state.payments ?? []),
     bankAccounts: state.settings.showExpenses === false ? {} : (state.bankAccounts ?? {}),
     emailLog: state.emailLog,
-    ivrLog: state.ivrLog,
+    ivrLog: isAdmin(me) ? state.ivrLog : [],
+    visits: isAdmin(me) ? state.visits ?? [] : [],
     nudge: can(me, "sendInvites") ? state.nudge : undefined,
     revision: state.revision,
     me: publicMember(me),

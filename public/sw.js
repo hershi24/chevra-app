@@ -6,6 +6,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Marks the site installable. Requests still go to the network.
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
