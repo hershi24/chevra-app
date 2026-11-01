@@ -21,13 +21,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
-import { MemberRsvpEditor } from "@/components/member-rsvp-editor";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { boardEnabled, resolveBoard } from "@/lib/community-board";
 import { SCOPE_ALL, expensesOpen, formatAgorot, scopedSettlement } from "@/lib/expenses";
-import { formatRelativeHe, formatTimeHe, gatheringLabel, memberById, rsvpWithVia } from "@/lib/format";
+import { formatRelativeHe, formatTimeHe, gatheringLabel, memberById } from "@/lib/format";
 import { memberAddress, normalizeNudgeSettings, reachableForNudge } from "@/lib/nudge-rules";
 import { memberHasPhone } from "@/lib/phone";
 import { upcomingGathering } from "@/lib/selectors";
@@ -388,8 +387,7 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
   }
 
   return (
-    <section className={PANEL} aria-label="החברה הקרובה">
-      <div className="md:grid md:grid-cols-[minmax(0,1fr)_300px]">
+    <section className={cn(PANEL, "md:grid md:grid-cols-[minmax(0,1fr)_300px]")} aria-label="החברה הקרובה">
       <div className="p-5 md:p-6">
         <div className="flex items-center gap-4">
           <DateBox iso={event.startsAt} />
@@ -512,30 +510,6 @@ function GatheringCard({ state, event, onOpen }: { state: PublicState; event: Ga
             }}
           />
         </label>
-      </div>
-      </div>
-      <div className="border-t border-[#e9ecef] px-5 py-4 md:px-6">
-        <div className="text-[15px]">עדכון הגעה</div>
-        <p className="mt-1 text-[12.5px] font-light text-muted-foreground">
-          מי שאמר בעל פה אפשר לעדכן כאן. ליד התשובה ייכתב «ידנית».
-        </p>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-          {state.members.map((member) => {
-            const status = event.rsvps[member.id] ?? "pending";
-            return (
-              <li key={member.id} className="rounded-2xl bg-[#f7f8fa] px-3 py-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <UserAvatar member={member} size="sm" />
-                  <span className="min-w-0 truncate text-sm">{member.displayName}</span>
-                  <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
-                    {rsvpWithVia(status, event.rsvpVia?.[member.id])}
-                  </span>
-                </div>
-                <MemberRsvpEditor eventId={event.id} memberId={member.id} status={status} className="mt-2" />
-              </li>
-            );
-          })}
-        </ul>
       </div>
     </section>
   );
