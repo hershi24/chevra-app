@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.meinchevra.app",
+      "sha256_cert_fingerprints": [
+        "7F:6D:E3:4C:6B:77:6C:85:59:55:E5:BC:DD:85:3C:A9:F7:C6:46:07:F2:5F:F2:C4:86:83:B0:98:1E:25:01:E7"
+      ]
+    }
+  }
+]
