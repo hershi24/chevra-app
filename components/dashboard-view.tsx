@@ -22,7 +22,6 @@ import { CommunityHome } from "@/components/community-home";
 import { boardEnabled } from "@/lib/community-board";
 import { Countdown } from "@/components/countdown";
 import { EventDialog } from "@/components/event-dialog";
-import { MemberRsvpEditor } from "@/components/member-rsvp-editor";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { expensesOpen, formatAgorot, settlement } from "@/lib/expenses";
@@ -36,7 +35,7 @@ import {
   memberById,
   rsvpWithVia,
 } from "@/lib/format";
-import { can, isAdmin } from "@/lib/permissions";
+import { can } from "@/lib/permissions";
 import { dmName, galleryItems, gatheringHeld, upcomingGathering } from "@/lib/selectors";
 import type { Gathering, Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -434,7 +433,6 @@ function HeroEvent({
   turn: { duty?: Member; next?: Member; suggested?: Member };
   onRsvp: (status: RsvpStatus) => Promise<void>;
 }) {
-  const editable = isAdmin(me) && event.status === "upcoming";
   const [listOpen, setListOpen] = useState(false);
   const host = memberById(members, event.hostId);
   const lecturer = memberById(members, event.lecturerId);
@@ -457,8 +455,7 @@ function HeroEvent({
   ].filter((d): d is { icon: LucideIcon; text: string } => Boolean(d));
 
   return (
-    <section className={cn(CARD, "h-full min-w-0 overflow-hidden")}>
-    <div className="grid md:grid-cols-[1fr_15rem]">
+    <section className={cn(CARD, "grid h-full min-w-0 overflow-hidden md:grid-cols-[1fr_15rem]")}>
       <div className="relative min-w-0 px-5 py-6 md:px-8 md:py-8">
         {can(me, "editEvent") ? (
           <div className="absolute end-3 top-3 md:end-5 md:top-5">
@@ -564,7 +561,7 @@ function HeroEvent({
             </div>
           ) : null}
         </div>
-        {showList && !held && !editable ? (
+        {showList && !held ? (
           <div className="mt-4">
             <button
               type="button"
@@ -595,33 +592,6 @@ function HeroEvent({
           </div>
         ) : null}
       </aside>
-    </div>
-      {editable ? (
-        <div className="border-t border-[#eceef1] px-5 py-4 md:px-8">
-          <div className="text-[15px]">עדכון הגעה</div>
-          <p className="mt-1 text-[12.5px] font-light text-muted-foreground">
-            מי שאמר בעל פה אפשר לעדכן כאן. ליד התשובה ייכתב «ידנית».
-          </p>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {members.map((member) => {
-              const answer = event.rsvps[member.id] ?? "pending";
-              const via = event.rsvpVia?.[member.id];
-              return (
-                <li key={member.id} className="rounded-2xl bg-[#f7f8fa] px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <UserAvatar member={member} size="sm" />
-                    <span className="min-w-0 truncate text-[13px] font-light">{member.displayName}</span>
-                    <span className="ms-auto shrink-0 text-[12px] font-light text-muted-foreground">
-                      {rsvpWithVia(answer, via)}
-                    </span>
-                  </div>
-                  <MemberRsvpEditor eventId={event.id} memberId={member.id} status={answer} className="mt-2" />
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }
