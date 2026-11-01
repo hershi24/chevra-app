@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-provider";
 import type { PublicState } from "@/lib/types";
+import { DownloadAppButton } from "@/components/download-app-button";
 import { EntrancePromoOverlay } from "@/components/entrance-promo";
 import { PasswordNotice } from "@/components/password-notice";
 import { BackgroundLayer } from "@/components/background-layer";
@@ -120,7 +121,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
       <BackgroundLayer />
 
       <header className="sticky top-0 z-30 hidden h-[72px] shrink-0 border-b border-[#e3e6eb] bg-[#fbfcfd] md:block">
-        <div className="flex h-full items-center justify-between gap-6 px-5 md:px-8">
+        <div className="flex h-full items-center justify-between gap-3 px-5 lg:gap-4 lg:px-6 xl:gap-6 xl:px-8">
           <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3">
             <img src="/brand-logo.png" alt="" className="h-[38px] w-auto" />
             <span className="min-w-0 text-start">
@@ -129,7 +130,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className="flex h-full min-w-0 items-stretch">
+          <nav className="flex h-full min-w-0 flex-1 items-stretch justify-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {nav.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -140,20 +141,21 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
                   title={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-2 px-2.5 text-[14px] font-light lg:px-4 lg:text-[15px]",
+                    "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-1.5 text-[13px] font-light lg:gap-2 lg:px-2 lg:text-[14px] xl:px-3.5 xl:text-[15px]",
                     active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <item.icon className={cn("size-4 shrink-0", active && "text-primary")} />
                   {item.short}
                   {active ? (
-                    <span className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-t bg-primary lg:inset-x-4" />
+                    <span className="absolute inset-x-1.5 bottom-0 h-0.5 rounded-t bg-primary lg:inset-x-2 xl:inset-x-3.5" />
                   ) : null}
                 </Link>
               );
             })}
           </nav>
 
+          <DownloadAppButton className="self-center" />
           <div className="flex shrink-0 items-center gap-3 rounded-full bg-[#f4f6f8] py-1.5 ps-3.5 pe-1.5">
             <div className="hidden min-w-0 text-start lg:block">
               <div className="truncate text-[13px]">{me.displayName}</div>
@@ -175,15 +177,18 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
 
       <header
         className={cn(
-          "sticky top-0 z-20 shrink-0 items-center justify-between border-b border-[#d0d5dc] bg-[#e4e8ee] px-4 py-3 md:hidden",
-          isDashboard ? "flex" : "hidden"
+          "sticky top-0 z-20 shrink-0 items-center justify-between gap-3 border-b border-[#d0d5dc] bg-[#e4e8ee] px-4 py-3 md:hidden",
+          isChat ? "hidden" : "flex"
         )}
       >
-        <div>
+        <div className="min-w-0">
           <img src="/brand-logo.png" alt="אש קודש" className="h-[34px] w-auto" />
-          <div className="text-[11px] text-muted-foreground">{me.displayName}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{me.displayName}</div>
         </div>
-        <UserAvatar member={me} size="sm" />
+        <div className="flex shrink-0 items-center gap-2">
+          <DownloadAppButton compact />
+          <UserAvatar member={me} size="sm" />
+        </div>
       </header>
 
       <PasswordNotice />

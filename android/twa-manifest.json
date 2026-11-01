@@ -1,0 +1,42 @@
+{
+  "packageId": "com.meinchevra.app",
+  "host": "xn--5dbghha2aj8e.com",
+  "name": "מיין חברה",
+  "launcherName": "מיין חברה",
+  "display": "standalone",
+  "themeColor": "#F3F4F6",
+  "themeColorDark": "#F3F4F6",
+  "navigationColor": "#F3F4F6",
+  "navigationColorDark": "#F3F4F6",
+  "navigationDividerColor": "#F3F4F6",
+  "navigationDividerColorDark": "#F3F4F6",
+  "backgroundColor": "#F3F4F6",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://xn--5dbghha2aj8e.com/icon.png",
+  "maskableIconUrl": "https://xn--5dbghha2aj8e.com/icon.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./meinchevra.keystore",
+    "alias": "meinchevra"
+  },
+  "appVersionCode": 1,
+  "appVersion": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://xn--5dbghha2aj8e.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://xn--5dbghha2aj8e.com/",
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": ["מייןחברה.com"],
+  "retainedBundles": []
+}

@@ -51,3 +51,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# android wrapper build output and the release key
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/*.keystore
+/android/*.apk
+/android/*.aab
+*.apk
+*.aab
+*.apk.idsig
+!/public/meinchevra.apk
