@@ -81,7 +81,7 @@ function sameVia(a?: Gathering["rsvpVia"], b?: Gathering["rsvpVia"]) {
 }
 
 function parseVia(value?: string | null): RsvpVia | undefined {
-  if (value === "email" || value === "phone" || value === "site") return value;
+  if (value === "email" || value === "phone" || value === "site" || value === "app" || value === "admin") return value;
   return undefined;
 }
 

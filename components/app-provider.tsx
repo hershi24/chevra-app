@@ -22,6 +22,7 @@ import {
   type ReactionRow,
 } from "@/lib/chat-message";
 import { preserveRsvpVia } from "@/lib/rsvp-record";
+import { rsvpSourceHere } from "@/lib/rsvp-source";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { Member, Message, PublicState, RsvpStatus, RsvpVia } from "@/lib/types";
 
@@ -42,6 +43,7 @@ type PendingRsvp = {
   eventId: string;
   memberId: string;
   status: RsvpStatus;
+  via: "app" | "site";
   ticket: number;
   revision: number;
 };
@@ -65,7 +67,7 @@ function withPendingRsvps(
     return {
       ...item,
       rsvps: { ...item.rsvps, [wait.memberId]: wait.status },
-      rsvpVia: { ...(item.rsvpVia ?? {}), [wait.memberId]: "site" as const },
+      rsvpVia: { ...(item.rsvpVia ?? {}), [wait.memberId]: wait.via },
     };
   });
   return changed ? { ...data, gatherings } : data;
@@ -280,6 +282,8 @@ export function AppProvider({
         };
       });
     } else if (body.type === "rsvp") {
+      const via = rsvpSourceHere();
+      body = { ...body, via };
       const current = stateRef.current;
       const memberId = current?.me.id;
       if (current && memberId) {
@@ -296,6 +300,7 @@ export function AppProvider({
           eventId,
           memberId,
           status,
+          via,
           ticket,
           revision: current.revision,
         });
@@ -308,7 +313,7 @@ export function AppProvider({
                     ? {
                         ...item,
                         rsvps: { ...item.rsvps, [memberId]: status },
-                        rsvpVia: { ...(item.rsvpVia ?? {}), [memberId]: "site" as const },
+                        rsvpVia: { ...(item.rsvpVia ?? {}), [memberId]: via },
                       }
                     : item
                 ),

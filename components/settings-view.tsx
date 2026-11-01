@@ -12,6 +12,7 @@ import { EntrancePromoPanel } from "@/components/entrance-promo";
 import { KibudPanel } from "@/components/kibud-panel";
 import { boardEnabled } from "@/lib/community-board";
 import { MemberAdmin, MemberDirectory } from "@/components/member-admin";
+import { MemberRsvpEditor } from "@/components/member-rsvp-editor";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -626,7 +627,7 @@ function InvitesSection() {
     <Section
       id="invites"
       title="הזמנות וצינתוק"
-      subtitle="המייל יוצא מכאן עם כפתורי הגעה. שליחת צינתוק מפעילה את שלוחה 5, לרשימה שרשומה שם. ליד כל תשובה כתוב אם אושרה במייל, בטלפון או באתר."
+      subtitle="המייל יוצא מכאן עם כפתורי הגעה. שליחת צינתוק מפעילה את שלוחה 5, לרשימה שרשומה שם. ליד כל תשובה כתוב אם אושרה במייל, בטלפון, באתר או באפליקציה. אפשר גם לעדכן תשובה ידנית."
       action={
         previewHref ? (
           <a
@@ -819,6 +820,11 @@ function MemberInvites({ event, note }: { event: Gathering; note: string }) {
                     {rsvpWithVia(status, event.rsvpVia?.[member.id])}
                   </span>
                 </div>
+                {event.status === "upcoming" ? (
+                  <div className="mt-2">
+                    <MemberRsvpEditor eventId={event.id} memberId={member.id} status={status} />
+                  </div>
+                ) : null}
                 <div className="truncate text-[12px] font-light text-muted-foreground">
                   {address ? <span className="[unicode-bidi:plaintext]" dir="ltr">{address}</span> : "אין כתובת מייל"}
                   <span className="px-1">·</span>

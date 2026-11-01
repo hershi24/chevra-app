@@ -10,6 +10,7 @@ import { EventDialog } from "@/components/event-dialog";
 import { NavigateLink } from "@/components/navigate-link";
 import { kibudTurn } from "@/lib/kibud";
 import { MediaProgressOverlay } from "@/components/media-progress";
+import { MemberRsvpEditor } from "@/components/member-rsvp-editor";
 import { UserAvatar } from "@/components/user-avatar";
 import { VoiceNotePlayer } from "@/components/voice-note-player";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   gatheringHeadline,
   memberById,
   rsvpLabel,
+  rsvpViaLabel,
   rsvpWithVia,
   splitGatheringTitle,
 } from "@/lib/format";
@@ -733,18 +735,39 @@ export function JournalDetail({
             {cancelled ? "מה ענו לפני הביטול" : "אישורי הגעה"}
           </h3>
           {cancelled ? <p className="mb-3 text-[13px] font-light text-muted-foreground">{answerTally}</p> : null}
+          {isUpcoming && isAdmin(me) ? (
+            <p className="mb-3 text-[13px] font-light text-muted-foreground">
+              מי שאמר בעל פה אפשר לעדכן כאן. ליד התשובה ייכתב «ידנית».
+            </p>
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-2">
             {state.members.map((member) => {
               const answer = event.rsvps[member.id] ?? "pending";
+              const editable = isUpcoming && isAdmin(me);
               return (
-                <div key={member.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-[14px]">
-                  <span className="flex items-center gap-2">
+                <div
+                  key={member.id}
+                  className={cn(
+                    "rounded-xl bg-white px-3 py-2 text-[14px]",
+                    editable ? "flex flex-col gap-2" : "flex items-center justify-between gap-3"
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
                     <UserAvatar member={member} size="sm" />
-                    {member.displayName}
+                    <span className="truncate">{member.displayName}</span>
+                    {editable && event.rsvpVia?.[member.id] ? (
+                      <span className="shrink-0 text-[12px] font-light text-muted-foreground">
+                        {rsvpViaLabel(event.rsvpVia[member.id])}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className={cn("text-xs font-medium", rsvpTone(answer))}>
-                    {rsvpWithVia(answer, event.rsvpVia?.[member.id])}
-                  </span>
+                  {editable ? (
+                    <MemberRsvpEditor eventId={event.id} memberId={member.id} status={answer} />
+                  ) : (
+                    <span className={cn("shrink-0 text-xs font-medium", rsvpTone(answer))}>
+                      {rsvpWithVia(answer, event.rsvpVia?.[member.id])}
+                    </span>
+                  )}
                 </div>
               );
             })}
