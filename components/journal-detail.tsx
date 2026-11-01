@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Mic, Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail, Mic, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { EventDialog } from "@/components/event-dialog";
@@ -26,7 +26,7 @@ import {
   rsvpWithVia,
   splitGatheringTitle,
 } from "@/lib/format";
-import { can, isAdmin } from "@/lib/permissions";
+import { can, isAdmin, isLeader } from "@/lib/permissions";
 import { gatheringHeld } from "@/lib/selectors";
 import type { EventMedia, Gathering, Member, RsvpStatus } from "@/lib/types";
 import { createLocalUpload, preloadMedia, uploadWithProgress } from "@/lib/upload-client";
@@ -107,6 +107,7 @@ export function JournalDetail({
   const [rsvping, setRsvping] = useState(false);
   const [cancelNote, setCancelNote] = useState("");
   const [sendingCancel, setSendingCancel] = useState(false);
+  const [sendingSummary, setSendingSummary] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef<HTMLDivElement>(null);
 
@@ -175,6 +176,39 @@ export function JournalDetail({
   const older = ordered[position - 1];
   const mosaic = visual.slice(0, 5);
   const canEditSummary = can(me, "uploadSummary");
+
+  async function sendLeaderSummary() {
+    if (!event || sendingSummary) return;
+    setSendingSummary(true);
+    try {
+      const res = await fetch("/api/attendance-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        sentCount?: number;
+        failedCount?: number;
+        leaders?: string[];
+        deliveries?: { status: string; error?: string; name?: string }[];
+      };
+      if (!res.ok) {
+        toast.error(data.error || "הסיכום לא נשלח");
+        return;
+      }
+      const names = data.leaders?.filter(Boolean) ?? [];
+      const who = names.length === 1 ? names[0] : "ראשי החברה";
+      const reason = data.deliveries?.find((row) => row.error)?.error;
+      if (data.sentCount && !data.failedCount) toast.success(`נשלח סיכום ל${who}`);
+      else if (data.sentCount) toast.success(`נשלח לחלק מהנמענים, ${data.failedCount} לא יצאו`);
+      else toast.error(reason || "הסיכום לא נשלח");
+    } catch {
+      toast.error("הסיכום לא נשלח");
+    } finally {
+      setSendingSummary(false);
+    }
+  }
 
   async function sendCancellation() {
     const current = event;
@@ -731,9 +765,22 @@ export function JournalDetail({
 
       {((!held && can(me, "viewRsvps")) || (event.status === "upcoming" && isAdmin(me))) ? (
         <div className="mt-9 px-5 md:px-8">
-          <h3 className={cn("text-[15px] font-medium", cancelled ? "mb-1" : "mb-3")}>
-            {cancelled ? "מה ענו לפני הביטול" : "אישורי הגעה"}
-          </h3>
+          <div className={cn("flex flex-wrap items-center justify-between gap-2", cancelled ? "mb-1" : "mb-3")}>
+            <h3 className="text-[15px] font-medium">{cancelled ? "מה ענו לפני הביטול" : "אישורי הגעה"}</h3>
+            {isLeader(me) ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-full"
+                disabled={sendingSummary}
+                onClick={() => void sendLeaderSummary()}
+              >
+                <Mail data-icon="inline-start" />
+                {sendingSummary ? "שולח…" : "סיכום לראש החברה"}
+              </Button>
+            ) : null}
+          </div>
           {cancelled ? <p className="mb-3 text-[13px] font-light text-muted-foreground">{answerTally}</p> : null}
           {event.status === "upcoming" && isAdmin(me) ? (
             <p className="mb-3 text-[13px] font-light text-muted-foreground">
