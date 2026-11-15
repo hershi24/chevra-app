@@ -1,5 +1,18 @@
 let workerReady = false;
 
+/** Same-origin address pdf.js can fetch. Files on the public host go through the server so the browser is not blocked. */
+export function pdfViewUrl(src: string) {
+  if (src.startsWith("/") && !src.startsWith("//")) return src;
+  return `/api/board-file?url=${encodeURIComponent(src)}`;
+}
+
+async function pdfBytes(src: string | ArrayBuffer) {
+  if (typeof src !== "string") return new Uint8Array(src.slice(0));
+  const response = await fetch(pdfViewUrl(src), { credentials: "same-origin" });
+  if (!response.ok) throw new Error("pdf");
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 export async function pdfPageImages(src: string | ArrayBuffer): Promise<string[]> {
   if (typeof document === "undefined") return [];
   const pdfjs = await import("pdfjs-dist");
@@ -7,9 +20,7 @@ export async function pdfPageImages(src: string | ArrayBuffer): Promise<string[]
     pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
     workerReady = true;
   }
-  const doc = await pdfjs.getDocument(
-    typeof src === "string" ? { url: src } : { data: new Uint8Array(src.slice(0)) }
-  ).promise;
+  const doc = await pdfjs.getDocument({ data: await pdfBytes(src), disableRange: true, disableStream: true }).promise;
   try {
     const images: string[] = [];
     const count = Math.min(doc.numPages, 6);

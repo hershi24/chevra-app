@@ -6,10 +6,12 @@ import { X } from "lucide-react";
 export function BoardViewer({
   title,
   pages,
+  fileUrl,
   onClose,
 }: {
   title: string;
   pages: string[];
+  fileUrl?: string;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -39,11 +41,15 @@ export function BoardViewer({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
-          {pages.map((src, index) => (
-            <img key={`${src.slice(0, 24)}-${index}`} src={src} alt="" className="w-full rounded-xl bg-white" />
-          ))}
-        </div>
+        {fileUrl ? (
+          <iframe title={title} src={fileUrl} className="mx-auto h-full min-h-[70vh] w-full max-w-3xl rounded-xl bg-white" />
+        ) : (
+          <div className="mx-auto flex max-w-3xl flex-col gap-4">
+            {pages.map((src, index) => (
+              <img key={`${src.slice(0, 24)}-${index}`} src={src} alt="" className="w-full rounded-xl bg-white" />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
