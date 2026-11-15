@@ -57,7 +57,7 @@ export function BoardFileCard({ title, url }: { title: string; url: string }) {
           <img
             src={preview}
             alt={title}
-            className="aspect-[3/4] w-full border-b border-[#e9ecef] bg-white object-cover object-top"
+            className="aspect-[3/4] w-full border-b border-[#e9ecef] bg-white object-contain object-top"
           />
           <span className="flex items-center justify-between gap-3 px-4 py-3">
             <span className="truncate text-[14.5px]">{title}</span>
@@ -80,10 +80,10 @@ export function BoardFileCard({ title, url }: { title: string; url: string }) {
           <span className="block truncate px-4 py-3 text-[14.5px]">{title}</span>
         </div>
       )}
-      {open && preview ? (
-        <BoardViewer title={title} pages={isImageUrl(url) ? [url] : pages} onClose={() => setOpen(false)} />
+      {open && viewUrl ? <BoardViewer title={title} pages={pages} fileUrl={viewUrl} onClose={() => setOpen(false)} /> : null}
+      {open && !viewUrl && preview ? (
+        <BoardViewer title={title} pages={[preview]} onClose={() => setOpen(false)} />
       ) : null}
-      {open && !preview && viewUrl ? <BoardViewer title={title} pages={[]} fileUrl={viewUrl} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
