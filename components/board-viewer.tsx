@@ -40,11 +40,11 @@ export function BoardViewer({
           <X className="size-4" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
+      <div className="min-h-0 flex-1 px-3 pb-4 sm:px-4">
         {fileUrl ? (
-          <iframe title={title} src={fileUrl} className="mx-auto h-full min-h-[70vh] w-full max-w-3xl rounded-xl bg-white" />
+          <iframe title={title} src={fileUrl} className="mx-auto h-full min-h-[78vh] w-full max-w-4xl rounded-xl bg-white" />
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          <div className="mx-auto flex max-w-3xl flex-col gap-4 overflow-y-auto">
             {pages.map((src, index) => (
               <img key={`${src.slice(0, 24)}-${index}`} src={src} alt="" className="w-full rounded-xl bg-white" />
             ))}
